@@ -1,0 +1,6 @@
+from .hybrid_recommender import HybridRecommender
+from .mastery_based import MasteryBasedRecommender, MasteryCalculator
+from .knowledge_graph_recommender import KnowledgeGraphRecommender
+from .collaborative_filtering import CollaborativeFiltering
+from .ripplenet import RippleNetRecommender
+from .multi_behavior import MultiBehaviorModel

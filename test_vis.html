@@ -1,0 +1,151 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <meta charset="UTF-8">
+    <title>知识图谱调试</title>
+    <script src="https://cdn.jsdelivr.net/npm/vis-network@9.1.2/standalone/umd/vis-network.min.js"></script>
+    <style>
+        body { font-family: Arial, sans-serif; padding: 20px; }
+        #mynetwork { width: 1000px; height: 600px; border: 2px solid #ddd; }
+        .error-log { background: #fee; padding: 10px; margin: 10px 0; border: 1px solid red; }
+        .success { background: #efe; padding: 10px; margin: 10px 0; border: 1px solid green; }
+    </style>
+</head>
+<body>
+    <h1>知识图谱调试页面</h1>
+    <div id="status"></div>
+    <div id="mynetwork"></div>
+
+    <script>
+        window.onerror = function(msg, url, line, col, error) {
+            var status = document.getElementById('status');
+            status.innerHTML = '<div class="error-log"><strong>JavaScript错误:</strong><br>' +
+                '消息: ' + msg + '<br>' +
+                '位置: ' + url + ' (行: ' + line + ', 列: ' + col + ')<br>' +
+                '错误对象: ' + (error ? error.stack : 'N/A') +
+                '</div>';
+            console.error('Error:', msg, url, line, col, error);
+            return false;
+        };
+
+        try {
+            // 从debug_graph.html复制实际的graphData
+            var graphData = {"edges": [{"from": "操作系统", "to": "第1章 操作系统概述", "type": "包含"}, {"from": "操作系统", "to": "第2章 进程与线程", "type": "包含"}, {"from": "操作系统", "to": "第3章 互斥与同步", "type": "包含"}], "nodes": [{"id": "操作系统", "label": "操作系统", "group": "root", "mastery": 0.0}, {"id": "第1章 操作系统概述", "label": "第1章 操作系统概述", "group": "chapter", "mastery": 0.0}]};
+
+            document.getElementById('status').innerHTML = '<div class="success">✓ graphData加载成功<br>节点数: ' + graphData.nodes.length + '<br>边数: ' + graphData.edges.length + '</div>';
+
+            console.log('Graph data loaded:', graphData);
+
+            // 测试vis库是否加载
+            if (typeof vis === 'undefined') {
+                throw new Error('vis.js库未加载！');
+            }
+            console.log('vis library loaded:', vis);
+
+            var nodesArr = graphData.nodes.map(function(n) {
+                return {
+                    id: n.id,
+                    label: n.label,
+                    group: n.group,
+                    mastery: n.mastery,
+                    shape: 'circle',
+                    size: 50,
+                    color: { background: '#3498db', border: '#2980b9' },
+                    font: { size: 11, face: 'Arial', align: 'center' },
+                    borderWidth: 2,
+                    borderWidthSelected: 3
+                };
+            });
+
+            var edgesArr = graphData.edges.map(function(e) {
+                return {
+                    from: e.from,
+                    to: e.to,
+                    arrows: 'to'
+                };
+            });
+
+            var nodes = new vis.DataSet(nodesArr);
+            var edges = new vis.DataSet(edgesArr);
+            var data = { nodes: nodes, edges: edges };
+
+            var options = {
+                physics: {
+                    enabled: true,
+                    solver: 'forceAtlas2Based',
+                    forceAtlas2Based: {
+                        gravitationalConstant: -300,
+                        centralGravity: 0.005,
+                        springLength: 150,
+                        springConstant: 0.15,
+                        damping: 0.3,
+                        avoidOverlap: 1.0
+                    },
+                    stabilization: {
+                        enabled: true,
+                        iterations: 2000,
+                        updateInterval: 25,
+                        onlyDynamicEdges: false,
+                        fit: true
+                    },
+                    timestep: 0.2,
+                    adaptiveTimestep: true,
+                    maxVelocity: 10
+                },
+                interaction: {
+                    hover: true,
+                    tooltipDelay: 100,
+                    zoomView: true,
+                    dragView: true
+                },
+                nodes: {
+                    scaling: {
+                        min: 20,
+                        max: 80
+                    },
+                    font: {
+                        size: 11,
+                        face: 'Arial'
+                    }
+                },
+                edges: {
+                    smooth: {
+                        enabled: true,
+                        type: 'continuous',
+                        roundness: 0.2
+                    },
+                    width: 1.5,
+                    length: 150
+                }
+            };
+
+            var container = document.getElementById('mynetwork');
+            var network = new vis.Network(container, data, options);
+
+            document.getElementById('status').innerHTML += '<div class="success">✓ 网络创建成功！知识图谱应该显示在下方。</div>';
+
+            network.on('stabilizationProgress', function(params) {
+                console.log('物理稳定化进度:', params.iterations, '/', params.total);
+            });
+
+            network.on('stabilizationIterationsDone', function() {
+                console.log('✓ 物理稳定化完成');
+                document.getElementById('status').innerHTML += '<div class="success">✓ 物理引擎已稳定</div>';
+            });
+
+            network.on('startStabilizing', function() {
+                console.log('开始物理稳定化...');
+            });
+
+            setTimeout(function() {
+                var physicsStatus = network.isPhysicsActive();
+                console.log('物理引擎状态:', physicsStatus ? '运行中' : '已停止');
+            }, 2000);
+
+        } catch(e) {
+            document.getElementById('status').innerHTML += '<div class="error-log"><strong>执行错误:</strong><br>' + e.message + '<br><pre>' + e.stack + '</pre></div>';
+            console.error('Execution error:', e);
+        }
+    </script>
+</body>
+</html>

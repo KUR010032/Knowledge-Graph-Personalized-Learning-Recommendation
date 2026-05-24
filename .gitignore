@@ -1,0 +1,33 @@
+# Python / Flask cache
+__pycache__/
+*.py[cod]
+*.pyo
+.pytest_cache/
+
+# Local runtime logs and temporary checks
+*.log
+.tmp_*
+.parse-check.mjs
+app/_page_script.js
+app/_runcheck.js
+
+# Local environments and editor files
+.env
+.venv/
+venv/
+env/
+.vscode/
+.idea/
+
+# Large course / thesis binaries stay on disk but are not stored in Git.
+# Keep source code, JSON data, and scripts versioned; use separate backups for media/documents.
+*.mp4
+*.pdf
+*.ppt
+*.pptx
+*.doc
+*.docx
+
+# OS files
+Thumbs.db
+.DS_Store

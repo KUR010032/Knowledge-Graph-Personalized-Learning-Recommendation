@@ -1,0 +1,1052 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <meta charset="UTF-8">
+    <title>资源推荐 - {{ student_name }}</title>
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body { font-family: 'Microsoft YaHei', 'SimHei', Arial, sans-serif; background-color: #f0f2f5; color: #333; display: flex; height: 100vh; overflow: hidden; }
+        
+        .sidebar { width: 200px; background: #2c3e50; color: white; display: flex; flex-direction: column; }
+        .sidebar-header { padding: 20px; border-bottom: 1px solid #34495e; }
+        .sidebar-header h3 { font-size: 15px; margin-bottom: 5px; font-weight: normal; color: #ecf0f1; }
+        .sidebar-header .user-badge { font-size: 12px; color: #95a5a6; }
+        
+        .nav-menu { flex: 1; padding: 10px 0; }
+        .nav-item { padding: 12px 20px; cursor: pointer; display: flex; align-items: center; gap: 10px; font-size: 14px; text-decoration: none; color: #bdc3c7; border-left: 3px solid transparent; }
+        .nav-item:hover { background: #34495e; color: white; }
+        .nav-item.active { background: #34495e; color: white; border-left-color: #3498db; }
+        .nav-item i { width: 18px; text-align: center; font-size: 16px; }
+        
+        .sidebar-footer { padding: 15px 20px; border-top: 1px solid #34495e; }
+        .logout-btn { width: 100%; padding: 8px; background: #e74c3c; color: white; border: none; border-radius: 3px; cursor: pointer; font-size: 13px; }
+        .logout-btn:hover { background: #c0392b; }
+        
+        .main-content { flex: 1; display: flex; flex-direction: column; overflow: hidden; }
+        .top-bar { background: white; padding: 12px 20px; border-bottom: 1px solid #e0e0e0; display: flex; justify-content: space-between; align-items: center; }
+        .top-bar h2 { color: #333; font-size: 16px; font-weight: normal; }
+        
+        .content-area { flex: 1; padding: 20px; overflow-y: auto; }
+        .card { background: white; padding: 20px; border: 1px solid #e0e0e0; margin-bottom: 15px; }
+        h3 { color: #333; margin-top: 0; margin-bottom: 15px; font-size: 15px; font-weight: normal; border-bottom: 1px solid #e0e0e0; padding-bottom: 10px; }
+        
+        .video-modal { display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.8); z-index: 1000; justify-content: center; align-items: center; }
+        .video-modal.show { display: flex; }
+        .video-container { background: white; border-radius: 12px; padding: 20px; max-width: 900px; width: 90%; position: relative; }
+        .video-close { position: absolute; top: 10px; right: 15px; font-size: 24px; cursor: pointer; color: #666; }
+        .video-close:hover { color: #333; }
+        .video-title { margin: 0 0 15px 0; color: #2c3e50; }
+        video { width: 100%; border-radius: 8px; background: #000; }
+        
+        .practice-btn { padding: 10px 20px; background: #9b59b6; color: white; border: none; border-radius: 6px; cursor: pointer; font-size: 14px; }
+        .practice-btn:hover { background: #8e44ad; }
+        .practice-btn:disabled { background: #bdc3c7; cursor: not-allowed; }
+        .question-box { background: #f8f9fa; padding: 20px; border-radius: 8px; margin-bottom: 15px; }
+        .question-title { font-size: 16px; font-weight: bold; color: #2c3e50; margin-bottom: 10px; }
+        .question-kp { font-size: 14px; color: #7f8c8d; margin-bottom: 15px; }
+        .question-options { display: flex; flex-direction: column; gap: 10px; margin-top: 15px; }
+        .option-btn { padding: 12px; border: 2px solid #ddd; border-radius: 6px; cursor: pointer; font-size: 14px; background: white; text-align: left; transition: all 0.3s; }
+        .option-btn:hover { border-color: #3498db; background: #ebf5fb; }
+        .option-btn.selected { border-color: #3498db; background: #ebf5fb; }
+        .option-btn.correct { border-color: #27ae60; background: #d5f4e6; }
+        .option-btn.wrong { border-color: #e74c3c; background: #fdeaea; }
+        .result-box { padding: 15px; border-radius: 8px; margin-top: 15px; text-align: center; }
+        .result-correct { background: #d5f4e6; color: #27ae60; }
+        .result-wrong { background: #fdeaea; color: #e74c3c; }
+        
+        .difficulty-badge { font-size: 11px; padding: 2px 8px; border-radius: 10px; }
+        .difficulty-easy { background: #d5f4e6; color: #27ae60; }
+        .difficulty-medium { background: #fef9e7; color: #f39c12; }
+        .difficulty-hard { background: #fdeaea; color: #e74c3c; }
+        
+        .kp-tag { font-size: 11px; padding: 2px 8px; border-radius: 10px; background: #ebf5fb; color: #3498db; }
+    </style>
+</head>
+<body>
+
+<div class="video-modal" id="videoModal" onclick="closeVideoModal(event)">
+    <div class="video-container" onclick="event.stopPropagation()">
+        <span class="video-close" onclick="closeVideoModal()">&times;</span>
+        <h3 class="video-title" id="videoTitle"></h3>
+        <div style="position:relative;width:100%;padding-top:56.25%;background:black;border-radius:8px;overflow:hidden;">
+            <video id="videoPlayer" controls style="position:absolute;top:0;left:0;width:100%;height:100%;object-fit:contain;">
+                您的浏览器不支持视频播放
+            </video>
+        </div>
+    </div>
+</div>
+
+<div class="sidebar">
+    <div class="sidebar-header">
+        <h3>学习推荐系统</h3>
+        <div class="user-badge">{{ student_name }}</div>
+    </div>
+    
+    <div class="nav-menu">
+        <a href="/student/graph" class="nav-item {% if active_page == 'graph' %}active{% endif %}">
+            <i>&#128200;</i> 学习画像
+        </a>
+        <a href="/student/progress" class="nav-item {% if active_page == 'progress' %}active{% endif %}">
+            <i>&#128197;</i> 学习进度
+        </a>
+        <a href="/student/recommend" class="nav-item {% if active_page == 'recommend' %}active{% endif %}">
+            <i>&#127919;</i> 资源推荐
+        </a>
+        <a href="/student/resources" class="nav-item {% if active_page == 'resources' %}active{% endif %}">
+            <i>&#128218;</i> 学习资源
+        </a>
+    </div>
+    
+    <div class="sidebar-footer">
+        <button class="logout-btn" onclick="location.href='/logout'">退出登录</button>
+    </div>
+</div>
+
+<div class="main-content">
+    <div class="top-bar">
+        <h2>资源推荐</h2>
+    </div>
+    
+    <div class="content-area">
+        <div id="recommendList"><p style='color:#95a5a6;text-align:center;padding:40px;'>加载中...</p></div>
+    </div>
+</div>
+
+<script>
+(function() {
+    var container = document.getElementById("recommendList");
+    var _v = "2026";
+    var selectedTarget = "";
+
+    function load() {
+        if (!container) return;
+        container.innerHTML = "<p style='color:#95a5a6;text-align:center;padding:40px;'>正在加载...</p>";
+        var targetParam = selectedTarget ? "&target_kp=" + encodeURIComponent(selectedTarget) : "";
+        fetch("/student/recommend/data?v=" + _v + targetParam + "&t=" + Date.now(), {credentials:"include"})
+            .then(function(r) { return r.json(); })
+            .then(function(data) {
+                console.log("Data:", data);
+                if (data.success && data.recommended_items) {
+                    render(data);
+                } else {
+                    container.innerHTML = "<p style='color:red;text-align:center;padding:40px;'>" + (data.error || "无数据") + "</p>";
+                }
+            })
+            .catch(function(err) {
+                console.error("Error:", err);
+                container.innerHTML = "<p style='color:red;text-align:center;padding:40px;'>网络错误: " + err.message + "</p>";
+            });
+    }
+
+    function render(data) {
+        container.innerHTML = "";
+        if (!data.success) {
+            container.innerHTML = "<p style='color:red;text-align:center;padding:40px;'>" + (data.error || "加载失败") + "</p>";
+            return;
+        }
+
+        if (data.path_recommendation) {
+            renderPathRecommendation(data);
+            return;
+        }
+
+        var items = data.recommended_items || [];
+        var weakPoints = data.weak_points || [];
+
+        if (items.length === 0) {
+            container.innerHTML = "<p style='text-align:center;color:#95a5a6;padding:40px;'>暂无推荐内容</p>";
+            return;
+        }
+
+        // 分类数据
+        var allQuestions = [];
+        var videoResources = [];
+        var docResources = [];
+        
+        items.forEach(function(item) {
+            if (item.questions) item.questions.forEach(function(q) { allQuestions.push({question: q, item: item}); });
+            if (item.resources) {
+                item.resources.forEach(function(res) {
+                    var ext = res.name.split(".").pop();
+                    if (ext === "mp4") {
+                        videoResources.push({resource: res, item: item});
+                    } else {
+                        docResources.push({resource: res, item: item});
+                    }
+                });
+            }
+        });
+
+        // 分类标签栏
+        var tabContainer = document.createElement("div");
+        tabContainer.style.cssText = "margin-bottom:20px;background:white;border-radius:10px;padding:5px;display:flex;gap:5px;box-shadow:0 2px 8px rgba(0,0,0,0.08);";
+        
+        var tabs = [
+            {id: 'practice', label: '✏️ 推荐练习', count: allQuestions.length, color: '#667eea'},
+            {id: 'video', label: '🎬 视频资源', count: videoResources.length, color: '#e74c3c'},
+            {id: 'doc', label: '📄 文档资源', count: docResources.length, color: '#27ae60'}
+        ];
+        
+        tabs.forEach(function(tab, idx) {
+            var tabBtn = document.createElement("div");
+            tabBtn.id = "tab-" + tab.id;
+            tabBtn.style.cssText = "flex:1;padding:12px;text-align:center;border-radius:8px;cursor:pointer;font-size:14px;font-weight:bold;color:" + (idx === 0 ? "white" : "#666") + ";background:" + (idx === 0 ? tab.color : "transparent") + ";transition:all 0.3s;";
+            tabBtn.innerHTML = tab.label + (tab.count > 0 ? " <span style='background:rgba(255,255,255,0.3);padding:1px 8px;border-radius:10px;font-size:11px;margin-left:4px;'>" + tab.count + "</span>" : "");
+            tabBtn.onclick = function() { switchTab(tab.id); };
+            tabContainer.appendChild(tabBtn);
+        });
+        
+        container.appendChild(tabContainer);
+
+        // 内容容器
+        var contentDiv = document.createElement("div");
+        contentDiv.id = "tabContent";
+        container.appendChild(contentDiv);
+
+        window._tabData = {
+            questions: allQuestions,
+            videos: videoResources,
+            docs: docResources,
+            weakPoints: weakPoints,
+            items: items,
+            resources: data.resources || []
+        };
+
+        switchTab('practice');
+    }
+
+    function esc(text) {
+        return String(text || "").replace(/[&<>"']/g, function(ch) {
+            return {"&":"&amp;","<":"&lt;",">":"&gt;","\"":"&quot;","'":"&#39;"}[ch];
+        });
+    }
+
+    function statusColor(status) {
+        if (status === "严重薄弱") return "#e74c3c";
+        if (status === "薄弱") return "#f39c12";
+        if (status === "基本掌握") return "#3498db";
+        return "#27ae60";
+    }
+
+    function renderPathRecommendation(data) {
+        var pr = data.path_recommendation || {};
+        var weak = pr.weak_diagnosis || [];
+        var options = pr.target_options || [];
+        var path = pr.learning_path || [];
+        if (!selectedTarget) selectedTarget = pr.selected_target || "";
+        container.innerHTML = "";
+
+        var html = "";
+        html += '<div class="card" style="border-left:4px solid #3498db;">';
+        html += '<h3 style="font-size:18px;">知识点掌握度诊断</h3>';
+        html += '<p style="font-size:13px;color:#7f8c8d;margin-bottom:12px;">先诊断薄弱知识点，再沿先修关系生成补救路径，最后为路径节点推荐资源。</p>';
+        if (weak.length === 0) {
+            html += '<div style="padding:12px;background:#d5f4e6;color:#27ae60;border-radius:6px;">当前没有低于 0.70 的薄弱知识点。</div>';
+        } else {
+            html += '<div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(260px,1fr));gap:10px;">';
+            weak.slice(0, 9).forEach(function(kp, idx) {
+                html += '<div style="padding:12px;background:#f8f9fa;border-radius:8px;border-left:3px solid '+statusColor(kp.status)+';">';
+                html += '<div style="font-weight:bold;color:#2c3e50;">'+(idx+1)+'. '+esc(kp.name)+'</div>';
+                html += '<div style="margin-top:6px;font-size:13px;color:#555;">掌握度 <strong>'+Number(kp.score).toFixed(2)+'</strong> · <span style="color:'+statusColor(kp.status)+';font-weight:bold;">'+esc(kp.status)+'</span></div>';
+                html += '</div>';
+            });
+            html += '</div>';
+        }
+        html += '</div>';
+
+        html += '<div class="card" style="border-left:4px solid #9b59b6;">';
+        html += '<h3 style="font-size:18px;">学习目标选择</h3>';
+        html += '<div style="display:flex;gap:12px;align-items:center;flex-wrap:wrap;">';
+        html += '<select id="targetSelect" style="min-width:320px;padding:10px;border:1px solid #ddd;border-radius:6px;font-size:14px;">';
+        options.forEach(function(opt) {
+            var selected = opt.name === pr.selected_target ? ' selected' : '';
+            html += '<option value="'+esc(opt.name)+'"'+selected+'>'+esc(opt.name)+'（'+Number(opt.score).toFixed(2)+'，'+esc(opt.status)+'）</option>';
+        });
+        html += '</select>';
+        html += '<button class="practice-btn" id="regenPathBtn" style="background:#3498db;">生成补救路径</button>';
+        html += '</div>';
+        html += '<p style="margin-top:10px;color:#7f8c8d;font-size:13px;">当前目标：<strong style="color:#2c3e50;">'+esc(pr.selected_target || "")+'</strong></p>';
+        html += '</div>';
+
+        html += '<div class="card" style="border-left:4px solid #e67e22;">';
+        html += '<h3 style="font-size:18px;">个性化补救学习路径</h3>';
+        if (path.length === 0) {
+            html += '<div style="padding:16px;background:#f8f9fa;border-radius:8px;color:#7f8c8d;">该目标的先修链掌握情况良好，暂无需要补救的路径节点。</div>';
+        } else {
+            path.forEach(function(step) {
+                html += '<div style="margin:14px 0;padding:16px;border:1px solid #eee;border-radius:10px;background:#fff;">';
+                html += '<div style="font-size:16px;font-weight:bold;color:#2c3e50;">第'+step.step+'步：'+esc(step.knowledge_point)+'</div>';
+                html += '<div style="margin-top:6px;font-size:13px;color:#555;">掌握度 '+Number(step.mastery).toFixed(2)+' · <span style="color:'+statusColor(step.status)+';font-weight:bold;">'+esc(step.status)+'</span> · KScore '+Number(step.knowledge_score).toFixed(3)+'</div>';
+                html += '<div style="margin-top:10px;padding:10px;background:#fef9e7;border-radius:6px;color:#7d6608;font-size:13px;">'+esc(step.explain)+'</div>';
+                html += '<div style="margin-top:12px;font-weight:bold;color:#2c3e50;">推荐资源</div>';
+                var resources = step.resources || [];
+                if (resources.length === 0) {
+                    html += '<div style="margin-top:8px;color:#95a5a6;font-size:13px;">暂无匹配资源。</div>';
+                } else {
+                    resources.forEach(function(res) {
+                        var isVideo = res.resource_type === "video";
+                        html += '<div style="margin-top:8px;padding:12px;background:#f8f9fa;border-radius:8px;display:flex;justify-content:space-between;gap:12px;align-items:center;">';
+                        html += '<div style="flex:1;min-width:0;">';
+                        html += '<div style="font-weight:bold;color:#2c3e50;">'+(isVideo ? "🎬 " : "📄 ")+esc(res.name)+'</div>';
+                        html += '<div style="font-size:12px;color:#7f8c8d;margin-top:4px;">RScore '+Number(res.score).toFixed(3)+' · 内容匹配 '+Number(res.score_detail.content_match).toFixed(2)+' · 薄弱覆盖 '+Number(res.score_detail.weak_cover).toFixed(2)+' · 难度匹配 '+Number(res.score_detail.difficulty_match).toFixed(2)+'</div>';
+                        html += '<ul style="margin:6px 0 0 16px;color:#555;font-size:12px;line-height:1.6;">';
+                        (res.reasons || []).forEach(function(reason) { html += '<li>'+esc(reason)+'</li>'; });
+                        html += '</ul></div>';
+                        if (isVideo) {
+                            html += '<button class="practice-btn path-video-btn" data-video="'+esc(res.name)+'" style="background:#9b59b6;white-space:nowrap;">播放</button>';
+                        }
+                        html += '<a href="/download/'+encodeURIComponent(res.name)+'" style="padding:9px 14px;background:#27ae60;color:white;text-decoration:none;border-radius:6px;font-size:13px;white-space:nowrap;">下载</a>';
+                        html += '</div>';
+                    });
+                }
+                html += '</div>';
+            });
+        }
+        html += '</div>';
+
+        html += '<div class="card" style="border-left:4px solid #95a5a6;">';
+        html += '<h3 style="font-size:18px;">推荐公式</h3>';
+        html += '<div style="font-family:Consolas,monospace;font-size:13px;line-height:1.8;color:#2c3e50;">';
+        html += '<div>KScore = '+esc(pr.formulas && pr.formulas.knowledge_score)+'</div>';
+        html += '<div>RScore = '+esc(pr.formulas && pr.formulas.resource_score)+'</div>';
+        html += '</div></div>';
+
+        container.innerHTML = html;
+
+        var targetSelect = document.getElementById("targetSelect");
+        var regenBtn = document.getElementById("regenPathBtn");
+        if (regenBtn && targetSelect) {
+            regenBtn.onclick = function() {
+                selectedTarget = targetSelect.value;
+                load();
+            };
+            targetSelect.onchange = regenBtn.onclick;
+        }
+        document.querySelectorAll(".path-video-btn").forEach(function(btn) {
+            btn.onclick = function() {
+                showVideoPlayer(btn.getAttribute("data-video"));
+            };
+        });
+    }
+    
+    window.switchTab = function(tabId) {
+        var tabs = ['practice', 'video', 'doc'];
+        var colors = {'practice': '#667eea', 'video': '#e74c3c', 'doc': '#27ae60'};
+        
+        tabs.forEach(function(t) {
+            var tabEl = document.getElementById('tab-' + t);
+            if (tabEl) {
+                if (t === tabId) {
+                    tabEl.style.background = colors[t];
+                    tabEl.style.color = "white";
+                } else {
+                    tabEl.style.background = "transparent";
+                    tabEl.style.color = "#666";
+                }
+            }
+        });
+
+        var contentDiv = document.getElementById('tabContent');
+        var d = window._tabData;
+        
+        if (tabId === 'practice') {
+            renderPracticeTab(contentDiv, d.questions, d.weakPoints, d.items, d.resources);
+        } else if (tabId === 'video') {
+            renderVideoTab(contentDiv, d.videos);
+        } else if (tabId === 'doc') {
+            renderDocTab(contentDiv, d.docs);
+        }
+    };
+    
+    window.renderPracticeTab = function(container, questions, weakPoints, items, resources) {
+        container.innerHTML = "";
+        
+        if (questions.length === 0) {
+            container.innerHTML = "<div style='text-align:center;padding:40px;color:#95a5a6;'><div style='font-size:48px;margin-bottom:15px;'>📝</div><div>暂无推荐练习</div></div>";
+            return;
+        }
+
+        var headerDiv = document.createElement("div");
+        headerDiv.style.cssText = "margin-bottom:20px;";
+        headerDiv.innerHTML =
+            "<h3 style='color:#2c3e50;margin-bottom:8px;font-size:18px;'>✏️ 推荐练习</h3>" +
+            "<p style='color:#7f8c8d;font-size:13px;'>基于薄弱点生成的针对性练习，共 <strong style='color:#667eea;'>" + questions.length + "</strong> 道题</p>";
+        container.appendChild(headerDiv);
+
+        var practiceSection = document.createElement("div");
+        practiceSection.style.cssText = "padding:25px;background:linear-gradient(135deg,#667eea 0%,#764ba2 100%);border-radius:12px;color:white;box-shadow:0 4px 15px rgba(102,126,234,0.3);";
+        practiceSection.innerHTML =
+            "<h4 style='margin:0 0 15px 0;font-size:16px;'>🎯 开始针对性练习</h4>" +
+            "<p style='font-size:13px;opacity:0.9;margin:0 0 20px 0;line-height:1.6;'>";
+        
+        if (weakPoints && weakPoints.length > 0) {
+            var wpNames = weakPoints.slice(0, 3).map(function(wp) { 
+                return wp.name.split(' ').slice(1).join(' ') || wp.name; 
+            }).join('、');
+            practiceSection.innerHTML += "针对薄弱点：<strong>" + wpNames + "</strong></p>";
+        } else {
+            practiceSection.innerHTML += "根据你的学习情况智能生成</p>";
+        }
+
+        var startBtn = document.createElement("button");
+        startBtn.style.cssText = "width:100%;padding:14px;background:white;color:#667eea;border:none;border-radius:8px;font-size:15px;font-weight:bold;cursor:pointer;transition:transform 0.2s;";
+        startBtn.textContent = "🚀 开始练习 (" + questions.length + "题)";
+        startBtn.onmouseover = function() { this.style.transform = "scale(1.02)"; };
+        startBtn.onmouseout = function() { this.style.transform = "scale(1)"; };
+        startBtn.onclick = (function() {
+            var qs = questions.map(function(q) { return q.question; });
+            return function() { startPractice(qs, "", weakPoints, items, resources); };
+        })();
+        practiceSection.appendChild(startBtn);
+        container.appendChild(practiceSection);
+    };
+    
+    window.renderVideoTab = function(container, videos) {
+        container.innerHTML = "";
+        
+        if (videos.length === 0) {
+            container.innerHTML = "<div style='text-align:center;padding:40px;color:#95a5a6;'><div style='font-size:48px;margin-bottom:15px;'>🎬</div><div>暂无视频推荐</div></div>";
+            return;
+        }
+
+        var headerDiv = document.createElement("div");
+        headerDiv.style.cssText = "margin-bottom:20px;";
+        headerDiv.innerHTML =
+            "<h3 style='color:#2c3e50;margin-bottom:8px;font-size:18px;'>🎬 视频资源</h3>" +
+            "<p style='color:#7f8c8d;font-size:13px;'>推荐 <strong style='color:#e74c3c;'>" + videos.length + "</strong> 个教学视频，点击可预览</p>";
+        container.appendChild(headerDiv);
+
+        videos.forEach(function(vData, idx) {
+            var res = vData.resource;
+            var item = vData.item;
+            
+            var card = document.createElement("div");
+            card.style.cssText = "margin:12px 0;background:white;border-radius:10px;box-shadow:0 2px 10px rgba(0,0,0,0.06);overflow:hidden;cursor:pointer;";
+            (function(videoName) {
+                card.onclick = function(e) { 
+                    if (e.target.closest('.video-right-panel')) return; 
+                    showVideoPlayer(videoName); 
+                };
+            })(res.name);
+
+            var videoRow = document.createElement("div");
+            videoRow.style.cssText = "display:flex;";
+
+            var midCol = document.createElement("div");
+            midCol.style.cssText = "width:50%;position:relative;background:#000;";
+            var aspectContainer = document.createElement("div");
+            aspectContainer.style.cssText = "position:relative;width:100%;padding-top:56.25%;background:linear-gradient(135deg,#1a1a2e 0%,#16213e 100%);display:flex;align-items:center;justify-content:center;";
+            aspectContainer.innerHTML = "<div style='position:absolute;top:50%;left:50%;transform:translate(-50%,-50%);text-align:center;'><div style='font-size:36px;color:rgba(255,255,255,0.7);'>▶</div><div style='color:rgba(255,255,255,0.5);font-size:11px;margin-top:5px;'>点击播放</div></div>";
+            var hdTag = document.createElement("span");
+            hdTag.style.cssText = "position:absolute;top:8px;left:8px;padding:3px 7px;background:#e74c3c;color:white;border-radius:4px;font-size:11px;font-weight:bold;";
+            hdTag.textContent = "HD";
+            aspectContainer.appendChild(hdTag);
+            midCol.appendChild(aspectContainer);
+            videoRow.appendChild(midCol);
+
+            var rightCol = document.createElement("div");
+            rightCol.className = "video-right-panel";
+            rightCol.style.cssText = "width:50%;padding:14px 16px;display:flex;flex-direction:column;justify-content:space-between;overflow:hidden;";
+
+            var titleSpan = document.createElement("div");
+            titleSpan.style.cssText = "font-size:15px;font-weight:bold;color:#2c3e50;margin-bottom:8px;line-height:1.4;";
+            titleSpan.textContent = "#" + (idx+1) + " " + res.name.replace(/\.[^.]+$/, "");
+            rightCol.appendChild(titleSpan);
+
+            var keyWeakPoints = (item.weak_points || []).slice().sort(function(a, b) {
+                return (a.mastery || 1) - (b.mastery || 1);
+            }).slice(0, 3);
+
+            if (keyWeakPoints.length > 0) {
+                var weakSection = document.createElement("div");
+                weakSection.style.cssText = "background:#fef5f5;padding:8px 10px;border-radius:6px;border-left:3px solid #e74c3c;margin-bottom:8px;";
+                var weakTitle = document.createElement("strong");
+                weakTitle.style.color = "#c0392b";
+                weakTitle.style.fontSize = "12px";
+                weakTitle.textContent = "📌 相关知识点";
+                weakSection.appendChild(weakTitle);
+                var weakList = document.createElement("div");
+                weakList.style.cssText = "margin-top:4px;font-size:11px;color:#555;line-height:1.5;";
+                weakList.innerHTML = keyWeakPoints.map(function(wp) {
+                    var masteryPct = Math.round((wp.mastery||0)*100);
+                    var masteryColor = masteryPct < 40 ? '#e74c3c' : (masteryPct < 70 ? '#f39c12' : '#27ae60');
+                    return "<div style='margin:1px 0;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;'>• " + (wp.name.split(' ').slice(1).join(' ') || wp.name) + " <span style='color:" + masteryColor + ";'>掌握度:" + masteryPct + "%</span></div>";
+                }).join("");
+                weakSection.appendChild(weakList);
+                rightCol.appendChild(weakSection);
+            }
+
+            if (item.key_points && item.key_points.length > 0) {
+                var keySection = document.createElement("div");
+                keySection.style.cssText = "background:#fef9e7;padding:8px 10px;border-radius:6px;border-left:3px solid #f39c12;margin-top:6px;";
+                var keyTitle = document.createElement("strong");
+                keyTitle.style.color = "#d68910";
+                keyTitle.style.fontSize = "12px";
+                keyTitle.textContent = "⭐ 涉及重点";
+                keySection.appendChild(keyTitle);
+                var keyTags = document.createElement("div");
+                keyTags.style.cssText = "margin-top:4px;font-size:11px;color:#555;line-height:1.5;";
+                keyTags.innerHTML = item.key_points.slice(0, 2).map(function(kp) { 
+                    return "<div style='margin:1px 0;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;'>• " + (kp.name.split(' ').slice(1).join(' ') || kp.name) + "</div>"; 
+                }).join("");
+                keySection.appendChild(keyTags);
+                rightCol.appendChild(keySection);
+            }
+
+            if (item.weak_points && item.weak_points.length > 0) {
+                var videoReasonDiv = document.createElement("div");
+                videoReasonDiv.style.cssText = "background:#f0f7ff;padding:8px 10px;border-radius:6px;border-left:3px solid #3498db;margin-top:6px;font-size:10px;color:#444;line-height:1.5;overflow:hidden;";
+                
+                var weakestVideoKp = item.weak_points[0];
+                var weakestVideoMastery = Math.round((weakestVideoKp.mastery || 0) * 100);
+                var reasonHtml = "<strong style='color:#2980b9;'>💡 推荐:</strong> ";
+                reasonHtml += "针对 <span style='color:#e74c3c;'>" + (weakestVideoKp.name.split(' ').slice(1).join(' ') || weakestVideoKp.name).substring(0, 15) + "...</span> (" + weakestVideoMastery + "%)";
+                
+                if (weakestVideoMastery < 40) {
+                    reasonHtml += "<br><span style='color:#e74c3c;'>📌 建议先看视频理解概念</span>";
+                }
+                
+                videoReasonDiv.innerHTML = reasonHtml;
+                rightCol.appendChild(videoReasonDiv);
+            }
+
+            var downloadBtn = document.createElement("a");
+            downloadBtn.href = "/download/" + encodeURIComponent(res.name);
+            downloadBtn.style.cssText = "display:inline-block;padding:8px 16px;background:#27ae60;color:white;text-decoration:none;border-radius:6px;font-size:12px;font-weight:bold;margin-top:auto;text-align:center;";
+            downloadBtn.textContent = "📥 下载";
+            (function(rname) {
+                downloadBtn.onclick = function(e) { 
+                    e.stopPropagation(); 
+                    fetch("/student/resource/download", {
+                        method: "POST",
+                        headers: {"Content-Type": "application/json"},
+                        body: JSON.stringify({resource_name: rname})
+                    }).catch(function(){});
+                };
+            })(res.name);
+            rightCol.appendChild(downloadBtn);
+
+            videoRow.appendChild(rightCol);
+            card.appendChild(videoRow);
+            container.appendChild(card);
+        });
+    };
+    
+    window.renderDocTab = function(container, docs) {
+        container.innerHTML = "";
+        
+        if (docs.length === 0) {
+            container.innerHTML = "<div style='text-align:center;padding:40px;color:#95a5a6;'><div style='font-size:48px;margin-bottom:15px;'>📄</div><div>暂无文档推荐</div></div>";
+            return;
+        }
+
+        var headerDiv = document.createElement("div");
+        headerDiv.style.cssText = "margin-bottom:20px;";
+        headerDiv.innerHTML =
+            "<h3 style='color:#2c3e50;margin-bottom:8px;font-size:18px;'>📄 文档资源</h3>" +
+            "<p style='color:#7f8c8d;font-size:13px;'>推荐 <strong style='color:#27ae60;'>" + docs.length + "</strong> 个学习文档（PPT、PDF等）</p>";
+        container.appendChild(headerDiv);
+
+        var seenResNames = {};
+        docs.forEach(function(dData, idx) {
+            var res = dData.resource;
+            var item = dData.item;
+            
+            if (seenResNames[res.name]) return;
+            seenResNames[res.name] = true;
+
+            var card = document.createElement("div");
+            card.style.cssText = "margin:12px 0;padding:18px;background:white;border-radius:10px;border-left:4px solid #27ae60;box-shadow:0 2px 10px rgba(0,0,0,0.06);";
+
+            var resHeader = document.createElement("div");
+            resHeader.style.cssText = "display:flex;justify-content:space-between;align-items:center;margin-bottom:12px;";
+            var titlePart = document.createElement("div");
+            titlePart.style.display = "flex";
+            titlePart.style.alignItems = "center";
+
+            var numBadge = document.createElement("span");
+            numBadge.style.cssText = "display:inline-block;width:26px;height:26px;line-height:26px;text-align:center;background:#27ae60;color:white;border-radius:50%;font-weight:bold;font-size:13px;margin-right:10px;";
+            numBadge.textContent = idx + 1;
+            titlePart.appendChild(numBadge);
+
+            var resName = document.createElement("span");
+            resName.style.cssText = "font-size:16px;font-weight:bold;color:#2c3e50;";
+            resName.textContent = res.name.replace(/\.[^.]+$/, "");
+            titlePart.appendChild(resName);
+            resHeader.appendChild(titlePart);
+
+            var extTag = document.createElement("span");
+            extTag.style.cssText = "padding:3px 10px;background:#d5f4e6;color:#27ae60;border-radius:4px;font-size:11px;font-weight:bold;";
+            extTag.textContent = res.name.split(".").pop().toUpperCase();
+            resHeader.appendChild(extTag);
+            card.appendChild(resHeader);
+
+            if (res.match_tag && res.match_tag !== "精确匹配") {
+                var matchTag = document.createElement("span");
+                matchTag.style.cssText = "display:inline-block;margin-bottom:10px;padding:3px 10px;background:#fff3cd;color:#856404;border-radius:4px;font-size:11px;";
+                matchTag.textContent = "💡 " + res.match_tag;
+                card.appendChild(matchTag);
+            }
+
+            if (item.weak_points && item.weak_points.length > 0) {
+                var pptWeakPoints = (item.weak_points || []).slice().sort(function(a, b) {
+                    var aAvoid = (item.avoidance_kps || []).some(function(x) { return x.name === a.name; });
+                    var bAvoid = (item.avoidance_kps || []).some(function(x) { return x.name === b.name; });
+                    if (aAvoid !== bAvoid) return bAvoid ? 1 : -1;
+                    return (a.mastery || 1) - (b.mastery || 1);
+                }).slice(0, 3);
+
+                if (pptWeakPoints.length > 0) {
+                    var weakSection = document.createElement("div");
+                    weakSection.style.cssText = "background:#fef5f5;padding:10px 12px;border-radius:6px;margin-bottom:8px;border-left:3px solid #e74c3c;";
+                    var weakTitle = document.createElement("strong");
+                    weakTitle.style.color = "#c0392b";
+                    weakTitle.style.fontSize = "13px";
+                    weakTitle.textContent = "📌 相关知识点";
+                    weakSection.appendChild(weakTitle);
+                    var weakList = document.createElement("div");
+                    weakList.style.cssText = "margin-top:6px;font-size:12px;color:#555;line-height:1.7;";
+                    weakList.innerHTML = pptWeakPoints.map(function(wp) {
+                        var masteryPct = Math.round((wp.mastery||0)*100);
+                        var masteryColor = masteryPct < 40 ? '#e74c3c' : (masteryPct < 70 ? '#f39c12' : '#27ae60');
+                        return "<div style='margin:2px 0;'>• " + (wp.name.split(' ').slice(1).join(' ') || wp.name) + " <span style='color:" + masteryColor + ";font-size:11px;'>掌握度:" + masteryPct + "%</span></div>";
+                    }).join("");
+                    weakSection.appendChild(weakList);
+                    card.appendChild(weakSection);
+                }
+            }
+
+            if (!!(item.key_points && item.key_points.length > 0)) {
+                var keySection = document.createElement("div");
+                keySection.style.cssText = "background:#fef9e7;padding:10px 12px;border-radius:6px;margin-bottom:12px;border-left:3px solid #f39c12;";
+                var keyTitle = document.createElement("strong");
+                keyTitle.style.color = "#d68910";
+                keyTitle.style.fontSize = "13px";
+                keyTitle.textContent = "⭐ 涉及重点: ";
+                keySection.appendChild(keyTitle);
+                var keyTags = document.createElement("span");
+                keyTags.style.fontSize = "12px";
+                keyTags.style.color = "#555";
+                keyTags.textContent = item.key_points.map(function(kp) { return kp.name.split(' ').slice(1).join(' ') || kp.name; }).join(", ");
+                keySection.appendChild(keyTags);
+                card.appendChild(keySection);
+            }
+
+            var reasonSection = document.createElement("div");
+            reasonSection.style.cssText = "background:#f0f7ff;padding:12px;border-radius:6px;margin-bottom:12px;border-left:3px solid #3498db;";
+            
+            var reasonTitle = document.createElement("strong");
+            reasonTitle.style.color = "#2980b9";
+            reasonTitle.style.fontSize = "13px";
+            reasonTitle.textContent = "💡 推荐理由";
+            reasonSection.appendChild(reasonTitle);
+            
+            var reasonList = document.createElement("div");
+            reasonList.style.cssText = "margin-top:8px;font-size:12px;color:#444;line-height:1.8;";
+            
+            var reasons = [];
+            
+            if (item.weak_points && item.weak_points.length > 0) {
+                var weakestKp = item.weak_points[0];
+                var weakestMastery = Math.round((weakestKp.mastery || 0) * 100);
+                reasons.push("该资源涵盖 <strong style='color:#e74c3c;'>" + (weakestKp.name.split(' ').slice(1).join(' ') || weakestKp.name) + "</strong>（掌握度仅 <strong>" + weakestMastery + "%</strong>），是你当前最需要加强的知识点");
+                
+                if (item.weak_points.length > 1) {
+                    var secondWeak = item.weak_points[1];
+                    var secondMastery = Math.round((secondWeak.mastery || 0) * 100);
+                    reasons.push("同时涉及 <strong style='color:#f39c12;'>" + (secondWeak.name.split(' ').slice(1).join(' ') || secondWeak.name) + "</strong>（掌握度 " + secondMastery + "%），可一并巩固");
+                }
+            }
+            
+            if (item.key_points && item.key_points.length > 0) {
+                var keyNames = item.key_points.slice(0, 2).map(function(kp) { return kp.name.split(' ').slice(1).join(' ') || kp.name; });
+                reasons.push("包含 <strong style='color:#d68910;'>" + keyNames.join("、") + "</strong> 等重点知识点，是考试高频考点");
+            }
+            
+            if (item.weak_points && item.weak_points.some(function(wp) { return (wp.mastery || 0) < 0.4; })) {
+                reasons.push("<span style='color:#e74c3c;'>📌 建议：先学习基础概念，再进行针对性练习</span>");
+            } else if (item.weak_points && item.weak_points.every(function(wp) { return (wp.mastery || 0) >= 0.5 && (wp.mastery || 0) < 0.75; })) {
+                reasons.push("<span style='color:#27ae60;'>💪 建议：通过此资源巩固提升，可达到较好掌握水平</span>");
+            }
+            
+            if (reasons.length > 0) {
+                reasonList.innerHTML = "<ul style='margin:0;padding-left:15px;'>" + reasons.map(function(r) { return "<li style='margin-bottom:4px;'>" + r + "</li>"; }).join("") + "</ul>";
+                reasonSection.appendChild(reasonList);
+                card.appendChild(reasonSection);
+            }
+
+            var actionDiv = document.createElement("div");
+            actionDiv.style.cssText = "margin-top:10px;padding-top:10px;border-top:1px solid #eee;display:flex;align-items:center;gap:8px;flex-wrap:wrap;";
+
+            var downloadBtn = document.createElement("a");
+            downloadBtn.href = "/download/" + encodeURIComponent(res.name);
+            downloadBtn.style.cssText = "padding:8px 20px;background:#27ae60;color:white;text-decoration:none;border-radius:6px;font-size:13px;";
+            downloadBtn.textContent = "📥 下载资源";
+            (function(rname) {
+                downloadBtn.onclick = function() {
+                    logBehavior("download", rname, "");
+                    fetch("/student/resource/download", {
+                        method: "POST",
+                        headers: {"Content-Type": "application/json"},
+                        body: JSON.stringify({resource_name: rname})
+                    }).catch(function(){});
+                };
+            })(res.name);
+            actionDiv.appendChild(downloadBtn);
+            card.appendChild(actionDiv);
+            container.appendChild(card);
+        });
+    };
+
+    window.recQuestions = [];
+    window.recCurrentIdx = 0;
+    window.recAnswers = [];
+    window.recAllItems = [];
+    window.recAllResources = [];
+
+    window.showVideoPlayer = function(name) {
+        var modal = document.getElementById("videoModal");
+        var player = document.getElementById("videoPlayer");
+        var titleEl = document.getElementById("videoTitle");
+        modal.style.display = "flex";
+        titleEl.textContent = name.replace(/\.[^.]+$/, "");
+        player.src = "/video/" + encodeURIComponent(name);
+        player.play();
+        
+        // 记录视频播放到数据库
+        fetch("/student/video/play", {
+            method: "POST",
+            headers: {"Content-Type": "application/json"},
+            body: JSON.stringify({video_name: name})
+        }).catch(function(){});
+    }
+
+    window.closeVideoModal = function(event) {
+        if (event && event.target.id !== "videoModal") return;
+        var modal = document.getElementById("videoModal");
+        var player = document.getElementById("videoPlayer");
+        modal.style.display = "none";
+        player.pause();
+        player.src = "";
+    };
+
+    function logBehavior(action, target, kp) {
+        fetch("/student/log_behavior", {
+            method: "POST",
+            credentials: "include",
+            headers: {"Content-Type": "application/json"},
+            body: JSON.stringify({action: action, target: target, knowledge_point: kp || ""})
+        }).catch(function(){});
+    }
+
+    function startPractice(questions, chapterKp, weakPoints, recItems, allResources) {
+        window.practiceQuestions = questions.slice();
+        window.originalPracticeQuestions = questions.slice(); // 保存原始题库用于"再练一次"
+        window.currentQuestionIndex = 0;
+        window.practiceAnswers = {};
+        window.practiceMode = true;
+        window.allResources = allResources || [];
+        renderContent();
+    }
+
+    window.renderContent = function() {
+        if (!window.practiceMode || !window.practiceQuestions || window.practiceQuestions.length === 0) return;
+        var q = window.practiceQuestions[window.currentQuestionIndex];
+        if (!q) { finishLibraryPractice(); return; }
+        var totalQ = window.practiceQuestions.length;
+        var container = document.getElementById("recommendList");
+        var html = '<div style="max-width:800px;margin:0 auto;">';
+        html += '<div style="text-align:right;margin-bottom:15px;color:#7f8c8d;font-size:13px;">题目 ' + (window.currentQuestionIndex+1) + '/' + totalQ + '</div>';
+        html += '<div class="question-box">';
+        html += '<div class="question-title">第 ' + (window.currentQuestionIndex+1) + ' 题</div>';
+            var kpDisplay = q._kp || q.knowledge_point || "";
+            kpDisplay = kpDisplay.replace(/^\s*\d+(?:\.\d+)+\s*/, "") || kpDisplay;
+        if (kpDisplay) {
+            html += '<div class="question-kp">知识域 <span class="kp-tag">' + kpDisplay + '</span>';
+            if (q.difficulty) {
+                var diffClass = q.difficulty === "easy" ? "difficulty-easy" : (q.difficulty === "medium" ? "difficulty-medium" : "difficulty-hard");
+                var diffLabel = q.difficulty === "easy" ? "简单" : (q.difficulty === "medium" ? "中等" : "困难");
+                html += ' &nbsp;&nbsp;<span class="difficulty-badge ' + diffClass + '">' + diffLabel + '</span>';
+            }
+            if (q._practice_tag) {
+                var tagColors = {"持续错题":"#e74c3c","最近出错":"#f39c12","新题":"#3498db","已掌握":"#27ae60","做过但需巩固":"#9b59b6","有错误记录":"#e67e22"};
+                var tagBg = tagColors[q._practice_tag] || "#95a5a6";
+                html += ' &nbsp;&nbsp;<span style="background:' + tagBg + ';color:white;padding:2px 8px;border-radius:10px;font-size:11px;">' + q._practice_tag + '</span>';
+            }
+            html += '</div>';
+        }
+        html += '<div style="font-size:16px;margin:15px 0;">' + q.question + '</div>';
+        html += '<div class="question-options">';
+        var optLabels = ["A","B","C","D"];
+        (q.options || []).forEach(function(opt, idx) {
+            var cleanOpt = opt.replace(/^[A-D][\.、]\s*/, '');
+            var optText = '<strong>' + optLabels[idx] + '</strong>. ' + cleanOpt;
+            html += '<button class="option-btn" onclick="selectOption(' + idx + ',this)">' + optText + '</button>';
+        });
+        html += '</div></div>';
+
+        html += '<div style="display:flex;gap:10px;justify-content:center;margin-top:20px;">';
+        html += '<button class="practice-btn" onclick="exitPractice()" style="background:#e74c3c;">✕ 退出练习</button>';
+        html += '<button class="practice-btn" onclick="prevQuestion()" style="background:#95a5a6;"' + (window.currentQuestionIndex===0?' disabled':'') + '>← 上一题</button>';
+        html += '<button class="practice-btn" id="submitBtn" onclick="submitAnswer()">提交答案</button>';
+        html += '<button class="practice-btn" onclick="nextQuestion()" id="nextBtn"' + (window.currentQuestionIndex>=totalQ-1?' disabled':'') + '>下一题 →</button>';
+        html += '</div></div>';
+        container.innerHTML = html;
+    };
+
+    window.selectOption = function(idx, btn) {
+        var btns = btn.parentElement.querySelectorAll('.option-btn');
+        btns.forEach(function(b){ b.classList.remove('selected'); });
+        btn.classList.add('selected');
+        window.selectedOption = idx;
+    };
+
+    window.submitAnswer = function() {
+        if (typeof window.selectedOption === "undefined") { alert("请先选择一个答案"); return; }
+        var q = window.practiceQuestions[window.currentQuestionIndex];
+        var optLabels = ["A","B","C","D"];
+        
+        // 支持两种答案格式：数字索引(0,1,2,3) 或 字母("A","B","C","D")
+        var correctIdx = q.answer;
+        if (typeof correctIdx === "string") {
+            correctIdx = optLabels.indexOf(correctIdx.toUpperCase());
+        }
+        correctIdx = parseInt(correctIdx) || 0;
+        
+        var isCorrect = window.selectedOption === correctIdx;
+        window.practiceAnswers[window.currentQuestionIndex] = isCorrect;
+
+        fetch("/student/submit", {
+            method: "POST",
+            headers: {"Content-Type": "application/json"},
+            credentials: "include",
+            body: JSON.stringify({
+                knowledge: q.knowledge_point || q._kp || "",
+                is_correct: isCorrect,
+                question_id: q.id
+            })
+        }).then(function(r) { return r.json(); })
+          .then(function(d) { console.log("[REC-SUBMIT] 已提交:", d); })
+          .catch(function(e) { console.error("[REC-SUBMIT] 失败:", e); });
+
+        var btns = document.querySelectorAll('.option-btn');
+        btns.forEach(function(b,i){
+            b.onclick=null;b.style.cursor='default';
+            if(i===correctIdx) b.classList.add('correct');
+            else if(i===window.selectedOption&&!isCorrect) b.classList.add('wrong');
+        });
+        
+        var yourAnswer = optLabels[window.selectedOption];
+        var correctAnswer = optLabels[correctIdx];
+        
+        var resultBox = document.createElement("div");
+        resultBox.className = "result-box " + (isCorrect?"result-correct":"result-wrong");
+        var resultHtml = (isCorrect?"✅ 回答正确":"❌ 回答错误");
+        resultHtml += '<div style="margin-top:10px;padding:10px;background:rgba(255,255,255,0.5);border-radius:6px;font-size:14px;">';
+        resultHtml += '<strong>你的答案：</strong>' + yourAnswer + '&nbsp;&nbsp;&nbsp;<strong>正确答案：</strong>' + correctAnswer;
+        resultHtml += '</div>';
+        if(q.explanation){
+            resultHtml += '<div style="margin-top:12px;padding:12px;background:#f8f9fa;border-left:3px solid #667eea;border-radius:4px;font-size:14px;color:#555;">';
+            resultHtml += '<strong style="color:#2c3e50;">📝 解析：</strong><br>';
+            resultHtml += q.explanation;
+            resultHtml += '</div>';
+        }
+        resultBox.innerHTML = resultHtml;
+        document.querySelector('.question-box').appendChild(resultBox);
+        document.getElementById("submitBtn").style.display="none";
+        var nextBtn=document.getElementById("nextBtn");
+        if(window.currentQuestionIndex>=window.practiceQuestions.length-1){
+            nextBtn.textContent="完成练习";nextBtn.disabled=false;nextBtn.onclick=finishLibraryPractice;
+        } else { nextBtn.disabled=false; }
+    };
+
+    window.nextQuestion = function() {
+        window.selectedOption=undefined;
+        window.currentQuestionIndex++;
+        renderContent();
+    };
+
+    window.prevQuestion = function() {
+        if(window.currentQuestionIndex>0){
+            window.selectedOption=undefined;
+            window.currentQuestionIndex--;
+            renderContent();
+        }
+    };
+
+    window.exitPractice = function() {
+        if(confirm('确定要退出练习吗？当前进度将不会保存。')){
+            exitPracticeMode();
+        }
+    };
+
+    window.finishLibraryPractice = function() {
+        var total = Object.keys(window.practiceAnswers).length;
+        var correct = 0;
+        var kpResults = {};
+        var wrongKps = [];
+        for(var idx in window.practiceAnswers){
+            var q = window.practiceQuestions[parseInt(idx)];
+            if(!q) continue;
+            var isCorrect = window.practiceAnswers[idx];
+            if(isCorrect) correct++;
+            var kpName = q.knowledge_point || '';
+            if(!kpResults[kpName]){ kpResults[kpName]={"name":kpName,"total":0,"correct":0,"wrong":0,"questions":[]}; }
+            kpResults[kpName].total++;kpResults[kpName].questions.push(q);
+            if(isCorrect){ kpResults[kpName].correct++; }
+            else{ kpResults[kpName].wrong++; if(wrongKps.indexOf(kpName)===-1){ wrongKps.push(kpName); } }
+        }
+        var pct = total>0?Math.round(correct/total*100):0;
+        var container = document.getElementById("recommendList");
+        var html='<div style="max-width:700px;margin:0 auto;">';
+        html+='<div style="text-align:center;background:white;border-radius:16px;padding:30px;box-shadow:0 4px 20px rgba(0,0,0,0.1);margin-bottom:20px;">';
+        html+='<h2 style="margin:0 0 10px;color:#2c3e50;">&#128202; 练习完成</h2>';
+        html+='<div style="font-size:42px;font-weight:bold;color:'+(pct>=70?'#27ae60':(pct>=40?'#f39c12':'#e74c3c'))+';">'+pct+'%</div>';
+        html+='<div style="color:#7f8c8d;margin-top:8px;font-size:14px;">正确/总题数：'+correct+'/'+total+'&nbsp;&nbsp;&nbsp;正确率：'+pct+'%</div>';
+        html+='</div>';
+        if(wrongKps.length>0){
+            html+='<div style="background:#fef5f5;border-radius:12px;padding:20px;margin-bottom:20px;border-left:4px solid #e74c3c;">';
+            html+='<h3 style="margin:0 0 15px;color:#c0392b;font-size:15px;">⚠️ 需要复习的知识点</h3>';
+            wrongKps.forEach(function(kp){
+                var r=kpResults[kp];var kpPct=r.total>0?Math.round(r.correct/r.total*100*10)/10:0;
+                html+='<div style="padding:8px 0;border-bottom:1px solid #fadbd8;font-size:13px;color:#555;display:flex;justify-content:space-between;"><strong>'+kp+'</strong><span style="color:#e74c3c;">正确率：'+kpPct+'%</span></div>';
+            });
+            html+='</div>';
+        }
+        html+='<div style="background:white;border-radius:12px;padding:20px;margin-bottom:20px;box-shadow:0 2px 10px rgba(0,0,0,0.06);">';
+        html+='<h3 style="margin:0 0 15px;color:#2c3e50;font-size:15px;">📚 针对性学习资源推荐</h3>';
+        var recommendedResources=[];
+        var seenRes={};
+        wrongKps.forEach(function(kp){
+            var kpName=kp;var kpData=kpResults[kp];var wrongCount=kpData.wrong||0;
+            var kpNumMatch=kpName.match(/^(\d+(?:\.\d+)*)/);var kpNumPrefix=kpNumMatch?kpNumMatch[1]:'';
+            (window.allResources||[]).forEach(function(res){
+                if(seenRes[res.name])return;
+                var resName=res.name||'';var resNumMatch=resName.match(/^(\d+(?:\.\d+)*)/);var resNumPrefix=resNumMatch?resNumMatch[1]:'';
+                if(!kpNumPrefix||!resNumPrefix)return;
+                var isExactMatch=false;
+                if(resNumPrefix===kpNumPrefix){ isExactMatch=true; }
+                else if(resNumPrefix.indexOf(kpNumPrefix+'.')===0){ isExactMatch=true; }
+                if(!isExactMatch)return;
+                var ext=res.name.split('.').pop().toLowerCase();var isVideo=ext==='mp4';
+                recommendedResources.push({resource:res,targetKp:kpName,wrongCount:wrongCount,isExactMatch:true,isVideo:isVideo});
+                seenRes[res.name]=true;
+            });
+        });
+        recommendedResources.sort(function(a,b){
+            if(a.targetKp!==b.targetKp){ return b.wrongCount-a.wrongCount; }
+            if(a.wrongCount>=2&&b.wrongCount>=2){ return(b.isVideo?1:0)-(a.isVideo?1:0); }
+            return(a.isVideo?1:0)-(b.isVideo?1:0);
+        });
+        var finalRecs=[];var kpResCount={};
+        recommendedResources.forEach(function(item){
+            if(finalRecs.length>=6)return;
+            var kp=item.targetKp;if(!kpResCount[kp])kpResCount[kp]=0;
+            if(kpResCount[kp]>=2)return;
+            finalRecs.push(item);kpResCount[kp]++;
+        });
+        if(finalRecs.length===0){
+            html+='<div style="color:#95a5a6;font-size:13px;padding:15px;text-align:center;background:#f8f9fa;border-radius:8px;">暂无针对性资源，建议复习本章整体内容</div>';
+        }else{
+            finalRecs.forEach(function(item){
+                var res=item.resource;var ext=res.name.split('.').pop().toLowerCase();var isVideo=ext==='mp4';
+                var borderColor='#27ae60';
+                var typeTag=isVideo?'<span style="display:inline-block;padding:2px 8px;background:#9b59b6;color:white;border-radius:3px;font-size:10px;">视频</span>':'<span style="display:inline-block;padding:2px 8px;background:#3498db;color:white;border-radius:3px;font-size:10px;">PPT</span>';
+                html+='<div style="display:flex;align-items:center;justify-content:space-between;padding:12px;margin:8px 0;background:#f8f9fa;border-radius:8px;border-left:3px solid '+borderColor+';">';
+                html+='<div style="flex:1;">';
+                html+='<div style="display:flex;align-items:center;gap:8px;margin-bottom:4px;">';
+                html+=typeTag;
+                html+='<strong style="font-size:13px;color:#2c3e50;">'+res.name.replace(/\.[^.]+$/,'')+'</strong>';
+                html+='</div>';
+                html+='<div style="font-size:11px;color:#7f8c8d;margin-left:24px;">';
+                html+='&#128270; 针对 <strong style="color:'+borderColor+';">'+item.targetKp+'</strong> · 精确匹配';
+                html+='</div></div>';
+                html+='<div style="display:flex;gap:6px;margin-left:10px;">';
+                if(isVideo){ html+='<a href="#" onclick="alert(&apos;视频播放功能&apos;);return false;" style="padding:5px 12px;background:#9b59b6;color:white;text-decoration:none;border-radius:5px;font-size:11px;">&#9654;</a>'; }
+                html+='<a href="/download/'+encodeURIComponent(res.name)+'" style="padding:5px 12px;background:#27ae60;color:white;text-decoration:none;border-radius:5px;font-size:11px;">&#11015;</a>';
+                html+='</div></div>';
+            });
+        }
+        html+='</div>';
+        html+='<div style="display:flex;gap:12px;justify-content:center;">';
+        html+='<button class="practice-btn" onclick="retryChapterPractice()" style="padding:12px 24px;">🔄 再练一次</button>';
+        html+='<button class="practice-btn" onclick="exitPracticeMode()" style="background:#667eea;padding:12px 24px;">📋 返回列表</button>';
+        html+='</div></div>';
+        container.innerHTML=html;
+    };
+
+    window.retryChapterPractice = function() {
+        // 智能题库过滤：剔除已掌握的题目
+        var masteryThreshold = 80; // 掌握度阈值
+        var filteredQuestions = [];
+        var removedKps = []; // 记录被移除的知识点
+        
+        // 获取本次练习中做对的题目知识点
+        var correctKpSet = {};
+        for(var idx in window.practiceAnswers){
+            if(window.practiceAnswers[idx]){
+                var q = window.practiceQuestions[parseInt(idx)];
+                if(q && q.knowledge_point){
+                    correctKpSet[q.knowledge_point] = true;
+                }
+            }
+        }
+        
+        // 过滤题目：保留未掌握或做错的题目
+        (window.originalPracticeQuestions || window.practiceQuestions).forEach(function(q) {
+            var kpName = q.knowledge_point || '';
+            var kpMastery = q.mastery || 0;
+            
+            // 检查该知识点的掌握度
+            var isMastered = kpMastery >= masteryThreshold;
+            
+            // 检查该题目是否在本次练习中做对了
+            var wasCorrectThisTime = correctKpSet[kpName];
+            
+            if (!isMastered || !wasCorrectThisTime) {
+                // 未掌握 或 本次做错 → 保留该题目
+                filteredQuestions.push(q);
+            } else {
+                // 已掌握且做对 → 移除
+                if(removedKps.indexOf(kpName) === -1){
+                    removedKps.push(kpName + '(' + kpMastery + '%)');
+                }
+            }
+        });
+        
+        // 如果没有剩余题目，提示用户
+        if(filteredQuestions.length === 0){
+            alert('🎉 太棒了！\n\n你已经掌握了所有知识点（掌握度≥' + masteryThreshold + '%），无需再练！\n\n可以尝试其他章节的练习。');
+            exitPracticeMode();
+            return;
+        }
+        
+        // 显示过滤信息
+        var msg = '📊 智能题库更新\n\n';
+        msg += '原题库：' + (window.originalPracticeQuestions || window.practiceQuestions).length + ' 题\n';
+        msg += '新题库：' + filteredQuestions.length + ' 题\n';
+        if(removedKps.length > 0){
+            msg += '\n已移除已掌握的知识点：\n• ' + removedKps.join('\n• ');
+        }
+        msg += '\n\n开始针对性练习！';
+        alert(msg);
+        
+        // 更新题库并重新开始
+        window.practiceAnswers = {};
+        window.currentQuestionIndex = 0;
+        window.practiceMode = true;
+        window.practiceQuestions = filteredQuestions;
+        renderContent();
+    };
+
+    window.exitPracticeMode=function(){
+        window.practiceMode=false;window.practiceQuestions=[];window.practiceAnswers={};
+        load();
+    };
+
+    load();
+})();
+</script>
+
+</body>
+</html>

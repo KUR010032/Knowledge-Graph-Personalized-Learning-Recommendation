@@ -1,0 +1,290 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>基于知识图谱的个性化学习推荐系统</title>
+    <script src="https://cdn.jsdelivr.net/npm/vue@3.3.8/dist/vue.global.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/vis-network@9.1.2/standalone/umd/vis-network.min.js"></script>
+    <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+    <div id="app">
+        <!-- Login Page -->
+        <div v-if="!isLoggedIn" class="login-container">
+            <div class="login-box">
+                <h2>基于知识图谱的个性化学习推荐系统</h2>
+                <div class="login-tabs">
+                    <button :class="{active: loginRole === 'student'}" @click="loginRole = 'student'">学生登录</button>
+                    <button :class="{active: loginRole === 'teacher'}" @click="loginRole = 'teacher'">教师登录</button>
+                </div>
+                <input type="text" v-model="loginForm.user_id" placeholder="学号/工号">
+                <input type="password" v-model="loginForm.password" placeholder="密码">
+                <button class="login-btn" @click="login">登录</button>
+                <p v-if="loginError" class="error-msg">{{ loginError }}</p>
+            </div>
+        </div>
+
+        <!-- Main App -->
+        <div v-else class="main-container">
+            <aside class="sidebar">
+                <div class="user-info">
+                    <h3>{{ userName }}</h3>
+                    <p>{{ userRole === 'student' ? '学生' : '教师' }}</p>
+                </div>
+                <nav>
+                    <a href="#" :class="{active: currentPage === 'graph'}" @click.prevent="currentPage = 'graph'">知识图谱</a>
+                    <a v-if="userRole !== 'teacher'" href="#" :class="{active: currentPage === 'recommend'}" @click.prevent="currentPage = 'recommend'">资源推荐</a>
+                    <a href="#" :class="{active: currentPage === 'resources'}" @click.prevent="currentPage = 'resources'">学习资源</a>
+                    <a href="#" :class="{active: currentPage === 'progress'}" @click.prevent="currentPage = 'progress'">学习进度</a>
+                    <a v-if="userRole === 'teacher'" href="#" :class="{active: currentPage === 'upload'}" @click.prevent="currentPage = 'upload'">资源上传</a>
+                </nav>
+                <button class="logout-btn" @click="logout">退出登录</button>
+            </aside>
+
+            <main class="content">
+                <!-- Knowledge Graph Page -->
+                <div v-if="currentPage === 'graph'" class="page">
+                    <h2>知识图谱</h2>
+                    <div id="knowledgeGraph" class="graph-container"></div>
+                    <div class="legend">
+                        <span class="legend-item"><span class="legend-circle low"></span> 薄弱 ≤33%</span>
+                        <span class="legend-item"><span class="legend-circle medium"></span> 一般 33-67%</span>
+                        <span class="legend-item"><span class="legend-circle high"></span> 良好 ≥67%</span>
+                        <span class="legend-item"><span class="legend-line blue"></span> 包含</span>
+                        <span class="legend-item"><span class="legend-line red"></span> 先修</span>
+                        <span class="legend-item"><span class="legend-line orange"></span> 相关</span>
+                    </div>
+                </div>
+
+                <!-- Recommendations Page -->
+                <div v-if="currentPage === 'recommend'" class="page">
+                    <h2>个性化资源推荐</h2>
+                    <div v-if="recommendations.length === 0" class="empty-state">
+                        <p>正在加载推荐内容...</p>
+                    </div>
+                    <div v-else class="recommend-list">
+                        <div v-for="(rec, index) in recommendations" :key="index" class="recommend-card">
+                            <div class="rec-header">
+                                <div class="rec-type-badge" :class="rec.type">
+                                    {{ rec.type === 'resource' ? '资源' : '题目' }}
+                                </div>
+                                <h4>{{ rec.name }}</h4>
+                                <div class="rec-tags">
+                                    <span class="tag difficulty" :class="rec.knowledge_labels.difficulty">{{ difficultyLabel(rec.knowledge_labels.difficulty) }}</span>
+                                    <span class="tag importance" :class="rec.knowledge_labels.importance">{{ importanceLabel(rec.knowledge_labels.importance) }}</span>
+                                    <span class="kp-tag">知识点: {{ rec.knowledge_point }}</span>
+                                    <span class="mastery-badge" :class="getMasteryClass(rec.mastery)">
+                                        掌握度 {{ (rec.mastery * 100).toFixed(0) }}%
+                                    </span>
+                                </div>
+                            </div>
+                            <div class="rec-body">
+                                <div v-if="rec.type === 'resource'" class="rec-resource-actions">
+                                    <a v-if="rec.resource_type === 'video'" :href="'/viewer.html?file=' + encodeURIComponent(rec.name) + '&type=' + rec.resource_type" class="view-btn" target="_blank">在线浏览</a>
+                                    <a :href="rec.url" class="download-btn" :download>下载资源</a>
+                                </div>
+                                <div v-else-if="rec.type === 'question'" class="rec-question-actions">
+                                    <button class="practice-btn" @click="startPracticeWithQuestion(rec)">开始答题</button>
+                                </div>
+                                <div class="rec-scores">
+                                    <span class="score-label">推荐分: {{ rec.recommend_score.toFixed(3) }}</span>
+                                    <span class="score-detail" v-if="rec.scores">
+                                        M:{{ rec.scores.M.toFixed(2) }} 
+                                        G:{{ rec.scores.G.toFixed(2) }} 
+                                        C:{{ rec.scores.C.toFixed(2) }} 
+                                        R:{{ rec.scores.R.toFixed(2) }} 
+                                        B:{{ rec.scores.B.toFixed(2) }}
+                                    </span>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Resources Page -->
+                <div v-if="currentPage === 'resources'" class="page">
+                    <h2>学习资源</h2>
+                    <div v-if="resourceChapters.length === 0" class="empty-state">
+                        <p>暂无学习资源</p>
+                    </div>
+                    <div v-else class="resource-chapters">
+                        <div v-for="ch in resourceChapters" :key="ch.name" class="resource-chapter">
+                            <div class="resource-chapter-header" @click="toggleResourceChapter(ch.name)">
+                                <span class="toggle-arrow">{{ expandedResourceChapters[ch.name] ? '▾' : '▸' }}</span>
+                                <h3>{{ ch.name }}</h3>
+                                <span class="resource-count">{{ ch.totalItems }} 个资源</span>
+                            </div>
+                            <div v-if="expandedResourceChapters[ch.name]" class="resource-chapter-items">
+                                <!-- 章级资源直接显示 -->
+                                <div v-if="ch.chapterResources && ch.chapterResources.length > 0" class="resource-section-items">
+                                    <div v-for="res in ch.chapterResources" :key="res.name" class="resource-item-row">
+                                        <span class="res-icon">{{ getResourceIcon(res.type) }}</span>
+                                        <span class="res-name">{{ res.name }}</span>
+                                        <span class="res-type-tag" :class="res.type">{{ res.type === 'video' ? '视频' : res.type === 'ppt' ? 'PPT' : '文档' }}</span>
+                                        <a :href="'/viewer.html?file=' + encodeURIComponent(res.name) + '&type=' + res.type" class="view-link" target="_blank">在线浏览</a>
+                                        <a :href="res.url" class="download-link-sm" download>下载</a>
+                                    </div>
+                                </div>
+                                <!-- 节级资源 -->
+                                <div v-for="sec in ch.sections" :key="ch.name + '_' + sec.name" class="resource-section">
+                                    <div class="resource-section-header" @click="toggleResourceSection(ch.name, sec.name)">
+                                        <span class="toggle-arrow-small">{{ expandedResourceChapters[ch.name + '_' + sec.name] ? '▾' : '▸' }}</span>
+                                        <h4>{{ sec.name === '其他' ? '其他资源' : sec.name }}</h4>
+                                        <span class="resource-count-small">{{ sec.items.length }} 个</span>
+                                    </div>
+                                    <div v-if="expandedResourceChapters[ch.name + '_' + sec.name]" class="resource-section-items">
+                                        <div v-for="res in sec.items" :key="res.name" class="resource-item-row">
+                                            <span class="res-icon">{{ getResourceIcon(res.type) }}</span>
+                                            <span class="res-name">{{ res.name }}</span>
+                                            <span class="res-type-tag" :class="res.type">{{ res.type === 'video' ? '视频' : res.type === 'ppt' ? 'PPT' : '文档' }}</span>
+                                            <a :href="'/viewer.html?file=' + encodeURIComponent(res.name) + '&type=' + res.type" class="view-link" target="_blank">在线浏览</a>
+                                            <a :href="res.url" class="download-link-sm" download>下载</a>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Progress Page -->
+                <div v-if="currentPage === 'progress'" class="page">
+                    <h2>学习进度</h2>
+                    <div v-if="userRole === 'teacher'" class="teacher-progress-selector">
+                        <label>选择学生：</label>
+                        <div class="searchable-select-wrapper">
+                            <input type="text" v-model="selectedStudentId" list="student-list" @change="loadProgressForStudent" @keyup.enter="loadProgressForManualStudent" placeholder="输入学号或姓名搜索" class="searchable-input">
+                            <datalist id="student-list">
+                                <option v-for="student in studentList" :key="student.id" :value="student.id"></option>
+                            </datalist>
+                        </div>
+                        <button class="query-btn" @click="loadProgressForManualStudent">查询</button>
+                    </div>
+                    <div v-if="progress.length === 0" class="empty-state">
+                        <p>{{ userRole === 'teacher' && !selectedStudentId ? '请选择要查询的学生' : '暂无学习记录' }}</p>
+                    </div>
+                    <div v-else>
+                        <div v-for="ch in progress" :key="ch.chapter" class="chapter-progress">
+                            <div class="chapter-header" @click="toggleChapter(ch.chapter)">
+                                <span class="toggle-icon">{{ expandedChapters[ch.chapter] ? '▾' : '▸' }}</span>
+                                <h3>{{ ch.chapter }}</h3>
+                                <span class="chapter-avg" :class="getMasteryClass(ch.avg_mastery)">
+                                    {{ (ch.avg_mastery * 100).toFixed(0) }}%
+                                </span>
+                            </div>
+                            <div v-if="expandedChapters[ch.chapter]" class="chapter-items">
+                                <div v-for="item in ch.items" :key="item.knowledge_point" class="progress-row">
+                                    <span class="kp-name">{{ item.knowledge_point }}</span>
+                                    <span class="kp-tags">
+                                        <span class="tag difficulty" :class="item.difficulty">{{ difficultyLabel(item.difficulty) }}</span>
+                                        <span v-if="item.importance === 'important'" class="tag importance important">重点</span>
+                                    </span>
+                                    <div class="mini-bar">
+                                        <div class="mini-fill" :style="{width: item.mastery * 100 + '%', background: getProgressColor(item.mastery)}"></div>
+                                    </div>
+                                    <span class="kp-pct">{{ (item.mastery * 100).toFixed(0) }}%</span>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Upload Page (Teacher Only) -->
+                <div v-if="currentPage === 'upload'" class="page">
+                    <h2>资源上传</h2>
+                    <div class="upload-container">
+                        <div class="upload-form">
+                            <div class="form-group">
+                                <label>资源类型：</label>
+                                <select v-model="uploadForm.type">
+                                    <option value="video">视频</option>
+                                    <option value="ppt">PPT</option>
+                                    <option value="doc">文档</option>
+                                </select>
+                            </div>
+                            <div class="form-group">
+                                <label>所属章节：</label>
+                                <select v-model="uploadForm.chapter">
+                                    <option value="">请选择章节</option>
+                                    <option v-for="ch in chapterOptions" :key="ch.value" :value="ch.value">
+                                        {{ ch.label }}
+                                    </option>
+                                </select>
+                            </div>
+                            <div class="form-group">
+                                <label>关联知识点（可选）：</label>
+                                <input type="text" v-model="uploadForm.knowledgePoint" placeholder="例如：2.2.1 进程的概念">
+                            </div>
+                            <div class="form-group">
+                                <label>选择文件：</label>
+                                <input type="file" ref="fileInput" @change="handleFileSelect" class="file-input">
+                            </div>
+                            <div v-if="uploadForm.fileName" class="selected-file">
+                                已选择：{{ uploadForm.fileName }}
+                            </div>
+                            <button class="upload-btn" @click="uploadResource" :disabled="!uploadForm.file || !uploadForm.chapter">
+                                上传资源
+                            </button>
+                            <div v-if="uploadMessage" class="upload-message" :class="uploadMessageType">
+                                {{ uploadMessage }}
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </main>
+        </div>
+
+        <!-- Question Practice Modal -->
+        <div v-if="showPractice" class="modal-overlay" @click.self="closePractice">
+            <div class="modal practice-modal">
+                <div class="modal-header">
+                    <h3>{{ practiceKp }}</h3>
+                    <button class="close-btn" @click="closePractice">&times;</button>
+                </div>
+                <div class="modal-body">
+                    <div v-if="practiceQuestions.length === 0" class="empty-state">
+                        <p>该知识点暂无题目</p>
+                    </div>
+                    <div v-else>
+                        <div class="question-progress">
+                            第 {{ currentQuestionIndex + 1 }} / {{ practiceQuestions.length }} 题
+                        </div>
+                        <div class="question-card">
+                            <div class="question-tags">
+                                <span class="tag difficulty" :class="currentQuestion.difficulty">{{ difficultyLabel(currentQuestion.difficulty) }}</span>
+                                <span class="tag importance" :class="currentQuestion.importance">{{ importanceLabel(currentQuestion.importance) }}</span>
+                            </div>
+                            <p class="question-content">{{ currentQuestion.content }}</p>
+                            <div class="options-list">
+                                <div v-for="(opt, idx) in currentQuestion.options" :key="idx"
+                                     class="option-item"
+                                     :class="{
+                                         selected: selectedAnswer === opt[0],
+                                         correct: showResult && opt[0] === currentQuestion.answer,
+                                         wrong: showResult && selectedAnswer === opt[0] && opt[0] !== currentQuestion.answer
+                                     }"
+                                     @click="selectAnswer(opt[0])">
+                                    {{ opt }}
+                                </div>
+                            </div>
+                            <div v-if="showResult" class="result-feedback" :class="{correct: isCorrect, wrong: !isCorrect}">
+                                {{ isCorrect ? '回答正确！' : '回答错误，正确答案是 ' + currentQuestion.answer }}
+                            </div>
+                            <div class="question-actions">
+                                <button v-if="!showResult" class="submit-btn" @click="submitAnswer" :disabled="!selectedAnswer">提交答案</button>
+                                <button v-if="showResult && currentQuestionIndex < practiceQuestions.length - 1"
+                                        class="next-btn" @click="nextQuestion">下一题</button>
+                                <button v-if="showResult && currentQuestionIndex >= practiceQuestions.length - 1"
+                                        class="finish-btn" @click="finishPractice">完成练习</button>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script src="app.js"></script>
+</body>
+</html>

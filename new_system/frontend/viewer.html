@@ -1,0 +1,157 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>在线浏览 - 学习资源</title>
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body { font-family: 'Microsoft YaHei', sans-serif; background: #f4f7f6; }
+        .viewer-header {
+            background: #2c3e50;
+            color: white;
+            padding: 16px 24px;
+            display: flex;
+            align-items: center;
+            gap: 16px;
+        }
+        .back-btn {
+            background: rgba(255,255,255,0.2);
+            border: none;
+            color: white;
+            padding: 8px 16px;
+            border-radius: 6px;
+            cursor: pointer;
+            font-size: 14px;
+        }
+        .back-btn:hover { background: rgba(255,255,255,0.3); }
+        .viewer-header h2 { font-size: 16px; font-weight: normal; }
+        .viewer-body {
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            min-height: calc(100vh - 60px);
+            padding: 40px;
+        }
+        .viewer-content {
+            background: white;
+            border-radius: 12px;
+            box-shadow: 0 4px 20px rgba(0,0,0,0.1);
+            padding: 40px;
+            text-align: center;
+            max-width: 600px;
+            width: 100%;
+        }
+        .file-icon { font-size: 64px; margin-bottom: 20px; }
+        .file-name { font-size: 18px; color: #2c3e50; margin-bottom: 12px; font-weight: bold; }
+        .file-type { font-size: 14px; color: #95a5a6; margin-bottom: 30px; }
+        .viewer-actions { display: flex; gap: 12px; justify-content: center; }
+        .btn {
+            padding: 12px 28px;
+            border: none;
+            border-radius: 8px;
+            font-size: 14px;
+            cursor: pointer;
+            text-decoration: none;
+            transition: all 0.3s;
+        }
+        .btn-primary { background: #3498db; color: white; }
+        .btn-primary:hover { background: #2980b9; }
+        .btn-success { background: #27ae60; color: white; }
+        .btn-success:hover { background: #219a52; }
+        .ppt-embed {
+            width: 100%;
+            height: calc(100vh - 100px);
+            border: none;
+            border-radius: 8px;
+        }
+    </style>
+</head>
+<body>
+    <div class="viewer-header">
+        <button class="back-btn" onclick="history.back()">← 返回</button>
+        <h2 id="pageTitle">在线浏览</h2>
+    </div>
+    <div class="viewer-body" id="viewerBody">
+        <div class="viewer-content">
+            <div class="file-icon" id="fileIcon">📊</div>
+            <div class="file-name" id="fileName">加载中...</div>
+            <div class="file-type" id="fileType">正在准备预览...</div>
+            <div class="viewer-actions">
+                <a class="btn btn-primary" id="downloadBtn" href="#" download>下载文件</a>
+                <a class="btn btn-success" id="openNewBtn" href="#" target="_blank">新窗口打开</a>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        const params = new URLSearchParams(window.location.search);
+        const filename = params.get('file');
+        const filetype = params.get('type');
+
+        if (!filename) {
+            document.getElementById('viewerBody').innerHTML = '<div class="viewer-content"><p>未指定文件</p></div>';
+        } else {
+            const ext = filename.split('.').pop().toLowerCase();
+            const icons = { pptx: '📊', ppt: '📊', pdf: '', docx: '📄', doc: '📄', mp4: '🎬', txt: '' };
+            const types = { pptx: 'PowerPoint 演示文稿', ppt: 'PowerPoint 演示文稿', pdf: 'PDF 文档', docx: 'Word 文档', doc: 'Word 文档', mp4: '视频文件', txt: '文本文件' };
+
+            document.getElementById('fileIcon').textContent = icons[ext] || '📄';
+            document.getElementById('fileName').textContent = filename;
+            document.getElementById('fileType').textContent = types[ext] || '未知类型';
+
+            const downloadUrl = `/api/download/${encodeURIComponent(filename)}`;
+            document.getElementById('downloadBtn').href = downloadUrl;
+            document.getElementById('openNewBtn').href = downloadUrl;
+            document.getElementById('pageTitle').textContent = '在线浏览 - ' + filename;
+
+            if (ext === 'mp4') {
+                document.getElementById('viewerBody').innerHTML = `
+                    <video controls autoplay style="width:100%;max-width:900px;border-radius:12px;box-shadow:0 4px 20px rgba(0,0,0,0.2);">
+                        <source src="${downloadUrl}" type="video/mp4">
+                        您的浏览器不支持视频播放
+                    </video>`;
+            } else if (ext === 'pdf') {
+                document.getElementById('viewerBody').innerHTML = `
+                    <iframe src="${downloadUrl}" class="ppt-embed" style="width:100%;height:calc(100vh - 60px);border:none;"></iframe>`;
+            } else if (ext === 'pptx' || ext === 'ppt') {
+                document.getElementById('viewerBody').innerHTML = `
+                    <div class="viewer-content" style="max-width:700px;">
+                        <div class="file-icon">📊</div>
+                        <div class="file-name">${filename}</div>
+                        <div class="file-type">PowerPoint 演示文稿</div>
+                        <p style="color:#666;margin:20px 0;font-size:14px;">
+                            PPT文件需要下载后使用 PowerPoint 或 WPS 打开浏览。<br>
+                            在线预览功能需要文件部署在公网服务器上才能使用。
+                        </p>
+                        <div class="viewer-actions">
+                            <a class="btn btn-primary" href="${downloadUrl}" download>下载文件</a>
+                        </div>
+                    </div>`;
+            } else if (ext === 'txt') {
+                fetch(downloadUrl)
+                    .then(r => r.text())
+                    .then(text => {
+                        document.getElementById('viewerBody').innerHTML = `
+                            <div style="background:white;border-radius:12px;padding:30px;max-width:800px;width:100%;box-shadow:0 4px 20px rgba(0,0,0,0.1);">
+                                <pre style="white-space:pre-wrap;font-family:Consolas,monospace;font-size:14px;line-height:1.6;color:#333;">${text.replace(/</g, '&lt;').replace(/>/g, '&gt;')}</pre>
+                            </div>`;
+                    });
+            } else if (ext === 'docx' || ext === 'doc') {
+                document.getElementById('viewerBody').innerHTML = `
+                    <div class="viewer-content" style="max-width:700px;">
+                        <div class="file-icon">📄</div>
+                        <div class="file-name">${filename}</div>
+                        <div class="file-type">Word 文档</div>
+                        <p style="color:#666;margin:20px 0;font-size:14px;">
+                            Word文件需要下载后使用 Word 或 WPS 打开浏览。
+                        </p>
+                        <div class="viewer-actions">
+                            <a class="btn btn-primary" href="${downloadUrl}" download>下载文件</a>
+                        </div>
+                    </div>`;
+            }
+        }
+    </script>
+</body>
+</html>

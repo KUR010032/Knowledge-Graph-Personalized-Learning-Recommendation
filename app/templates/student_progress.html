@@ -1,0 +1,777 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <meta charset="UTF-8">
+    <title>学习进度总览 - {{ student_name }}</title>
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body { font-family: 'Microsoft YaHei', 'SimHei', Arial, sans-serif; background-color: #f0f2f5; color: #333; display: flex; height: 100vh; overflow: hidden; }
+        
+        .sidebar { width: 200px; background: #2c3e50; color: white; display: flex; flex-direction: column; }
+        .sidebar-header { padding: 20px; border-bottom: 1px solid #34495e; }
+        .sidebar-header h3 { font-size: 15px; margin-bottom: 5px; font-weight: normal; color: #ecf0f1; }
+        .sidebar-header .user-badge { font-size: 12px; color: #95a5a6; }
+        
+        .nav-menu { flex: 1; padding: 10px 0; }
+        .nav-item { padding: 12px 20px; cursor: pointer; display: flex; align-items: center; gap: 10px; font-size: 14px; text-decoration: none; color: #bdc3c7; border-left: 3px solid transparent; }
+        .nav-item:hover { background: #34495e; color: white; }
+        .nav-item.active { background: #34495e; color: white; border-left-color: #3498db; }
+        .nav-item i { width: 18px; text-align: center; font-size: 16px; }
+        
+        .sidebar-footer { padding: 15px 20px; border-top: 1px solid #34495e; }
+        .logout-btn { width: 100%; padding: 8px; background: #e74c3c; color: white; border: none; border-radius: 3px; cursor: pointer; font-size: 13px; }
+        .logout-btn:hover { background: #c0392b; }
+        
+        .main-content { flex: 1; display: flex; flex-direction: column; overflow: hidden; }
+        .top-bar { background: white; padding: 12px 20px; border-bottom: 1px solid #e0e0e0; display: flex; justify-content: space-between; align-items: center; }
+        .top-bar h2 { color: #333; font-size: 16px; font-weight: normal; }
+        
+        .content-area { flex: 1; padding: 20px; overflow-y: auto; }
+        
+        /* 总体进度卡片 */
+        .progress-overview {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            border-radius: 12px;
+            padding: 30px;
+            color: white;
+            margin-bottom: 25px;
+            box-shadow: 0 4px 15px rgba(102, 126, 234, 0.3);
+            display: flex;
+            align-items: center;
+            gap: 40px;
+        }
+        
+        .progress-circle-container {
+            position: relative;
+            width: 150px;
+            height: 150px;
+            flex-shrink: 0;
+        }
+        
+        .progress-circle {
+            width: 100%;
+            height: 100%;
+            border-radius: 50%;
+            background: conic-gradient(#fff var(--progress), rgba(255,255,255,0.2) 0);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            position: relative;
+        }
+        
+        .progress-circle::before {
+            content: '';
+            position: absolute;
+            width: 120px;
+            height: 120px;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            border-radius: 50%;
+        }
+        
+        .progress-circle-text {
+            position: relative;
+            z-index: 1;
+            text-align: center;
+        }
+        
+        .progress-percentage {
+            font-size: 36px;
+            font-weight: bold;
+            line-height: 1;
+        }
+        
+        .progress-label {
+            font-size: 14px;
+            opacity: 0.9;
+            margin-top: 5px;
+        }
+        
+        .progress-stats {
+            flex: 1;
+            display: grid;
+            grid-template-columns: repeat(2, 1fr);
+            gap: 20px;
+        }
+        
+        .stat-card {
+            background: rgba(255,255,255,0.15);
+            backdrop-filter: blur(10px);
+            padding: 15px 20px;
+            border-radius: 10px;
+            border: 1px solid rgba(255,255,255,0.2);
+        }
+        
+        .stat-label {
+            font-size: 13px;
+            opacity: 0.9;
+            margin-bottom: 8px;
+        }
+        
+        .stat-value {
+            font-size: 28px;
+            font-weight: bold;
+        }
+        
+        .stat-subtext {
+            font-size: 11px;
+            opacity: 0.8;
+            margin-top: 4px;
+        }
+        
+        /* 分类卡片容器 */
+        .category-grid {
+            display: grid;
+            grid-template-columns: repeat(2, 1fr);
+            gap: 20px;
+            margin-bottom: 25px;
+        }
+        
+        .category-card {
+            background: white;
+            border-radius: 12px;
+            padding: 25px;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.06);
+        }
+        
+        .category-header {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            margin-bottom: 20px;
+            padding-bottom: 15px;
+            border-bottom: 2px solid #f0f0f0;
+        }
+        
+        .category-title {
+            font-size: 18px;
+            font-weight: bold;
+            color: #2c3e50;
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+        
+        .category-icon {
+            font-size: 24px;
+        }
+        
+        .category-count {
+            font-size: 14px;
+            color: #7f8c8d;
+            background: #f8f9fa;
+            padding: 5px 12px;
+            border-radius: 15px;
+        }
+        
+        /* 章节列表 */
+        .chapter-list {
+            max-height: 400px;
+            overflow-y: auto;
+        }
+        
+        .chapter-item {
+            margin-bottom: 15px;
+            border: 1px solid #e8e8e8;
+            border-radius: 10px;
+            overflow: hidden;
+            transition: all 0.3s;
+        }
+        
+        .chapter-item:hover {
+            box-shadow: 0 2px 8px rgba(0,0,0,0.08);
+        }
+        
+        .chapter-header-row {
+            padding: 15px 20px;
+            background: #fafafa;
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+        }
+        
+        .chapter-name {
+            font-size: 15px;
+            font-weight: bold;
+            color: #2c3e50;
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+        
+        .status-badge {
+            padding: 4px 12px;
+            border-radius: 12px;
+            font-size: 11px;
+            font-weight: bold;
+            color: white;
+        }
+        
+        .status-completed { background: #27ae60; }
+        .status-learning { background: #f39c12; }
+        .status-not-started { background: #95a5a6; }
+        
+        .mastery-bar {
+            width: 100%;
+            height: 6px;
+            background: #e0e0e0;
+            border-radius: 3px;
+            margin-top: 10px;
+            overflow: hidden;
+        }
+        
+        .mastery-fill {
+            height: 100%;
+            border-radius: 3px;
+            transition: width 0.5s ease;
+        }
+        
+        .section-list {
+            padding: 15px 20px;
+            background: white;
+            display: none;
+        }
+        
+        .section-list.show {
+            display: block;
+        }
+        
+        .section-item {
+            padding: 10px 0;
+            border-bottom: 1px solid #f0f0f0;
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+        }
+        
+        .section-item:last-child {
+            border-bottom: none;
+        }
+        
+        .section-name {
+            font-size: 13px;
+            color: #555;
+            flex: 1;
+        }
+        
+        .section-mastery {
+            font-size: 12px;
+            font-weight: bold;
+            padding: 3px 10px;
+            border-radius: 10px;
+            margin-left: 10px;
+        }
+        
+        /* 视频和资源列表 */
+        .item-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fill, minmax(250px, 1fr));
+            gap: 15px;
+            max-height: 350px;
+            overflow-y: auto;
+        }
+        
+        .item-card {
+            border: 1px solid #e8e8e8;
+            border-radius: 10px;
+            padding: 15px;
+            display: flex;
+            align-items: center;
+            gap: 12px;
+            transition: all 0.3s;
+        }
+        
+        .item-card:hover {
+            box-shadow: 0 2px 8px rgba(0,0,0,0.08);
+            transform: translateY(-2px);
+        }
+        
+        .item-icon {
+            width: 45px;
+            height: 45px;
+            border-radius: 10px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 22px;
+            flex-shrink: 0;
+        }
+        
+        .icon-video { background: #fef5f5; color: #e74c3c; }
+        .icon-doc { background: #f0f7ff; color: #3498db; }
+        .icon-downloaded { background: #d5f4e6; color: #27ae60; }
+        
+        .item-info {
+            flex: 1;
+            min-width: 0;
+        }
+        
+        .item-name {
+            font-size: 13px;
+            font-weight: bold;
+            color: #2c3e50;
+            white-space: nowrap;
+            overflow: hidden;
+            text-overflow: ellipsis;
+        }
+        
+        .item-meta {
+            font-size: 11px;
+            color: #95a5a6;
+            margin-top: 4px;
+        }
+        
+        .item-status-icon {
+            font-size: 20px;
+            flex-shrink: 0;
+        }
+        
+        /* 练习统计卡片 */
+        .practice-stats {
+            display: grid;
+            grid-template-columns: repeat(3, 1fr);
+            gap: 15px;
+            margin-top: 15px;
+        }
+        
+        .practice-stat {
+            text-align: center;
+            padding: 20px;
+            background: #f8f9fa;
+            border-radius: 10px;
+        }
+        
+        .practice-stat-value {
+            font-size: 32px;
+            font-weight: bold;
+            color: #667eea;
+        }
+        
+        .practice-stat-label {
+            font-size: 12px;
+            color: #7f8c8d;
+            margin-top: 8px;
+        }
+        
+        /* 加载状态 */
+        .loading {
+            text-align: center;
+            padding: 60px 20px;
+            color: #95a5a6;
+            font-size: 15px;
+        }
+        
+        .loading-spinner {
+            display: inline-block;
+            width: 40px;
+            height: 40px;
+            border: 4px solid #f3f3f3;
+            border-top: 4px solid #667eea;
+            border-radius: 50%;
+            animation: spin 1s linear infinite;
+            margin-bottom: 15px;
+        }
+        
+        @keyframes spin {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
+        }
+        
+        /* 空状态 */
+        .empty-state {
+            text-align: center;
+            padding: 40px 20px;
+            color: #95a5a6;
+        }
+        
+        .empty-icon {
+            font-size: 48px;
+            margin-bottom: 15px;
+        }
+    </style>
+</head>
+<body>
+
+<div class="sidebar">
+    <div class="sidebar-header">
+        <h3>学习推荐系统</h3>
+        <div class="user-badge">{{ student_name }}</div>
+    </div>
+    
+    <div class="nav-menu">
+        <a href="/student/graph" class="nav-item {% if active_page == 'graph' %}active{% endif %}">
+            <i>&#128200;</i> 学习画像
+        </a>
+        <a href="/student/progress" class="nav-item {% if active_page == 'progress' %}active{% endif %}">
+            <i>&#128197;</i> 学习进度
+        </a>
+        <a href="/student/recommend" class="nav-item {% if active_page == 'recommend' %}active{% endif %}">
+            <i>&#127919;</i> 资源推荐
+        </a>
+        <a href="/student/resources" class="nav-item {% if active_page == 'resources' %}active{% endif %}">
+            <i>&#128218;</i> 学习资源
+        </a>
+    </div>
+    
+    <div class="sidebar-footer">
+        <button class="logout-btn" onclick="location.href='/logout'">退出登录</button>
+    </div>
+</div>
+
+<div class="main-content">
+    <div class="top-bar">
+        <h2>学习进度总览</h2>
+        <span style="color: #7f8c8d; font-size: 13px;">实时追踪你的学习轨迹</span>
+    </div>
+    
+    <div class="content-area">
+        <div id="progressContainer">
+            <div class="loading">
+                <div class="loading-spinner"></div>
+                <div>加载中...</div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<script>
+var container = document.getElementById("progressContainer");
+
+function load() {
+    fetch("/student/progress/data", {
+        credentials: "include"
+    })
+    .then(function(response) { return response.json(); })
+    .then(function(data) {
+        if (!data.success) {
+            container.innerHTML = "<p style='color:red;text-align:center;padding:40px;'>" + (data.error || "加载失败") + "</p>";
+            return;
+        }
+        
+        renderProgress(data);
+    })
+    .catch(function(error) {
+        console.error("Error:", error);
+        container.innerHTML = "<p style='color:red;text-align:center;padding:40px;'>网络错误，请重试</p>";
+    });
+}
+
+function renderProgress(data) {
+    container.innerHTML = "";
+    var stats = data.statistics;
+    var courseStats = data.course_statistics;
+    
+    // 1. 总体进度概览（包含课程级别综合统计）
+    var overviewHTML = createOverviewSection(stats, courseStats);
+    container.insertAdjacentHTML('beforeend', overviewHTML);
+    
+    // 2. 四个分类卡片
+    var categoriesHTML = createCategoriesGrid(data);
+    container.insertAdjacentHTML('beforeend', categoriesHTML);
+}
+
+function createOverviewSection(stats, courseStats) {
+    var completion = stats.overall_completion || 0;
+    completion = Math.max(0, Math.min(100, Number(completion) || 0));
+    
+    // 课程级别综合统计（如果有数据）
+    var courseStatsHTML = '';
+    if (courseStats) {
+        var avgMastery = Math.round(courseStats.average_mastery * 100);
+        var accuracy = courseStats.accuracy || 0;
+        var totalPracticed = courseStats.total_practiced_questions || 0;
+        var totalCorrect = courseStats.total_correct_questions || 0;
+        
+        courseStatsHTML = `
+            <div style="grid-column: span 2; background: rgba(255,255,255,0.2); backdrop-filter: blur(10px); padding: 20px; border-radius: 10px; border: 1px solid rgba(255,255,255,0.3); margin-top: 15px;">
+                <div style="font-size: 15px; font-weight: bold; margin-bottom: 12px; opacity: 1;">📊 课程综合统计（根节点聚合）</div>
+                <div style="display: grid; grid-template-columns: repeat(4, 1fr); gap: 15px;">
+                    <div style="text-align: center;">
+                        <div style="font-size: 24px; font-weight: bold; color: #fff;">${avgMastery}%</div>
+                        <div style="font-size: 11px; opacity: 0.9; margin-top: 3px;">平均掌握度</div>
+                    </div>
+                    <div style="text-align: center;">
+                        <div style="font-size: 24px; font-weight: bold; color: #fff;">${accuracy}%</div>
+                        <div style="font-size: 11px; opacity: 0.9; margin-top: 3px;">总体正确率</div>
+                    </div>
+                    <div style="text-align: center;">
+                        <div style="font-size: 24px; font-weight: bold; color: #fff;">${totalPracticed}</div>
+                        <div style="font-size: 11px; opacity: 0.9; margin-top: 3px;">总练习题数</div>
+                    </div>
+                    <div style="text-align: center;">
+                        <div style="font-size: 24px; font-weight: bold; color: #fff;">${totalCorrect}</div>
+                        <div style="font-size: 11px; opacity: 0.9; margin-top: 3px;">正确题数</div>
+                    </div>
+                </div>
+            </div>
+        `;
+    }
+    
+    return `
+        <div class="progress-overview">
+            <div class="progress-circle-container">
+                <div class="progress-circle" style="--progress: ${completion}%;">
+                    <div class="progress-circle-text">
+                        <div class="progress-percentage">${completion}%</div>
+                        <div class="progress-label">总体完成度</div>
+                    </div>
+                </div>
+            </div>
+            
+            <div class="progress-stats">
+                <div class="stat-card">
+                    <div class="stat-label">📚 已学章节</div>
+                    <div class="stat-value">${stats.learned_chapters}<small style="font-size:14px;opacity:0.8;">/${stats.total_chapters}</small></div>
+                    <div class="stat-subtext">掌握度达标章节</div>
+                </div>
+                
+                <div class="stat-card">
+                    <div class="stat-label">🎬 已看视频</div>
+                    <div class="stat-value">${stats.watched_videos}<small style="font-size:14px;opacity:0.8;">/${stats.total_videos}</small></div>
+                    <div class="stat-subtext">观看完成或进行中</div>
+                </div>
+                
+                <div class="stat-card">
+                    <div class="stat-label">📄 已阅资源</div>
+                    <div class="stat-value">${stats.viewed_resources}<small style="font-size:14px;opacity:0.8;">/${stats.total_resources}</small></div>
+                    <div class="stat-subtext">已查看或已下载</div>
+                </div>
+                
+                <div class="stat-card">
+                    <div class="stat-label">✏️ 练习题目</div>
+                    <div class="stat-value">${stats.practiced_questions}<small style="font-size:14px;opacity:0.8;">/${stats.total_questions}</small></div>
+                    <div class="stat-subtext">累计练习次数</div>
+                </div>
+                
+                ${courseStatsHTML}
+            </div>
+        </div>
+    `;
+}
+
+function createCategoriesGrid(data) {
+    return `
+        <div class="category-grid">
+            ${createChapterCard(data.chapters)}
+            ${createVideoCard(data.videos_watched)}
+            ${createResourceCard(data.resources_viewed)}
+            ${createPracticeCard(data.questions_practiced)}
+        </div>
+    `;
+}
+
+function createChapterCard(chapters) {
+    var chaptersList = chapters.map(function(ch, idx) {
+        var statusClass = ch.status === 'completed' ? 'status-completed' : (ch.status === 'learning' ? 'status-learning' : 'status-not-started');
+        var statusText = ch.status === 'completed' ? '✅ 已完成' : (ch.status === 'learning' ? '📖 学习中' : '⏸ 未开始');
+        var masteryColor = ch.avg_mastery >= 0.8 ? '#27ae60' : (ch.avg_mastery >= 0.4 ? '#f39c12' : '#95a5a6');
+        var masteryPercent = Math.round(ch.avg_mastery * 100);
+        
+        var sectionsHTML = ch.sections.map(function(sec) {
+            var secStatusClass = sec.status === 'completed' ? '#27ae60' : (sec.status === 'learning' ? '#f39c12' : '#e0e0e0');
+            var secMastery = Math.round(sec.avg_mastery * 100);
+            return `
+                <div class="section-item">
+                    <span class="section-name">${sec.name}</span>
+                    <span class="section-mastery" style="background:${secStatusClass};color:white;">${secMastery}%</span>
+                </div>
+            `;
+        }).join('');
+        
+        return `
+            <div class="chapter-item">
+                <div class="chapter-header-row" onclick="toggleSections(this)">
+                    <div>
+                        <div class="chapter-name">
+                            ${ch.name}
+                            <span class="status-badge ${statusClass}">${statusText}</span>
+                        </div>
+                        <div class="mastery-bar">
+                            <div class="mastery-fill" style="width:${masteryPercent}%;background:${masteryColor};"></div>
+                        </div>
+                        <div style="margin-top:8px;font-size:12px;color:#7f8c8d;">
+                            平均掌握度: <strong style="color:${masteryColor};">${masteryPercent}%</strong> | 
+                            已掌握知识点: ${ch.learned_kps}/${ch.total_kps}
+                        </div>
+                    </div>
+                    <span style="font-size:20px;color:#95a5a6;cursor:pointer;" class="toggle-arrow">▾</span>
+                </div>
+                <div class="section-list">
+                    ${sectionsHTML}
+                </div>
+            </div>
+        `;
+    }).join('');
+    
+    return `
+        <div class="category-card" style="grid-column: span 2;">
+            <div class="category-header">
+                <div class="category-title">
+                    <span class="category-icon">📚</span>
+                    章节学习进度
+                </div>
+                <span class="category-count">${chapters.length} 个章节</span>
+            </div>
+            <div class="chapter-list">
+                ${chaptersList || '<div class="empty-state"><div class="empty-icon">📚</div><div>暂无章节数据</div></div>'}
+            </div>
+        </div>
+    `;
+}
+
+function createVideoCard(videos) {
+    var videosList = videos.slice(0, 8).map(function(v) {
+        var iconClass = v.status === 'completed' ? '✅' : (v.status === 'watching' ? '▶️' : '⏸');
+        var iconBg = v.status === 'completed' ? 'icon-downloaded' : 'icon-video';
+        
+        return `
+            <div class="item-card">
+                <div class="item-icon ${iconBg}">${v.status === 'completed' ? '✓' : '▶'}</div>
+                <div class="item-info">
+                    <div class="item-name">${v.name.replace('.mp4', '')}</div>
+                    <div class="item-meta">
+                        完成率: ${v.completion_rate}% | 播放${v.play_count}次
+                        ${v.last_viewed ? '<br>' + formatTime(v.last_viewed) : ''}
+                    </div>
+                </div>
+                <div class="item-status-icon">${iconClass}</div>
+            </div>
+        `;
+    }).join('');
+    
+    return `
+        <div class="category-card">
+            <div class="category-header">
+                <div class="category-title">
+                    <span class="category-icon">🎬</span>
+                    视频观看记录
+                </div>
+                <span class="category-count">${videos.length} 个视频</span>
+            </div>
+            <div class="item-grid">
+                ${videosList || '<div class="empty-state"><div class="empty-icon">🎬</div><div>暂无观看记录</div></div>'}
+            </div>
+        </div>
+    `;
+}
+
+function createResourceCard(resources) {
+    var resourcesList = resources.slice(0, 8).map(function(r) {
+        var iconClass = r.downloaded ? '✅' : (r.view_count > 0 ? '👁' : '⏸');
+        var iconBg = r.downloaded ? 'icon-downloaded' : 'icon-doc';
+        
+        return `
+            <div class="item-card">
+                <div class="item-icon ${iconBg}">${r.downloaded ? '↓' : '📄'}</div>
+                <div class="item-info">
+                    <div class="item-name">${r.name.split('.').slice(0, -1).join('.')}</div>
+                    <div class="item-meta">
+                        查看${r.view_count}次 ${r.downloaded ? '| 已下载' : ''}
+                        ${r.last_viewed ? '<br>' + formatTime(r.last_viewed) : ''}
+                    </div>
+                </div>
+                <div class="item-status-icon">${iconClass}</div>
+            </div>
+        `;
+    }).join('');
+    
+    return `
+        <div class="category-card">
+            <div class="category-header">
+                <div class="category-title">
+                    <span class="category-icon">📄</span>
+                    资源查看记录
+                </div>
+                <span class="category-count">${resources.length} 个资源</span>
+            </div>
+            <div class="item-grid">
+                ${resourcesList || '<div class="empty-state"><div class="empty-icon">📄</div><div>暂无查看记录</div></div>'}
+            </div>
+        </div>
+    `;
+}
+
+function createPracticeCard(practiceData) {
+    if (!practiceData || typeof practiceData !== 'object') {
+        return `
+            <div class="category-card" style="grid-column: span 2;">
+                <div class="category-header">
+                    <div class="category-title">
+                        <span class="category-icon">✏️</span>
+                        题目练习统计
+                    </div>
+                </div>
+                <div class="empty-state">
+                    <div class="empty-icon">✏️</div>
+                    <div>暂无练习数据</div>
+                </div>
+            </div>
+        `;
+    }
+    
+    return `
+        <div class="category-card" style="grid-column: span 2;">
+            <div class="category-header">
+                <div class="category-title">
+                    <span class="category-icon">✏️</span>
+                    题目练习统计
+                </div>
+            </div>
+            <div class="practice-stats">
+                <div class="practice-stat">
+                    <div class="practice-stat-value">${practiceData.total_attempts}</div>
+                    <div class="practice-stat-label">总练习题数</div>
+                </div>
+                <div class="practice-stat">
+                    <div class="practice-stat-value" style="color:#27ae60;">${practiceData.correct_count}</div>
+                    <div class="practice-stat-label">正确题数</div>
+                </div>
+                <div class="practice-stat">
+                    <div class="practice-stat-value" style="color:${practiceData.accuracy >= 70 ? '#27ae60' : (practiceData.accuracy >= 40 ? '#f39c12' : '#e74c3c')};">${practiceData.accuracy}%</div>
+                    <div class="practice-stat-label">正确率</div>
+                </div>
+            </div>
+            <div style="margin-top:20px;text-align:center;color:#7f8c8d;font-size:13px;">
+                已覆盖 <strong style="color:#667eea;">${practiceData.practiced_kps}</strong> 个知识点的练习
+            </div>
+        </div>
+    `;
+}
+
+function toggleSections(header) {
+    var sectionList = header.nextElementSibling;
+    var arrow = header.querySelector('.toggle-arrow');
+    
+    if (sectionList.classList.contains('show')) {
+        sectionList.classList.remove('show');
+        arrow.textContent = '▾';
+    } else {
+        sectionList.classList.add('show');
+        arrow.textContent = '▴';
+    }
+}
+
+function formatTime(timeStr) {
+    if (!timeStr) return '';
+    try {
+        var date = new Date(timeStr);
+        var now = new Date();
+        var diff = now - date;
+        var days = Math.floor(diff / (1000 * 60 * 60 * 24));
+        
+        if (diff < 0) return date.toLocaleDateString('zh-CN');
+        if (days === 0) return '今天';
+        if (days === 1) return '昨天';
+        if (days < 7) return days + '天前';
+        return date.toLocaleDateString('zh-CN');
+    } catch(e) {
+        return timeStr;
+    }
+}
+
+// 页面加载时获取数据
+load();
+</script>
+
+</body>
+</html>

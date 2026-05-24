@@ -1,0 +1,20 @@
+清库
+MATCH (n)
+DETACH DELETE n;
+
+
+清空学生
+MATCH (s:Student)
+DETACH DELETE s
+
+
+全图
+MATCH (n)-[r]->(m) RETURN n,r,m
+
+
+知识图谱
+MATCH (a:Knowledge)-[r]->(b:Knowledge)
+RETURN a, r, b
+
+
+
