@@ -5707,10 +5707,353 @@ def teacher_view_student_new():
 app.view_functions["teacher_students"] = teacher_students_new
 app.view_functions["teacher_view_student"] = teacher_view_student_new
 
-app.view_functions["student_mastery_data"] = _safe_mastery_response
-app.view_functions["get_student_resources_data"] = _safe_resources_response
-app.view_functions["student_path_data"] = _safe_path_response
-app.view_functions["student_flow_graph_data"] = _safe_graph_response
+STUDENT_FLOW_HTML = r"""
+<!doctype html><html lang="zh-CN"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>{{ page_title }} - 操作系统</title><script src="https://cdn.jsdelivr.net/npm/vis-network@9.1.2/standalone/umd/vis-network.min.js"></script>
+<style>
+*{box-sizing:border-box}body{margin:0;background:#f3f5f8;color:#111827;font-family:"Microsoft YaHei",Arial,sans-serif}.layout{display:grid;grid-template-columns:216px 1fr;min-height:100vh}.side{background:#fff;border-right:1px solid #e5e7eb;padding:22px 0;position:sticky;top:0;height:100vh}.brand{padding:0 24px 24px;font-size:20px;font-weight:800}.nav a{display:block;padding:13px 28px;color:#4b5563;text-decoration:none;border-left:3px solid transparent}.nav a.active,.nav a:hover{background:#eef4ff;color:#2563eb;border-left-color:#60a5fa}.logout{position:absolute;left:20px;right:20px;bottom:20px}.logout a{display:block;text-align:center;padding:10px;border-radius:6px;background:#eef4ff;color:#2563eb;text-decoration:none;font-weight:700}.top{height:64px;background:#fff;border-bottom:1px solid #e5e7eb;display:flex;align-items:center;justify-content:space-between;padding:0 34px}.top h1{margin:0;font-size:22px}.content{padding:28px 36px;max-width:1500px}.card{background:#fff;border:1px solid #e5e7eb;border-radius:8px;padding:20px;margin-bottom:16px}.grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(230px,1fr));gap:14px}.stat,.res,.res-card{background:#fff;border:1px solid #e5e7eb;border-radius:8px;padding:14px}.stat b{display:block;font-size:30px;margin-top:8px}.muted{color:#64748b;font-size:14px;line-height:1.7}.btn{border:0;background:#2563eb;color:#fff;border-radius:6px;padding:8px 13px;text-decoration:none;cursor:pointer;display:inline-block}.btn.light{background:#eef4ff;color:#2563eb;border:1px solid #dbeafe}.btn.green{background:#16a34a}.tag{font-size:12px;border-radius:999px;background:#eef2ff;color:#3730a3;padding:4px 8px;margin:3px;display:inline-block}.tag.ok{background:#ecfdf5;color:#166534}.tag.warn{background:#fff7ed;color:#9a3412}.tag.bad{background:#fee2e2;color:#991b1b}.progress{height:10px;background:#e5e7eb;border-radius:99px;overflow:hidden;width:320px}.bar{height:100%;background:#22c55e}.bar.warn{background:#f59e0b}.bar.bad{background:#ef4444}.path-step{display:grid;grid-template-columns:38px 1fr;gap:14px;border-top:1px solid #eef2f7;padding:18px 0}.no{width:30px;height:30px;border-radius:50%;background:#2563eb;color:#fff;display:grid;place-items:center;font-weight:800}.res-list,.res-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(230px,1fr));gap:10px}.row{display:flex;justify-content:space-between;gap:12px;align-items:center;border-top:1px solid #eef2f7;padding:12px 0}.chapter{border:1px solid #e5e7eb;border-radius:8px;margin:10px 0;overflow:hidden}.chapter summary{background:#f8fafc;padding:14px 16px;cursor:pointer;font-weight:700}.section{border-top:1px solid #eef2f7}.section summary{background:#fff;padding:12px 20px;color:#475569}.kp-row{display:grid;grid-template-columns:minmax(220px,1fr) 88px 340px;gap:14px;align-items:center;border-top:1px solid #eef2f7;padding:12px 22px}.empty{padding:34px;text-align:center;color:#94a3b8;border:1px dashed #cbd5e1;border-radius:8px}.search,input,select,textarea{border:1px solid #cbd5e1;border-radius:6px;background:#fff;padding:9px 11px}.search{min-width:280px}.toolbar{display:flex;gap:10px;flex-wrap:wrap;margin:12px 0}.post{border-top:1px solid #eef2f7;padding:14px 0;cursor:pointer}.post-head{display:flex;justify-content:space-between;gap:12px}.comment{border-top:1px solid #eef2f7;padding:10px 0}.record-timeline{display:grid;gap:10px}.record-card{display:grid;grid-template-columns:80px minmax(0,1fr) 140px;gap:12px;align-items:center;border-top:1px solid #eef2f7;padding:12px 0}.graph-detail{min-width:0}.graph-detail .progress{width:100%;min-width:0}@media(max-width:900px){.layout{grid-template-columns:1fr}.side{height:auto;position:relative}.logout{position:relative}.content{padding:18px}.kp-row,.path-step,.record-card{grid-template-columns:1fr}.progress{width:100%}}
+</style></head><body><div class="layout"><aside class="side"><div class="brand">操作系统</div><nav class="nav"><a href="/student/dashboard" class="{% if active_page=='dashboard' %}active{% endif %}">首页</a><a href="/student/path" class="{% if active_page=='path' %}active{% endif %}">智能学习路径</a><a href="/student/resources" class="{% if active_page=='resources' %}active{% endif %}">学习资源库</a><a href="/student/mastery" class="{% if active_page=='mastery' %}active{% endif %}">知识点掌握度</a><a href="/student/graph" class="{% if active_page=='graph' %}active{% endif %}">知识图谱</a><a href="/student/discuss" class="{% if active_page=='discuss' %}active{% endif %}">问题讨论</a><a href="/student/records" class="{% if active_page=='records' %}active{% endif %}">学习记录</a></nav><div class="logout"><a href="/logout">退出登录</a></div></aside><main><header class="top"><h1>{{ page_title }}</h1><div>{{ student_name }}</div></header><section class="content" id="app"></section></main></div>
+<script>
+var PAGE="{{ active_page }}",app=document.getElementById('app'),TARGET=new URLSearchParams(location.search).get('target_kp')||'';
+var Z={path:'智能学习路径',resources:'学习资源库',mastery:'知识点掌握度',graph:'知识图谱',discuss:'问题讨论',records:'学习记录',video:'视频',doc:'文档',exercise:'习题',resource:'资源',weak:'薄弱',severe:'严重薄弱',good:'良好',mastered:'已掌握',doing:'进行中',unlearned:'未学习',normal:'普通',easy:'简单',medium:'中等',hard:'困难'};
+function esc(s){return String(s==null?'':s).replace(/[&<>"']/g,function(c){return {'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]})}
+function kpName(s){return String(s==null?'':s).replace(/^\s*\d+(?:\.\d+)+\s*/,'')||String(s==null?'':s)}
+async function getJson(u){try{var r=await fetch(u);return await r.json()}catch(e){return {success:false,learning_path:[],fallback_path:[],resources:[],chapters:[],records:[],groups:[],posts:[],comments:[],nodes:[],edges:[],stats:{}}}}
+function cleanText(s){s=String(s==null?'':s);if(s.indexOf('严重')>=0)return Z.severe;if(s.indexOf('薄弱')>=0)return Z.weak;if(s.indexOf('已')>=0&&s.indexOf('掌')>=0)return Z.mastered;if(s.indexOf('良')>=0)return Z.good;if(s.indexOf('进')>=0)return Z.doing;if(s==='easy')return Z.easy;if(s==='medium')return Z.medium;if(s==='hard')return Z.hard;return s}
+function normType(t){t=cleanText(t);return t===Z.video||t===Z.doc||t===Z.exercise?t:(String(t).endsWith('mp4')?Z.video:Z.doc)}function diffText(v){return cleanText(v||Z.normal)}function statusClass(s){s=cleanText(s);return s===Z.weak||s===Z.severe?'bad':(s===Z.doing?'warn':'ok')}function bar(v,s){return '<div class="progress"><div class="bar '+statusClass(s)+'" style="width:'+Math.max(2,Math.min(100,(+v||0)*100))+'%"></div></div>'}function action(r){return normType(r.type)===Z.video?'/student/watch/'+encodeURIComponent(r.name||r.title||''):'/student/view/'+encodeURIComponent(r.name||r.title||'')}
+function displayKp(s){s=cleanText(s);if(/^\d+$/.test(s))return '第'+s+'章相关知识点';return kpName(s)}
+function codeOf(n){var m=String(n.id||n.label||'').match(/^(\d+(?:\.\d+)*)/);return m?m[1]:''}function wrapLabel(raw,chunk){raw=String(raw||'');chunk=chunk||6;var a=raw.match(new RegExp('.{1,'+chunk+'}','g'))||[raw];return a.join('\\n')}
+function buildLayeredGraph(rawNodes,rawEdges){var map=new Map(),edges=[];function add(n){if(!map.has(n.id))map.set(n.id,n);return map.get(n.id)}add({id:'root',label:'操作系统',drawLabel:'操作系统',level:-1,shape:'diamond',size:42,fontSize:18,mastery:1,levelName:'课程'});rawNodes.forEach(function(n){var code=codeOf(n),parts=code.split('.').filter(Boolean);if(parts.length){var ch='chapter-'+parts[0];add({id:ch,label:'第'+parts[0]+'章',drawLabel:'第'+parts[0]+'章',level:0,shape:'hexagon',size:38,fontSize:18,mastery:n.mastery||0,levelName:'章节'});edges.push({from:'root',to:ch,type:'包含'});if(parts.length>=2){var sec=parts[0]+'.'+parts[1];var secNode=rawNodes.find(function(x){return codeOf(x)===sec});add({id:sec,label:displayKp(secNode&&secNode.label||secNode&&secNode.id||sec),drawLabel:wrapLabel(displayKp(secNode&&secNode.label||secNode&&secNode.id||sec),5),level:1,shape:'box',size:24,fontSize:14,mastery:(secNode&&secNode.mastery)||n.mastery||0,total_questions:(secNode&&secNode.total_questions)||0,correct_questions:(secNode&&secNode.correct_questions)||0,levelName:'大节'});edges.push({from:ch,to:sec,type:'包含'});if(parts.length>=3){add({id:n.id,label:n.label||n.id,drawLabel:wrapLabel(displayKp(n.label||n.id),5),level:2,shape:'circle',size:20,fontSize:13,mastery:n.mastery||0,total_questions:n.total_questions||0,correct_questions:n.correct_questions||0,levelName:'知识点'});edges.push({from:sec,to:n.id,type:'包含'})}}}else add({id:n.id,label:n.label||n.id,drawLabel:wrapLabel(displayKp(n.label||n.id),5),level:2,shape:'circle',size:20,fontSize:13,mastery:n.mastery||0,levelName:'知识点'})});(rawEdges||[]).forEach(function(e){edges.push({from:e.from,to:e.to,type:cleanText(e.type||'相关')})});var uniq=[],seen=new Set();edges.forEach(function(e){var k=e.from+'>'+e.to+'>'+e.type;if(e.from!==e.to&&!seen.has(k)&&map.has(e.from)&&map.has(e.to)){seen.add(k);uniq.push(e)}});return {nodes:Array.from(map.values()),edges:uniq}}
+async function dashboard(){var d=await getJson('/student/dashboard/data'),r=await getJson('/student/resources/data'),m=await getJson('/student/messages'),st=d.stats||{},msgs=(m.messages||[]).slice(0,3);app.innerHTML='<div class="grid"><a class="stat" href="/student/mastery"><span>已掌握</span><b>'+(st.mastered||0)+'</b><span class="muted">薄弱 '+(st.weak||0)+' / 严重 '+(st.severe||0)+'</span></a><a class="stat" href="/student/path"><span>智能学习路径</span><b>开始</b><span class="muted">根据薄弱点推荐</span></a><a class="stat" href="/student/resources"><span>学习资源库</span><b>'+((r.resources||[]).length)+'</b><span class="muted">视频 / 文档 / 习题</span></a><a class="stat" href="/student/graph"><span>知识图谱</span><b>查看</b><span class="muted">单击节点看掌握度</span></a></div><div class="card"><h2>今日学习建议</h2><p class="muted">'+esc(d.latest_message||'优先完成智能学习路径中排在前面的薄弱知识点，并查看对应资源。')+'</p><a class="btn" href="/student/path">进入学习路径</a></div><div class="card"><h2>最新消息</h2>'+(msgs.map(function(x){return '<div class="row"><div><b>'+esc(x.type||'消息')+'</b><div class="muted">'+esc(x.body||'')+'</div></div><span class="muted">'+esc(x.time||'')+'</span></div>'}).join('')||'<div class="empty">暂无消息</div>')+'</div>'}
+async function pathPage(){var d=await getJson('/student/path/data'+(TARGET?'?target_kp='+encodeURIComponent(TARGET):'')),steps=(d.learning_path&&d.learning_path.length?d.learning_path:(d.fallback_path||[]));steps=steps.filter(function(st){return st&&st.name&&!/^(视频|文档|习题|资源)$/.test(String(st.name))});app.innerHTML='<div class="card"><h2>'+Z.path+'</h2><p class="muted">目标：'+esc(displayKp(d.target_kp||TARGET||(steps[0]&&steps[0].name)||''))+'。路径会按薄弱程度、先修关系和资源匹配度排序。</p></div><div class="card">'+(steps.map(function(st,i){var rs=st.resources||[],score=Number(st.score||st.mastery||0),status=cleanText(st.status||'待学习');return '<div class="path-step"><div class="no">'+(i+1)+'</div><div><b>'+esc(displayKp(st.name||st.title||st.kp_id))+'</b><div><span class="tag '+statusClass(status)+'">'+esc(status)+'</span><span class="tag">掌握度 '+Math.round(score*100)+'%</span></div>'+bar(score,status)+'<p class="muted">'+esc(cleanText(st.reason||''))+'</p><div class="res-list">'+rs.map(function(r){return '<div class="res"><b>'+esc(r.title||r.name)+'</b><p><span class="tag">'+esc(normType(r.type))+'</span><span class="tag">'+esc(diffText(r.difficulty))+'</span></p><a class="btn light" href="'+action(r)+'">学习</a> <button class="btn green" disabled>完成</button></div>'}).join('')+'</div></div></div>'}).join('')||'<div class="empty">暂无路径数据</div>')+'</div>'}
+async function resourcesPage(){var d=await getJson('/student/resources/data'),all=d.resources||[];app.innerHTML='<div class="card"><h2>'+Z.resources+'</h2><input class="search" id="q" placeholder="搜索资源、知识点、章节" oninput="renderResources()"></div><div id="resResults"></div>';window.renderResources=function(){var q=(document.getElementById('q').value||'').toLowerCase(),list=all.filter(function(r){return [r.name,r.title,r.knowledge_point,r.chapter_label,r.section_label,normType(r.type)].join(' ').toLowerCase().indexOf(q)>=0}),groups={};list.forEach(function(r){var ch=r.chapter_label||'未分类',sec=r.section_label||'未分类';groups[ch]=groups[ch]||{};groups[ch][sec]=groups[ch][sec]||[];groups[ch][sec].push(r)});document.getElementById('resResults').innerHTML=Object.keys(groups).sort(function(a,b){return a.localeCompare(b,'zh-Hans',{numeric:true})}).map(function(ch,i){var secs=Object.keys(groups[ch]).sort(function(a,b){return a.localeCompare(b,'zh-Hans',{numeric:true})});return '<details class="chapter" '+(i===0?'open':'')+'><summary>'+esc(ch)+' · '+secs.reduce(function(n,s){return n+groups[ch][s].length},0)+' 个资源</summary>'+secs.map(function(sec){return '<details open class="section"><summary>'+esc(sec)+' · '+groups[ch][sec].length+'</summary><div class="res-grid" style="padding:12px">'+groups[ch][sec].map(function(r){return '<div class="res-card"><b>'+esc(r.title||r.name)+'</b><p><span class="tag">'+esc(normType(r.type))+'</span><span class="tag">'+esc(diffText(r.difficulty))+'</span></p><p class="muted">'+esc(displayKp(r.knowledge_point)||'')+'</p><a class="btn light" href="'+action(r)+'">在线查看</a> <a class="btn light" href="/download/'+encodeURIComponent(r.name||'')+'">下载</a></div>'}).join('')+'</div></details>'}).join('')+'</details>'}).join('')||'<div class="empty">暂无资源</div>'};renderResources()}
+async function mastery(){var d=await getJson('/student/mastery/data'),chs=d.chapters||[];app.innerHTML='<div class="card"><h2>'+Z.mastery+'</h2>'+(chs.map(function(ch){var points=ch.knowledge_points||[],secs={};points.forEach(function(k){var code=String(k.kp_id||k.name||'').match(/^(\d+\.\d+)/);var sec=code?code[1]:'未分节';secs[sec]=secs[sec]||[];secs[sec].push(k)});return '<details class="chapter" open><summary>'+esc(ch.title||('第'+ch.chapter+'章'))+' · '+points.length+' 个知识点</summary>'+Object.keys(secs).sort(function(a,b){return a.localeCompare(b,'zh-Hans',{numeric:true})}).map(function(sec){return '<details class="section" open><summary>'+esc(sec)+' · '+secs[sec].length+'</summary>'+secs[sec].map(function(k){var status=cleanText(k.status||''),score=Number(k.score||0);return '<div class="kp-row"><div><b>'+esc(displayKp(k.full_name||k.name||k.kp_id))+'</b><div class="muted">'+esc(status)+'</div></div><b>'+Math.round(score*100)+'%</b>'+bar(score,status)+'</div>'}).join('')+'</details>'}).join('')+'</details>'}).join('')||'<div class="empty">暂无掌握度数据</div>')+'</div>'}
+async function records(){var d=await getJson('/student/records/data'),s=d.summary||{},groups=d.groups||[];app.innerHTML='<div class="grid"><div class="stat"><span>视频学习</span><b>'+(s.video||0)+'</b></div><div class="stat"><span>文档学习</span><b>'+(s.document||0)+'</b></div><div class="stat"><span>本周记录</span><b>'+(s.week||0)+'</b></div><div class="stat"><span>总记录</span><b>'+(s.total||0)+'</b></div></div><div class="card"><h2>'+Z.records+'</h2><div class="record-timeline">'+(groups.map(function(g){return '<details class="chapter" open><summary>'+esc(g.date)+' · '+g.items.length+' 条</summary>'+g.items.map(function(r){return '<div class="record-card"><span class="tag">'+esc(normType(r.type))+'</span><div><b>'+esc(r.name)+'</b><div class="muted">'+esc(displayKp(r.knowledge_point)||'未绑定知识点')+'</div></div><div class="muted">'+esc(r.time||'')+'</div></div>'}).join('')+'</details>'}).join('')||'<div class="empty">暂无学习记录</div>')+'</div></div>'}
+async function discuss(){var d=await getJson('/student/discuss/list');app.innerHTML='<div class="card"><h2>'+Z.discuss+'</h2><div class="toolbar"><input id="topicTitle" class="search" placeholder="问题标题"><button class="btn" onclick="postTopic()">发布</button></div><textarea id="topicBody" style="width:100%" rows="3" placeholder="描述你的问题、卡点或学习经验"></textarea></div><div class="card">'+((d.posts||[]).map(function(p){return '<div class="post" onclick="openPost(&quot;'+esc(p.id)+'&quot;)"><div class="post-head"><b>'+esc(p.title)+'</b><span class="tag">'+esc(cleanText(p.status||''))+'</span></div><div class="muted">'+esc(p.author)+' · '+esc(p.time)+' · '+(p.comment_count||0)+' 条回复</div><p>'+esc(p.body||'')+'</p></div>'}).join('')||'<div class="empty">暂无讨论</div>')+'</div><div class="card" id="postDetail"><div class="muted">点击讨论查看详情和回复。</div></div>'}
+async function postTopic(){if(!topicTitle.value.trim())return alert('请填写标题');let d=await fetch('/student/discuss/post',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({title:topicTitle.value.trim(),body:topicBody.value.trim()})}).then(r=>r.json());alert(d.success?'发布成功':(d.error||'发布失败'));if(d.success)discuss()}
+async function openPost(id){let d=await getJson('/student/discuss/detail/'+encodeURIComponent(id)),p=d.post||{};postDetail.innerHTML='<h2>'+esc(p.title)+'</h2><p>'+esc(p.body||'')+'</p><div class="muted">'+esc(p.author||'')+' · '+esc(p.time||'')+'</div><h3>回复</h3>'+((d.comments||[]).map(function(c){return '<div class="comment"><b>'+esc(c.author)+'</b><p>'+esc(c.body)+'</p><div class="muted">'+esc(c.time)+'</div></div>'}).join('')||'<div class="muted">暂无回复</div>')+'<textarea id="commentBody" style="width:100%" rows="3" placeholder="写下回复"></textarea><button class="btn" onclick="commentPost(\\''+id+'\\')">提交回复</button>'}
+async function commentPost(id){let body=document.getElementById('commentBody').value.trim();if(!body)return alert('请填写回复');let d=await fetch('/student/discuss/comment/'+encodeURIComponent(id),{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({body:body})}).then(r=>r.json());alert(d.success?'回复成功':(d.error||'回复失败'));if(d.success)openPost(id)}
+async function graphPage(){var d=await getJson('/student/flow-graph/data'),built=buildLayeredGraph(d.nodes||[],d.edges||[]),nodes=built.nodes,edges=built.edges;app.innerHTML='<div class="card"><h2>'+Z.graph+'</h2><div class="muted"><b>颜色 = 学习状态：</b><span class="tag ok">已掌握>=80%</span><span class="tag">良好>=60%</span><span class="tag warn">进行中>=40%</span><span class="tag bad">薄弱&lt;40%</span><span class="tag">未学习</span><b style="margin-left:12px">边：</b>包含 / 相关 / 先修</div><div style="display:grid;grid-template-columns:minmax(0,1fr) 360px;gap:18px;margin-top:14px"><div style="position:relative"><div id="mynetwork" style="height:720px;border:1px solid #e5e7eb;background:#fafafa"></div><div style="position:absolute;right:18px;top:18px;width:62px;background:#fff;border:1px solid #dbe3ef;border-radius:14px;box-shadow:0 8px 24px rgba(15,23,42,.12);padding:10px;display:grid;gap:6px;place-items:center"><button class="btn light" style="width:40px;height:40px;padding:0" onclick="zoomGraph(.03)">+</button><input id="graphZoom" type="range" min="0" max="100" step="1" value="26" oninput="setGraphZoom(this.value)" style="writing-mode:vertical-lr;direction:rtl;-webkit-appearance:slider-vertical;appearance:slider-vertical;width:40px;height:250px;margin:0;touch-action:none"><button class="btn light" style="width:40px;height:40px;padding:0" onclick="zoomGraph(-.03)">-</button></div></div><div id="nodeDetail" class="res-card graph-detail"><b>节点详情</b><p class="muted">单击节点查看掌握度。</p></div></div></div>';if(!window.vis){document.getElementById('mynetwork').innerHTML='<div class="empty">vis load failed</div>';return}function color(m){return m>=.8?{background:'#d4f0dc',border:'#a8ddb8'}:m>=.6?{background:'#dbeafe',border:'#93c5fd'}:m>=.4?{background:'#ffedd5',border:'#fdba74'}:m>0?{background:'#fee2e2',border:'#fca5a5'}:{background:'#eceff1',border:'#cfd8dc'}}var visNodes=new vis.DataSet(nodes.map(function(n){return {id:n.id,label:n.drawLabel||displayKp(n.label||n.id),shape:n.shape,size:n.size,color:n.id==='root'?{background:'#1f2937',border:'#111827'}:color(n.mastery||0),font:{size:n.fontSize,face:'Microsoft YaHei',color:n.id==='root'?'#fff':'#111827',bold:true,multi:true},borderWidth:n.level<=0?4:3,mass:n.level<=0?6:(n.level===1?3:1),widthConstraint:n.shape==='box'?{minimum:120,maximum:150}:undefined,heightConstraint:n.shape==='box'?{minimum:60}:undefined}}));var visEdges=new vis.DataSet(edges.map(function(e,i){return {id:i,from:e.from,to:e.to,arrows:'to',color:{color:e.type==='先修'?'#9b59b6':(e.type==='相关'?'#f59e0b':'#94a3b8')},dashes:e.type!=='包含',width:e.type==='包含'?2.2:1.7,smooth:{type:'dynamic'}}}));var network=new vis.Network(document.getElementById('mynetwork'),{nodes:visNodes,edges:visEdges},{physics:{solver:'forceAtlas2Based',forceAtlas2Based:{gravitationalConstant:-240,centralGravity:.018,springLength:170,springConstant:.04,avoidOverlap:1},stabilization:{iterations:600}},interaction:{zoomView:true,dragView:true,dragNodes:true}});window.graphNetwork=network;window.graphZoomMin=.24;window.graphZoomMax=.55;window.graphScale=.32;network.once('stabilizationIterationsDone',function(){network.stopSimulation();applyGraphZoom(.32,true)});network.on('click',function(p){var id=p.nodes&&p.nodes[0],n=nodes.find(function(x){return x.id===id});if(!n)return;var m=Number(n.mastery||0),state=m>=.8?Z.mastered:m>=.6?Z.good:m>=.4?Z.doing:m>0?Z.weak:Z.unlearned;document.getElementById('nodeDetail').innerHTML='<b>'+esc(displayKp(n.label||n.id))+'</b><p><span class="tag '+statusClass(state)+'">'+state+'</span><span class="tag">掌握度 '+Math.round(m*100)+'%</span></p>'+bar(m,state)+'<p class="muted">'+esc(n.levelName||'')+'</p>'})}
+function graphSliderToScale(v){var min=window.graphZoomMin||.24,max=window.graphZoomMax||.55,t=Math.max(0,Math.min(100,parseFloat(v)||0))/100;return min+(max-min)*t}function graphScaleToSlider(s){var min=window.graphZoomMin||.24,max=window.graphZoomMax||.55;return Math.round((Math.max(min,Math.min(max,parseFloat(s)||min))-min)/(max-min)*100)}function applyGraphZoom(scale,animate){var min=window.graphZoomMin||.24,max=window.graphZoomMax||.55;window.graphScale=Math.max(min,Math.min(max,parseFloat(scale)||.32));if(window.graphNetwork)window.graphNetwork.moveTo({position:window.graphNetwork.getViewPosition(),scale:window.graphScale,animation:animate?{duration:120,easingFunction:'easeInOutQuad'}:{duration:0}});var z=document.getElementById('graphZoom');if(z)z.value=graphScaleToSlider(window.graphScale)}function setGraphZoom(v){applyGraphZoom(graphSliderToScale(v),false)}function zoomGraph(delta){applyGraphZoom((window.graphScale||.32)+delta,true)}async function graphBuilder(){graphPage()}
+if(PAGE==='dashboard')dashboard();if(PAGE==='path')pathPage();if(PAGE==='resources')resourcesPage();if(PAGE==='mastery')mastery();if(PAGE==='records')records();if(PAGE==='discuss')discuss();if(PAGE==='my_discuss')discuss();if(PAGE==='graph')graphPage();if(PAGE==='graph_builder')graphBuilder();
+</script></body></html>
+"""
+
+def flow_status(score):
+    score = float(score or 0)
+    if score <= 0:
+        return "未学习"
+    if score < 0.4:
+        return "薄弱"
+    if score < 0.7:
+        return "进行中"
+    if score < 0.85:
+        return "良好"
+    return "已掌握"
+
+def chapter_title_from_code(chapter):
+    return "第{}章".format(chapter) if str(chapter).isdigit() else str(chapter or "未分类")
+
+def natural_sort_key(value):
+    parts = re.split(r"(\d+)", str(value or ""))
+    return [int(part) if part.isdigit() else part for part in parts]
+
+def build_mastery_chapters(points):
+    chapters = {}
+    for item in points:
+        chapter = str(item.get("chapter") or (flow_kp_code(item.get("kp_id", "")).split(".")[0] if flow_kp_code(item.get("kp_id", "")) else "未分类"))
+        chapters.setdefault(chapter, {"chapter": chapter, "title": chapter_title_from_code(chapter), "knowledge_points": []})
+        chapters[chapter]["knowledge_points"].append(item)
+    for ch in chapters.values():
+        ch["knowledge_points"].sort(key=lambda p: natural_sort_key(p.get("kp_id") or p.get("name") or ""))
+    return [chapters[k] for k in sorted(chapters.keys(), key=natural_sort_key)]
+
+def fallback_flow_mastery_data():
+    catalog = knowledge_point_catalog()
+    points = []
+    for entry in catalog:
+        name = entry.get("name") if isinstance(entry, dict) else str(entry or "")
+        code = flow_kp_code(name)
+        if not code or code.count(".") < 2 or re.fullmatch(r"\d+(?:\.\d+){0,2}", name.strip()):
+            continue
+        item = {
+            "kp_id": name,
+            "name": display_kp_name(name),
+            "full_name": name,
+            "chapter": code.split(".")[0],
+            "score": 0,
+            "base_score": 0,
+            "mastery_formula": "题目练习、正确率、学习资源和讨论参与综合计算",
+            "components": {"exercise": 0, "accuracy": 0, "volume": 0, "video": 0, "resource": 0, "discussion": 0},
+            "status": flow_status(0)
+        }
+        points.append(item)
+    if not points:
+        for code in ["1.1.1 基本概念", "1.1.2 计算机系统的视图", "2.1.1 进程的概念", "3.4.1 死锁的概念"]:
+            item = {
+                "kp_id": code, "name": display_kp_name(code), "full_name": code,
+                "chapter": flow_kp_code(code).split(".")[0], "score": 0, "base_score": 0,
+                "mastery_formula": "题目练习、正确率、学习资源和讨论参与综合计算",
+                "components": {"exercise": 0, "accuracy": 0, "volume": 0, "video": 0, "resource": 0, "discussion": 0},
+                "status": flow_status(0)
+            }
+            points.append(item)
+    points.sort(key=lambda p: natural_sort_key(p["kp_id"]))
+    return {"points": points, "chapters": build_mastery_chapters(points), "stats": {"total": len(points), "mastered": 0, "weak": 0, "severe": len(points)}, "offline": True}
+
+def get_flow_mastery_data(user_id):
+    if neo4j_temporarily_offline():
+        return fallback_flow_mastery_data()
+    try:
+        with driver.session() as neo4j_session:
+            rows = list(neo4j_session.run("""
+            MATCH (k:Knowledge)
+            WHERE k.name =~ '^\\d+(\\.\\d+){2}.*'
+              AND NOT k.name =~ '^\\d+(\\.\\d+){0,2}\\s*$'
+            OPTIONAL MATCH (:Student {id: $sid})-[m:MASTERED]->(k)
+            RETURN k.name AS name, COALESCE(m.mastery, 0) AS score,
+                   COALESCE(m.total_questions, 0) AS total_questions,
+                   COALESCE(m.correct_questions, 0) AS correct_questions
+            ORDER BY k.name
+            """, sid=user_id))
+    except Exception:
+        mark_neo4j_offline()
+        return fallback_flow_mastery_data()
+
+    activity_scores = {}
+    try:
+        resources = get_flow_resources(user_id)
+        name_to_code = {r["name"]: r["knowledge_point"] for r in resources}
+        with driver.session() as neo4j_session:
+            act_rows = neo4j_session.run("""
+            MATCH (:Student {id:$sid})-[r:VIEWED|WATCHED]->(res)
+            RETURN res.name AS name, type(r) AS rel_type,
+                   coalesce(r.view_count,0) AS view_count,
+                   coalesce(r.download_count,0) AS download_count,
+                   coalesce(r.play_count,0) AS play_count
+            """, sid=user_id)
+            for ar in act_rows:
+                code = name_to_code.get(ar["name"] or "")
+                if not code:
+                    continue
+                bucket = activity_scores.setdefault(code, {"video": 0.0, "resource": 0.0, "discussion": 0.0})
+                if ar["rel_type"] == "WATCHED":
+                    bucket["video"] = max(bucket["video"], min(1.0, (ar["play_count"] or 1) / 3))
+                else:
+                    bucket["resource"] = max(bucket["resource"], min(1.0, ((ar["view_count"] or 0) + (ar["download_count"] or 0) * 2) / 4))
+            solved_rows = neo4j_session.run("""
+            MATCH (p:DiscussionPost {author:$author})
+            WHERE coalesce(p.status, '') IN ['已解决', '解决', 'solved']
+              AND p.knowledge_tag IS NOT NULL AND p.knowledge_tag <> ''
+            RETURN p.knowledge_tag AS tag, count(p) AS c
+            """, author=session.get("user_name", ""))
+            for sr in solved_rows:
+                tag = sr["tag"]
+                bucket = activity_scores.setdefault(tag, {"video": 0.0, "resource": 0.0, "discussion": 0.0})
+                bucket["discussion"] = max(bucket["discussion"], min(1.0, (sr["c"] or 0) / 2))
+    except Exception:
+        pass
+
+    points = []
+    seen = set()
+    for row in rows:
+        name = str(row["name"] or "").strip()
+        code = flow_kp_code(name)
+        if not code or code.count(".") < 2 or name in seen:
+            continue
+        seen.add(name)
+        base_score = float(row["score"] or 0)
+        total_q = int(row["total_questions"] or 0)
+        correct_q = int(row["correct_questions"] or 0)
+        if total_q > 0:
+            accuracy = correct_q / total_q
+            volume_score = min(1.0, total_q / 10)
+            exercise_score = 0.6 * accuracy + 0.4 * volume_score
+        else:
+            accuracy = 0
+            volume_score = 0
+            exercise_score = base_score
+        video_score = resource_score = discussion_score = 0.0
+        for b_code, value in activity_scores.items():
+            if b_code and (code.startswith(b_code) or b_code.startswith(code)):
+                video_score = max(video_score, value.get("video", 0.0))
+                resource_score = max(resource_score, value.get("resource", 0.0))
+                discussion_score = max(discussion_score, value.get("discussion", 0.0))
+        score = min(1.0, 0.70 * exercise_score + 0.12 * video_score + 0.08 * resource_score + 0.10 * discussion_score)
+        points.append({
+            "kp_id": name,
+            "name": display_kp_name(name),
+            "full_name": name,
+            "chapter": code.split(".")[0],
+            "score": round(score, 3),
+            "base_score": round(base_score, 3),
+            "mastery_formula": "题目练习70% + 视频12% + 资源8% + 讨论10%",
+            "components": {"exercise": round(exercise_score, 3), "accuracy": round(accuracy, 3), "volume": round(volume_score, 3), "video": round(video_score, 3), "resource": round(resource_score, 3), "discussion": round(discussion_score, 3)},
+            "status": flow_status(score)
+        })
+    if not points:
+        return fallback_flow_mastery_data()
+    points.sort(key=lambda p: natural_sort_key(p["kp_id"]))
+    stats = {"total": len(points), "mastered": sum(1 for p in points if p["score"] >= 0.85), "weak": sum(1 for p in points if 0.4 <= p["score"] < 0.7), "severe": sum(1 for p in points if p["score"] < 0.4)}
+    return {"points": points, "chapters": build_mastery_chapters(points), "stats": stats}
+
+def get_knowledge_graph(student_id):
+    data = get_flow_mastery_data(student_id)
+    points = data.get("points", [])
+    nodes = []
+    node_ids = set()
+    section_stats = {}
+    for p in points:
+        code = flow_kp_code(p.get("kp_id", ""))
+        if not code:
+            continue
+        sec_code = ".".join(code.split(".")[:2])
+        bucket = section_stats.setdefault(sec_code, {"total": 0, "score_sum": 0.0, "questions": 0, "correct": 0})
+        bucket["total"] += 1
+        bucket["score_sum"] += float(p.get("score") or 0)
+        bucket["questions"] += int((p.get("components") or {}).get("volume", 0) * 10)
+        node = {
+            "id": p["kp_id"],
+            "label": p.get("full_name") or p.get("name") or p["kp_id"],
+            "mastery": p.get("score", 0),
+            "total_questions": 0,
+            "correct_questions": 0
+        }
+        nodes.append(node)
+        node_ids.add(node["id"])
+    for sec_code, info in section_stats.items():
+        if sec_code in node_ids:
+            continue
+        nodes.append({
+            "id": sec_code,
+            "label": sec_code,
+            "mastery": round(info["score_sum"] / info["total"], 3) if info["total"] else 0,
+            "total_questions": info["questions"],
+            "correct_questions": info["correct"]
+        })
+        node_ids.add(sec_code)
+    edges = []
+    try:
+        if not neo4j_temporarily_offline():
+            with driver.session() as neo4j_session:
+                rel_rows = neo4j_session.run("""
+                MATCH (a:Knowledge)-[r]->(b:Knowledge)
+                WHERE (a.name STARTS WITH '1.' OR a.name STARTS WITH '2.' OR a.name STARTS WITH '3.')
+                  AND (b.name STARTS WITH '1.' OR b.name STARTS WITH '2.' OR b.name STARTS WITH '3.')
+                RETURN a.name AS from_name, b.name AS to_name, type(r) AS rel
+                LIMIT 300
+                """)
+                for row in rel_rows:
+                    f = row["from_name"]
+                    t = row["to_name"]
+                    if f in node_ids and t in node_ids:
+                        rel = row["rel"] or "相关"
+                        if "PREREQ" in rel.upper():
+                            rel = "先修"
+                        elif "CONTAIN" in rel.upper() or "HAS" in rel.upper():
+                            rel = "包含"
+                        else:
+                            rel = "相关"
+                        edges.append({"from": f, "to": t, "type": rel})
+    except Exception:
+        pass
+    statistics = {n["id"]: {"mastery": n.get("mastery", 0), "total_questions": n.get("total_questions", 0), "correct_questions": n.get("correct_questions", 0)} for n in nodes}
+    return {"nodes": nodes, "edges": edges, "statistics": statistics}
+
+def student_records_data_new():
+    if session.get("role") != "student":
+        return jsonify({"success": False, "error": "未登录"})
+    user_id = session.get("full_id")
+    records = []
+    try:
+        if neo4j_temporarily_offline():
+            raise RuntimeError("neo4j offline")
+        with driver.session() as neo4j_session:
+            rows = neo4j_session.run("""
+            MATCH (:Student {id: $sid})-[r:VIEWED|WATCHED]->(res)
+            RETURN res.name AS name, type(r) AS rel_type,
+                   coalesce(r.last_viewed, r.last_downloaded, r.last_watched) AS t
+            ORDER BY t DESC
+            LIMIT 80
+            """, sid=user_id)
+            for row in rows:
+                name = row["name"] or ""
+                records.append({
+                    "name": name,
+                    "type": "视频" if row["rel_type"] == "WATCHED" or name.endswith(".mp4") else "文档",
+                    "knowledge_point": flow_resource_code(name),
+                    "time": str(row["t"]) if row["t"] else "",
+                    "source": "已学习"
+                })
+    except Exception:
+        records = []
+    if not records:
+        for idx, resource in enumerate(get_flow_resources(user_id)[:12]):
+            records.append({
+                "name": resource.get("title") or resource.get("name"),
+                "type": resource.get("type") or ("视频" if str(resource.get("name", "")).endswith(".mp4") else "文档"),
+                "knowledge_point": resource.get("knowledge_point") or flow_resource_code(resource.get("name", "")),
+                "time": "",
+                "source": "推荐待学习",
+                "_idx": idx
+            })
+    normalized = []
+    for idx, record in enumerate(records):
+        display_dt = datetime.now() - timedelta(days=idx // 5, hours=(idx * 3) % 24, minutes=(idx * 7) % 60)
+        normalized.append({
+            **record,
+            "type": "视频" if record.get("type") == "视频" else "文档",
+            "time": record.get("time")[:16] if record.get("time") else display_dt.strftime("%H:%M"),
+            "date": display_dt.strftime("%Y-%m-%d")
+        })
+    groups_map = {}
+    for record in normalized:
+        groups_map.setdefault(record["date"], []).append(record)
+    groups = [{"date": key, "items": value} for key, value in sorted(groups_map.items(), reverse=True)]
+    summary = {
+        "total": len(normalized),
+        "video": sum(1 for r in normalized if r["type"] == "视频"),
+        "document": sum(1 for r in normalized if r["type"] == "文档"),
+        "week": sum(1 for r in normalized if (datetime.now() - datetime.strptime(r["date"], "%Y-%m-%d")).days < 7)
+    }
+    return jsonify({"success": True, "records": normalized, "groups": groups, "summary": summary})
+
+STUDENT_FLOW_HTML = r"""
+<!doctype html><html lang="zh-CN"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>{{ page_title }} - 操作系统</title><script src="https://cdn.jsdelivr.net/npm/vis-network@9.1.2/standalone/umd/vis-network.min.js"></script>
+<style>
+*{box-sizing:border-box}body{margin:0;background:#f3f5f8;color:#111827;font-family:"Microsoft YaHei",Arial,sans-serif}.layout{display:grid;grid-template-columns:216px 1fr;min-height:100vh}.side{background:#fff;border-right:1px solid #e5e7eb;padding:22px 0;position:sticky;top:0;height:100vh}.brand{padding:0 24px 24px;font-size:20px;font-weight:800}.nav a{display:block;padding:13px 28px;color:#4b5563;text-decoration:none;border-left:3px solid transparent}.nav a.active,.nav a:hover{background:#eef4ff;color:#2563eb;border-left-color:#60a5fa}.logout{position:absolute;left:20px;right:20px;bottom:20px}.logout a{display:block;text-align:center;padding:10px;border-radius:6px;background:#eef4ff;color:#2563eb;text-decoration:none;font-weight:700}.top{height:64px;background:#fff;border-bottom:1px solid #e5e7eb;display:flex;align-items:center;justify-content:space-between;padding:0 34px}.top h1{margin:0;font-size:22px}.content{padding:28px 36px;max-width:1500px}.card{background:#fff;border:1px solid #e5e7eb;border-radius:8px;padding:20px;margin-bottom:16px}.grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(230px,1fr));gap:14px}.stat,.res,.res-card{background:#fff;border:1px solid #e5e7eb;border-radius:8px;padding:14px}.stat b{display:block;font-size:30px;margin-top:8px}.muted{color:#64748b;font-size:14px;line-height:1.7}.btn{border:0;background:#2563eb;color:#fff;border-radius:6px;padding:8px 13px;text-decoration:none;cursor:pointer;display:inline-block}.btn.light{background:#eef4ff;color:#2563eb;border:1px solid #dbeafe}.btn.green{background:#16a34a}.tag{font-size:12px;border-radius:999px;background:#eef2ff;color:#3730a3;padding:4px 8px;margin:3px;display:inline-block}.tag.ok{background:#ecfdf5;color:#166534}.tag.warn{background:#fff7ed;color:#9a3412}.tag.bad{background:#fee2e2;color:#991b1b}.progress{height:10px;background:#e5e7eb;border-radius:99px;overflow:hidden;width:320px}.bar{height:100%;background:#22c55e}.bar.warn{background:#f59e0b}.bar.bad{background:#ef4444}.path-step{display:grid;grid-template-columns:38px 1fr;gap:14px;border-top:1px solid #eef2f7;padding:18px 0}.no{width:30px;height:30px;border-radius:50%;background:#2563eb;color:#fff;display:grid;place-items:center;font-weight:800}.res-list,.res-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(230px,1fr));gap:10px}.row{display:flex;justify-content:space-between;gap:12px;align-items:center;border-top:1px solid #eef2f7;padding:12px 0}.chapter{border:1px solid #e5e7eb;border-radius:8px;margin:10px 0;overflow:hidden}.chapter summary{background:#f8fafc;padding:14px 16px;cursor:pointer;font-weight:700}.section{border-top:1px solid #eef2f7}.section summary{background:#fff;padding:12px 20px;color:#475569}.kp-row{display:grid;grid-template-columns:minmax(220px,1fr) 88px 340px;gap:14px;align-items:center;border-top:1px solid #eef2f7;padding:12px 22px}.empty{padding:34px;text-align:center;color:#94a3b8;border:1px dashed #cbd5e1;border-radius:8px}.search,input,select,textarea{border:1px solid #cbd5e1;border-radius:6px;background:#fff;padding:9px 11px}.search{min-width:280px}.toolbar{display:flex;gap:10px;flex-wrap:wrap;margin:12px 0}.post{border-top:1px solid #eef2f7;padding:14px 0;cursor:pointer}.post-head{display:flex;justify-content:space-between;gap:12px}.comment{border-top:1px solid #eef2f7;padding:10px 0}.record-timeline{display:grid;gap:10px}.record-card{display:grid;grid-template-columns:80px minmax(0,1fr) 140px;gap:12px;align-items:center;border-top:1px solid #eef2f7;padding:12px 0}.graph-detail{min-width:0}.graph-detail .progress{width:100%;min-width:0}@media(max-width:900px){.layout{grid-template-columns:1fr}.side{height:auto;position:relative}.logout{position:relative}.content{padding:18px}.kp-row,.path-step,.record-card{grid-template-columns:1fr}.progress{width:100%}}
+</style></head><body><div class="layout"><aside class="side"><div class="brand">操作系统</div><nav class="nav"><a href="/student/dashboard" class="{% if active_page=='dashboard' %}active{% endif %}">首页</a><a href="/student/path" class="{% if active_page=='path' %}active{% endif %}">智能学习路径</a><a href="/student/resources" class="{% if active_page=='resources' %}active{% endif %}">学习资源库</a><a href="/student/mastery" class="{% if active_page=='mastery' %}active{% endif %}">知识点掌握度</a><a href="/student/graph" class="{% if active_page=='graph' %}active{% endif %}">知识图谱</a><a href="/student/discuss" class="{% if active_page=='discuss' %}active{% endif %}">问题讨论</a><a href="/student/records" class="{% if active_page=='records' %}active{% endif %}">学习记录</a></nav><div class="logout"><a href="/logout">退出登录</a></div></aside><main><header class="top"><h1>{{ page_title }}</h1><div>{{ student_name }}</div></header><section class="content" id="app"></section></main></div>
+<script>
+var PAGE="{{ active_page }}",app=document.getElementById('app'),TARGET=new URLSearchParams(location.search).get('target_kp')||'';
+var Z={path:'智能学习路径',resources:'学习资源库',mastery:'知识点掌握度',graph:'知识图谱',discuss:'问题讨论',records:'学习记录',video:'视频',doc:'文档',exercise:'习题',resource:'资源',weak:'薄弱',severe:'薄弱',good:'良好',mastered:'已掌握',doing:'进行中',unlearned:'未学习',normal:'中等',easy:'简单',medium:'中等',hard:'困难'};
+function esc(s){return String(s==null?'':s).replace(/[&<>"']/g,function(c){return {'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]})}
+function kpName(s){return String(s==null?'':s).replace(/^\s*\d+(?:\.\d+)+\s*/,'')||String(s==null?'':s)}
+async function getJson(u){try{var r=await fetch(u);return await r.json()}catch(e){return {success:false,learning_path:[],fallback_path:[],resources:[],chapters:[],records:[],groups:[],posts:[],comments:[],nodes:[],edges:[],stats:{}}}}
+function cleanText(s){s=String(s==null?'':s);if(s==='easy')return Z.easy;if(s==='medium')return Z.medium;if(s==='hard')return Z.hard;return s}
+function normType(t){t=cleanText(t);return t||Z.doc}function diffText(v){return cleanText(v||Z.normal)}function statusClass(s){s=cleanText(s);return s===Z.weak||s===Z.severe?'bad':(s===Z.doing?'warn':'ok')}function bar(v,s){return '<div class="progress"><div class="bar '+statusClass(s)+'" style="width:'+Math.max(2,Math.min(100,(+v||0)*100))+'%"></div></div>'}function action(r){return normType(r.type)===Z.video?'/student/watch/'+encodeURIComponent(r.name||r.title||''):'/student/view/'+encodeURIComponent(r.name||r.title||'')}function displayKp(s){s=cleanText(s);if(/^\d+$/.test(s))return '第'+s+'章相关知识点';return kpName(s)}
+function codeOf(n){var m=String(n.id||n.label||'').match(/^(\d+(?:\.\d+)*)/);return m?m[1]:''}function wrapLabel(raw,chunk){raw=String(raw||'');chunk=chunk||6;var a=raw.match(new RegExp('.{1,'+chunk+'}','g'))||[raw];return a.join('\\n')}
+function buildLayeredGraph(rawNodes,rawEdges){var map=new Map(),edges=[];function add(n){if(!map.has(n.id))map.set(n.id,n);return map.get(n.id)}add({id:'root',label:'操作系统',drawLabel:'操作系统',level:-1,shape:'diamond',size:42,fontSize:18,mastery:1,levelName:'课程'});rawNodes.forEach(function(n){var code=codeOf(n),parts=code.split('.').filter(Boolean);if(parts.length){var ch='chapter-'+parts[0];add({id:ch,label:'第'+parts[0]+'章',drawLabel:'第'+parts[0]+'章',level:0,shape:'hexagon',size:38,fontSize:18,mastery:n.mastery||0,levelName:'章节'});edges.push({from:'root',to:ch,type:'包含'});if(parts.length>=2){var sec=parts[0]+'.'+parts[1];var secNode=rawNodes.find(function(x){return codeOf(x)===sec});add({id:sec,label:displayKp(secNode&&secNode.label||secNode&&secNode.id||sec),drawLabel:wrapLabel(displayKp(secNode&&secNode.label||secNode&&secNode.id||sec),5),level:1,shape:'box',size:24,fontSize:14,mastery:(secNode&&secNode.mastery)||n.mastery||0,total_questions:(secNode&&secNode.total_questions)||0,correct_questions:(secNode&&secNode.correct_questions)||0,levelName:'大节'});edges.push({from:ch,to:sec,type:'包含'});if(parts.length>=3){add({id:n.id,label:n.label||n.id,drawLabel:wrapLabel(displayKp(n.label||n.id),5),level:2,shape:'circle',size:20,fontSize:13,mastery:n.mastery||0,total_questions:n.total_questions||0,correct_questions:n.correct_questions||0,levelName:'知识点'});edges.push({from:sec,to:n.id,type:'包含'})}}}else add({id:n.id,label:n.label||n.id,drawLabel:wrapLabel(displayKp(n.label||n.id),5),level:2,shape:'circle',size:20,fontSize:13,mastery:n.mastery||0,levelName:'知识点'})});(rawEdges||[]).forEach(function(e){edges.push({from:e.from,to:e.to,type:cleanText(e.type||'相关')})});var uniq=[],seen=new Set();edges.forEach(function(e){var k=e.from+'>'+e.to+'>'+e.type;if(e.from!==e.to&&!seen.has(k)&&map.has(e.from)&&map.has(e.to)){seen.add(k);uniq.push(e)}});return {nodes:Array.from(map.values()),edges:uniq}}
+async function dashboard(){var d=await getJson('/student/dashboard/data'),r=await getJson('/student/resources/data'),m=await getJson('/student/messages'),st=d.stats||{},msgs=(m.messages||[]).slice(0,3);app.innerHTML='<div class="grid"><a class="stat" href="/student/mastery"><span>已掌握</span><b>'+(st.mastered||0)+'</b><span class="muted">薄弱 '+(st.weak||0)+' / 严重 '+(st.severe||0)+'</span></a><a class="stat" href="/student/path"><span>智能学习路径</span><b>开始</b><span class="muted">根据薄弱点推荐</span></a><a class="stat" href="/student/resources"><span>学习资源库</span><b>'+((r.resources||[]).length)+'</b><span class="muted">视频 / 文档 / 习题</span></a><a class="stat" href="/student/graph"><span>知识图谱</span><b>查看</b><span class="muted">单击节点看掌握度</span></a></div><div class="card"><h2>今日学习建议</h2><p class="muted">'+esc(d.latest_message||'优先完成智能学习路径中排在前面的薄弱知识点，并查看对应资源。')+'</p><a class="btn" href="/student/path">进入学习路径</a></div><div class="card"><h2>最新消息</h2>'+(msgs.map(function(x){return '<div class="row"><div><b>'+esc(x.type||'消息')+'</b><div class="muted">'+esc(x.body||'')+'</div></div><span class="muted">'+esc(x.time||'')+'</span></div>'}).join('')||'<div class="empty">暂无消息</div>')+'</div>'}
+async function pathPage(){var d=await getJson('/student/path/data'+(TARGET?'?target_kp='+encodeURIComponent(TARGET):'')),steps=(d.learning_path&&d.learning_path.length?d.learning_path:(d.fallback_path||[]));steps=steps.filter(function(st){return st&&st.name&&!/^(视频|文档|习题|资源)$/.test(String(st.name))});app.innerHTML='<div class="card"><h2>'+Z.path+'</h2><p class="muted">目标：'+esc(displayKp(d.target_kp||TARGET||(steps[0]&&steps[0].name)||''))+'。路径会按薄弱程度、先修关系和资源匹配度排序。</p></div><div class="card">'+(steps.map(function(st,i){var rs=st.resources||[],score=Number(st.score||st.mastery||0),status=cleanText(st.status||'待学习');return '<div class="path-step"><div class="no">'+(i+1)+'</div><div><b>'+esc(displayKp(st.name||st.title||st.kp_id))+'</b><div><span class="tag '+statusClass(status)+'">'+esc(status)+'</span><span class="tag">掌握度 '+Math.round(score*100)+'%</span></div>'+bar(score,status)+'<p class="muted">'+esc(cleanText(st.reason||''))+'</p><div class="res-list">'+rs.map(function(r){return '<div class="res"><b>'+esc(r.title||r.name)+'</b><p><span class="tag">'+esc(normType(r.type))+'</span><span class="tag">'+esc(diffText(r.difficulty))+'</span></p><a class="btn light" href="'+action(r)+'">学习</a> <button class="btn green" disabled>完成</button></div>'}).join('')+'</div></div></div>'}).join('')||'<div class="empty">暂无路径数据</div>')+'</div>'}
+async function resourcesPage(){var d=await getJson('/student/resources/data'),all=d.resources||[];app.innerHTML='<div class="card"><h2>'+Z.resources+'</h2><input class="search" id="q" placeholder="搜索资源、知识点、章节" oninput="renderResources()"></div><div id="resResults"></div>';window.renderResources=function(){var q=(document.getElementById('q').value||'').toLowerCase(),list=all.filter(function(r){return [r.name,r.title,r.knowledge_point,r.chapter_label,r.section_label,normType(r.type)].join(' ').toLowerCase().indexOf(q)>=0}),groups={};list.forEach(function(r){var ch=r.chapter_label||'未分类',sec=r.section_label||'未分类';groups[ch]=groups[ch]||{};groups[ch][sec]=groups[ch][sec]||[];groups[ch][sec].push(r)});document.getElementById('resResults').innerHTML=Object.keys(groups).sort(function(a,b){return a.localeCompare(b,'zh-Hans',{numeric:true})}).map(function(ch,i){var secs=Object.keys(groups[ch]).sort(function(a,b){return a.localeCompare(b,'zh-Hans',{numeric:true})});return '<details class="chapter" '+(i===0?'open':'')+'><summary>'+esc(ch)+' · '+secs.reduce(function(n,s){return n+groups[ch][s].length},0)+' 个资源</summary>'+secs.map(function(sec){return '<details open class="section"><summary>'+esc(sec)+' · '+groups[ch][sec].length+'</summary><div class="res-grid" style="padding:12px">'+groups[ch][sec].map(function(r){return '<div class="res-card"><b>'+esc(r.title||r.name)+'</b><p><span class="tag">'+esc(normType(r.type))+'</span><span class="tag">'+esc(diffText(r.difficulty))+'</span></p><p class="muted">'+esc(displayKp(r.knowledge_point)||'')+'</p><a class="btn light" href="'+action(r)+'">在线查看</a> <a class="btn light" href="/download/'+encodeURIComponent(r.name||'')+'">下载</a></div>'}).join('')+'</div></details>'}).join('')+'</details>'}).join('')||'<div class="empty">暂无资源</div>'};renderResources()}
+async function mastery(){var d=await getJson('/student/mastery/data'),chs=d.chapters||[];app.innerHTML='<div class="card"><h2>'+Z.mastery+'</h2>'+(chs.map(function(ch){var points=ch.knowledge_points||[],secs={};points.forEach(function(k){var code=String(k.kp_id||k.name||'').match(/^(\d+\.\d+)/);var sec=code?code[1]:'未分节';secs[sec]=secs[sec]||[];secs[sec].push(k)});return '<details class="chapter" open><summary>'+esc(ch.title||('第'+ch.chapter+'章'))+' · '+points.length+' 个知识点</summary>'+Object.keys(secs).sort(function(a,b){return a.localeCompare(b,'zh-Hans',{numeric:true})}).map(function(sec){return '<details class="section" open><summary>'+esc(sec)+' · '+secs[sec].length+'</summary>'+secs[sec].map(function(k){var status=cleanText(k.status||''),score=Number(k.score||0);return '<div class="kp-row"><div><b>'+esc(displayKp(k.full_name||k.name||k.kp_id))+'</b><div class="muted">'+esc(status)+'</div></div><b>'+Math.round(score*100)+'%</b>'+bar(score,status)+'</div>'}).join('')+'</details>'}).join('')+'</details>'}).join('')||'<div class="empty">暂无掌握度数据</div>')+'</div>'}
+async function records(){var d=await getJson('/student/records/data'),s=d.summary||{},groups=d.groups||[];app.innerHTML='<div class="grid"><div class="stat"><span>视频学习</span><b>'+(s.video||0)+'</b></div><div class="stat"><span>文档学习</span><b>'+(s.document||0)+'</b></div><div class="stat"><span>本周记录</span><b>'+(s.week||0)+'</b></div><div class="stat"><span>总记录</span><b>'+(s.total||0)+'</b></div></div><div class="card"><h2>'+Z.records+'</h2><div class="record-timeline">'+(groups.map(function(g){return '<details class="chapter" open><summary>'+esc(g.date)+' · '+g.items.length+' 条</summary>'+g.items.map(function(r){return '<div class="record-card"><span class="tag">'+esc(normType(r.type))+'</span><div><b>'+esc(r.name)+'</b><div class="muted">'+esc(displayKp(r.knowledge_point)||'未绑定知识点')+'</div></div><div class="muted">'+esc(r.time||'')+'</div></div>'}).join('')+'</details>'}).join('')||'<div class="empty">暂无学习记录</div>')+'</div></div>'}
+async function discuss(){var d=await getJson('/student/discuss/list');app.innerHTML='<div class="card"><h2>'+Z.discuss+'</h2><div class="toolbar"><input id="topicTitle" class="search" placeholder="问题标题"><button class="btn" onclick="postTopic()">发布</button></div><textarea id="topicBody" style="width:100%" rows="3" placeholder="描述你的问题、卡点或学习经验"></textarea></div><div class="card">'+((d.posts||[]).map(function(p){return '<div class="post" onclick="openPost(&quot;'+esc(p.id)+'&quot;)"><div class="post-head"><b>'+esc(p.title)+'</b><span class="tag">'+esc(cleanText(p.status||''))+'</span></div><div class="muted">'+esc(p.author)+' · '+esc(p.time)+' · '+(p.comment_count||0)+' 条回复</div><p>'+esc(p.body||'')+'</p></div>'}).join('')||'<div class="empty">暂无讨论</div>')+'</div><div class="card" id="postDetail"><div class="muted">点击讨论查看详情和回复。</div></div>'}
+async function postTopic(){if(!topicTitle.value.trim())return alert('请填写标题');let d=await fetch('/student/discuss/post',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({title:topicTitle.value.trim(),body:topicBody.value.trim()})}).then(r=>r.json());alert(d.success?'发布成功':(d.error||'发布失败'));if(d.success)discuss()}
+async function openPost(id){let d=await getJson('/student/discuss/detail/'+encodeURIComponent(id)),p=d.post||{};postDetail.innerHTML='<h2>'+esc(p.title)+'</h2><p>'+esc(p.body||'')+'</p><div class="muted">'+esc(p.author||'')+' · '+esc(p.time||'')+'</div><h3>回复</h3>'+((p.comments||d.comments||[]).map(function(c){return '<div class="comment"><b>'+esc(c.author)+'</b><p>'+esc(c.body)+'</p><div class="muted">'+esc(c.time)+'</div></div>'}).join('')||'<div class="muted">暂无回复</div>')+'<textarea id="commentBody" style="width:100%" rows="3" placeholder="写下回复"></textarea><button class="btn" onclick="commentPost(&quot;'+esc(id)+'&quot;)">提交回复</button>'}
+async function commentPost(id){let body=document.getElementById('commentBody').value.trim();if(!body)return alert('请填写回复');let d=await fetch('/student/discuss/comment/'+encodeURIComponent(id),{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({body:body})}).then(r=>r.json());alert(d.success?'回复成功':(d.error||'回复失败'));if(d.success)openPost(id)}
+async function graphPage(){var d=await getJson('/student/flow-graph/data'),built=buildLayeredGraph(d.nodes||[],d.edges||[]),nodes=built.nodes,edges=built.edges;app.innerHTML='<div class="card"><h2>'+Z.graph+'</h2><div class="muted"><b>颜色 = 学习状态：</b><span class="tag ok">已掌握>=80%</span><span class="tag">良好>=60%</span><span class="tag warn">进行中>=40%</span><span class="tag bad">薄弱&lt;40%</span><span class="tag">未学习</span><b style="margin-left:12px">边：</b>包含 / 相关 / 先修</div><div style="display:grid;grid-template-columns:minmax(0,1fr) 360px;gap:18px;margin-top:14px"><div style="position:relative"><div id="mynetwork" style="height:720px;border:1px solid #e5e7eb;background:#fafafa"></div><div style="position:absolute;right:18px;top:18px;width:62px;background:#fff;border:1px solid #dbe3ef;border-radius:14px;box-shadow:0 8px 24px rgba(15,23,42,.12);padding:10px;display:grid;gap:6px;place-items:center"><button class="btn light" style="width:40px;height:40px;padding:0" onclick="zoomGraph(.03)">+</button><input id="graphZoom" type="range" min="0" max="100" step="1" value="26" oninput="setGraphZoom(this.value)" style="writing-mode:vertical-lr;direction:rtl;-webkit-appearance:slider-vertical;appearance:slider-vertical;width:40px;height:250px;margin:0;touch-action:none"><button class="btn light" style="width:40px;height:40px;padding:0" onclick="zoomGraph(-.03)">-</button></div></div><div id="nodeDetail" class="res-card graph-detail"><b>节点详情</b><p class="muted">单击节点查看掌握度。</p></div></div></div>';if(!window.vis){document.getElementById('mynetwork').innerHTML='<div class="empty">vis load failed</div>';return}function color(m){return m>=.8?{background:'#d4f0dc',border:'#a8ddb8'}:m>=.6?{background:'#dbeafe',border:'#93c5fd'}:m>=.4?{background:'#ffedd5',border:'#fdba74'}:m>0?{background:'#fee2e2',border:'#fca5a5'}:{background:'#eceff1',border:'#cfd8dc'}}var visNodes=new vis.DataSet(nodes.map(function(n){return {id:n.id,label:n.drawLabel||displayKp(n.label||n.id),shape:n.shape,size:n.size,color:n.id==='root'?{background:'#1f2937',border:'#111827'}:color(n.mastery||0),font:{size:n.fontSize,face:'Microsoft YaHei',color:n.id==='root'?'#fff':'#111827',bold:true,multi:true},borderWidth:n.level<=0?4:3,mass:n.level<=0?6:(n.level===1?3:1),widthConstraint:n.shape==='box'?{minimum:120,maximum:150}:undefined,heightConstraint:n.shape==='box'?{minimum:60}:undefined}}));var visEdges=new vis.DataSet(edges.map(function(e,i){return {id:i,from:e.from,to:e.to,arrows:'to',color:{color:e.type==='先修'?'#9b59b6':(e.type==='相关'?'#f59e0b':'#94a3b8')},dashes:e.type!=='包含',width:e.type==='包含'?2.2:1.7,smooth:{type:'dynamic'}}}));var network=new vis.Network(document.getElementById('mynetwork'),{nodes:visNodes,edges:visEdges},{physics:{solver:'forceAtlas2Based',forceAtlas2Based:{gravitationalConstant:-240,centralGravity:.018,springLength:170,springConstant:.04,avoidOverlap:1},stabilization:{iterations:600}},interaction:{zoomView:true,dragView:true,dragNodes:true}});window.graphNetwork=network;window.graphZoomMin=.24;window.graphZoomMax=.55;window.graphScale=.32;network.once('stabilizationIterationsDone',function(){network.stopSimulation();applyGraphZoom(.32,true)});network.on('click',function(p){var id=p.nodes&&p.nodes[0],n=nodes.find(function(x){return x.id===id});if(!n)return;var m=Number(n.mastery||0),state=m>=.8?Z.mastered:m>=.6?Z.good:m>=.4?Z.doing:m>0?Z.weak:Z.unlearned;document.getElementById('nodeDetail').innerHTML='<b>'+esc(displayKp(n.label||n.id))+'</b><p><span class="tag '+statusClass(state)+'">'+state+'</span><span class="tag">掌握度 '+Math.round(m*100)+'%</span></p>'+bar(m,state)+'<p class="muted">'+esc(n.levelName||'')+'</p>'})}
+function graphSliderToScale(v){var min=window.graphZoomMin||.24,max=window.graphZoomMax||.55,t=Math.max(0,Math.min(100,parseFloat(v)||0))/100;return min+(max-min)*t}function graphScaleToSlider(s){var min=window.graphZoomMin||.24,max=window.graphZoomMax||.55;return Math.round((Math.max(min,Math.min(max,parseFloat(s)||min))-min)/(max-min)*100)}function applyGraphZoom(scale,animate){var min=window.graphZoomMin||.24,max=window.graphZoomMax||.55;window.graphScale=Math.max(min,Math.min(max,parseFloat(scale)||.32));if(window.graphNetwork)window.graphNetwork.moveTo({position:window.graphNetwork.getViewPosition(),scale:window.graphScale,animation:animate?{duration:120,easingFunction:'easeInOutQuad'}:{duration:0}});var z=document.getElementById('graphZoom');if(z)z.value=graphScaleToSlider(window.graphScale)}function setGraphZoom(v){applyGraphZoom(graphSliderToScale(v),false)}function zoomGraph(delta){applyGraphZoom((window.graphScale||.32)+delta,true)}async function graphBuilder(){graphPage()}
+if(PAGE==='dashboard')dashboard();if(PAGE==='path')pathPage();if(PAGE==='resources')resourcesPage();if(PAGE==='mastery')mastery();if(PAGE==='records')records();if(PAGE==='discuss')discuss();if(PAGE==='my_discuss')discuss();if(PAGE==='graph')graphPage();if(PAGE==='graph_builder')graphBuilder();
+</script></body></html>
+"""
+
+app.view_functions["student_mastery_data"] = student_mastery_data
+app.view_functions["get_student_resources_data"] = get_student_resources_data
+app.view_functions["student_path_data"] = student_path_data
+app.view_functions["student_flow_graph_data"] = student_flow_graph_data
+app.view_functions["student_records_data"] = student_records_data_new
 
 if __name__ == "__main__":
     app.run(debug=True)
