@@ -1,0 +1,833 @@
+{
+  "total_files": 137,
+  "teachers": [
+    "李老师",
+    "陈老师",
+    "张老师"
+  ],
+  "knowledge_points_count": 45,
+  "files": [
+    {
+      "type": "PPT",
+      "teacher": "张老师",
+      "filename": "1.1.1_基本概念_张老师.pptx",
+      "knowledge_point": "1.1.1 基本概念"
+    },
+    {
+      "type": "PPT",
+      "teacher": "李老师",
+      "filename": "1.1.1_基本概念_李老师.pptx",
+      "knowledge_point": "1.1.1 基本概念"
+    },
+    {
+      "type": "Video",
+      "teacher": "陈老师",
+      "filename": "1.1.1_基本概念_陈老师.mp4",
+      "knowledge_point": "1.1.1 基本概念"
+    },
+    {
+      "type": "Video",
+      "teacher": "张老师",
+      "filename": "1.1.2_计算机系统的视图_张老师.mp4",
+      "knowledge_point": "1.1.2 计算机系统的视图"
+    },
+    {
+      "type": "PPT",
+      "teacher": "张老师",
+      "filename": "1.1.2_计算机系统的视图_张老师.pptx",
+      "knowledge_point": "1.1.2 计算机系统的视图"
+    },
+    {
+      "type": "PPT",
+      "teacher": "李老师",
+      "filename": "1.1.2_计算机系统的视图_李老师.pptx",
+      "knowledge_point": "1.1.2 计算机系统的视图"
+    },
+    {
+      "type": "Video",
+      "teacher": "李老师",
+      "filename": "1.1.3_操作系统的基本功能_李老师.mp4",
+      "knowledge_point": "1.1.3 操作系统的基本功能"
+    },
+    {
+      "type": "PPT",
+      "teacher": "李老师",
+      "filename": "1.1.3_操作系统的基本功能_李老师.pptx",
+      "knowledge_point": "1.1.3 操作系统的基本功能"
+    },
+    {
+      "type": "PPT",
+      "teacher": "张老师",
+      "filename": "1.2_操作系统的形成和发展_张老师.pptx",
+      "knowledge_point": "1.2 操作系统的形成和发展"
+    },
+    {
+      "type": "Video",
+      "teacher": "陈老师",
+      "filename": "1.2_操作系统的形成和发展_陈老师.mp4",
+      "knowledge_point": "1.2 操作系统的形成和发展"
+    },
+    {
+      "type": "PPT",
+      "teacher": "张老师",
+      "filename": "1.3_操作系统的分类_张老师.pptx",
+      "knowledge_point": "1.3 操作系统的分类"
+    },
+    {
+      "type": "Video",
+      "teacher": "李老师",
+      "filename": "1.3_操作系统的分类_李老师.mp4",
+      "knowledge_point": "1.3 操作系统的分类"
+    },
+    {
+      "type": "PPT",
+      "teacher": "陈老师",
+      "filename": "1.3_操作系统的分类_陈老师.pptx",
+      "knowledge_point": "1.3 操作系统的分类"
+    },
+    {
+      "type": "PPT",
+      "teacher": "张老师",
+      "filename": "1.4_操作系统的运行环境_张老师.pptx",
+      "knowledge_point": "1.4 操作系统的运行环境"
+    },
+    {
+      "type": "Video",
+      "teacher": "李老师",
+      "filename": "1.4_操作系统的运行环境_李老师.mp4",
+      "knowledge_point": "1.4 操作系统的运行环境"
+    },
+    {
+      "type": "PPT",
+      "teacher": "李老师",
+      "filename": "1.4_操作系统的运行环境_李老师.pptx",
+      "knowledge_point": "1.4 操作系统的运行环境"
+    },
+    {
+      "type": "PPT",
+      "teacher": "陈老师",
+      "filename": "1.4_操作系统的运行环境_陈老师.pptx",
+      "knowledge_point": "1.4 操作系统的运行环境"
+    },
+    {
+      "type": "Video",
+      "teacher": "张老师",
+      "filename": "1.5_操作系统的结构_张老师.mp4",
+      "knowledge_point": "1.5 操作系统的结构"
+    },
+    {
+      "type": "PPT",
+      "teacher": "张老师",
+      "filename": "1.5_操作系统的结构_张老师.pptx",
+      "knowledge_point": "1.5 操作系统的结构"
+    },
+    {
+      "type": "PPT",
+      "teacher": "李老师",
+      "filename": "1.5_操作系统的结构_李老师.pptx",
+      "knowledge_point": "1.5 操作系统的结构"
+    },
+    {
+      "type": "PPT",
+      "teacher": "陈老师",
+      "filename": "1.5_操作系统的结构_陈老师.pptx",
+      "knowledge_point": "1.5 操作系统的结构"
+    },
+    {
+      "type": "Video",
+      "teacher": "张老师",
+      "filename": "1.6.1_现代操作系统技术特性_张老师.mp4",
+      "knowledge_point": "1.6.1 现代操作系统技术特性"
+    },
+    {
+      "type": "PPT",
+      "teacher": "张老师",
+      "filename": "1.6.1_现代操作系统技术特性_张老师.pptx",
+      "knowledge_point": "1.6.1 现代操作系统技术特性"
+    },
+    {
+      "type": "PPT",
+      "teacher": "李老师",
+      "filename": "1.6.1_现代操作系统技术特性_李老师.pptx",
+      "knowledge_point": "1.6.1 现代操作系统技术特性"
+    },
+    {
+      "type": "PPT",
+      "teacher": "陈老师",
+      "filename": "1.6.1_现代操作系统技术特性_陈老师.pptx",
+      "knowledge_point": "1.6.1 现代操作系统技术特性"
+    },
+    {
+      "type": "Video",
+      "teacher": "张老师",
+      "filename": "1.6.2_UNIX技术特性_张老师.mp4",
+      "knowledge_point": "1.6.2 UNIX技术特性"
+    },
+    {
+      "type": "PPT",
+      "teacher": "张老师",
+      "filename": "1.6.2_UNIX技术特性_张老师.pptx",
+      "knowledge_point": "1.6.2 UNIX技术特性"
+    },
+    {
+      "type": "PPT",
+      "teacher": "李老师",
+      "filename": "1.6.2_UNIX技术特性_李老师.pptx",
+      "knowledge_point": "1.6.2 UNIX技术特性"
+    },
+    {
+      "type": "PPT",
+      "teacher": "陈老师",
+      "filename": "1.6.2_UNIX技术特性_陈老师.pptx",
+      "knowledge_point": "1.6.2 UNIX技术特性"
+    },
+    {
+      "type": "Video",
+      "teacher": "张老师",
+      "filename": "1.6.3_Linux技术特性_张老师.mp4",
+      "knowledge_point": "1.6.3 Linux技术特性"
+    },
+    {
+      "type": "PPT",
+      "teacher": "李老师",
+      "filename": "1.6.3_Linux技术特性_李老师.pptx",
+      "knowledge_point": "1.6.3 Linux技术特性"
+    },
+    {
+      "type": "Video",
+      "teacher": "张老师",
+      "filename": "1.6.4_Windows Server技术特性_张老师.mp4",
+      "knowledge_point": "1.6.4 Windows Server技术特性"
+    },
+    {
+      "type": "PPT",
+      "teacher": "张老师",
+      "filename": "1.6.4_Windows Server技术特性_张老师.pptx",
+      "knowledge_point": "1.6.4 Windows Server技术特性"
+    },
+    {
+      "type": "PPT",
+      "teacher": "李老师",
+      "filename": "1.6.4_Windows Server技术特性_李老师.pptx",
+      "knowledge_point": "1.6.4 Windows Server技术特性"
+    },
+    {
+      "type": "PPT",
+      "teacher": "陈老师",
+      "filename": "1.6.4_Windows Server技术特性_陈老师.pptx",
+      "knowledge_point": "1.6.4 Windows Server技术特性"
+    },
+    {
+      "type": "Video",
+      "teacher": "陈老师",
+      "filename": "2.1.1_单道程序的顺序执行_陈老师.mp4",
+      "knowledge_point": "2.1.1 单道程序的顺序执行"
+    },
+    {
+      "type": "PPT",
+      "teacher": "陈老师",
+      "filename": "2.1.1_单道程序的顺序执行_陈老师.pptx",
+      "knowledge_point": "2.1.1 单道程序的顺序执行"
+    },
+    {
+      "type": "Video",
+      "teacher": "张老师",
+      "filename": "2.1.2_多道程序的并发执行_张老师.mp4",
+      "knowledge_point": "2.1.2 多道程序的并发执行"
+    },
+    {
+      "type": "PPT",
+      "teacher": "张老师",
+      "filename": "2.1.2_多道程序的并发执行_张老师.pptx",
+      "knowledge_point": "2.1.2 多道程序的并发执行"
+    },
+    {
+      "type": "PPT",
+      "teacher": "李老师",
+      "filename": "2.1.2_多道程序的并发执行_李老师.pptx",
+      "knowledge_point": "2.1.2 多道程序的并发执行"
+    },
+    {
+      "type": "Video",
+      "teacher": "张老师",
+      "filename": "2.2.1_进程的概念_张老师.mp4",
+      "knowledge_point": "2.2.1 进程的概念"
+    },
+    {
+      "type": "PPT",
+      "teacher": "张老师",
+      "filename": "2.2.1_进程的概念_张老师.pptx",
+      "knowledge_point": "2.2.1 进程的概念"
+    },
+    {
+      "type": "PPT",
+      "teacher": "李老师",
+      "filename": "2.2.1_进程的概念_李老师.pptx",
+      "knowledge_point": "2.2.1 进程的概念"
+    },
+    {
+      "type": "Video",
+      "teacher": "张老师",
+      "filename": "2.2.2_进程的实体_张老师.mp4",
+      "knowledge_point": "2.2.2 进程的实体"
+    },
+    {
+      "type": "PPT",
+      "teacher": "张老师",
+      "filename": "2.2.2_进程的实体_张老师.pptx",
+      "knowledge_point": "2.2.2 进程的实体"
+    },
+    {
+      "type": "PPT",
+      "teacher": "李老师",
+      "filename": "2.2.2_进程的实体_李老师.pptx",
+      "knowledge_point": "2.2.2 进程的实体"
+    },
+    {
+      "type": "PPT",
+      "teacher": "陈老师",
+      "filename": "2.2.2_进程的实体_陈老师.pptx",
+      "knowledge_point": "2.2.2 进程的实体"
+    },
+    {
+      "type": "PPT",
+      "teacher": "李老师",
+      "filename": "2.2.3_进程状态和转换_李老师.pptx",
+      "knowledge_point": "2.2.3 进程状态和转换"
+    },
+    {
+      "type": "Video",
+      "teacher": "陈老师",
+      "filename": "2.2.3_进程状态和转换_陈老师.mp4",
+      "knowledge_point": "2.2.3 进程状态和转换"
+    },
+    {
+      "type": "PPT",
+      "teacher": "陈老师",
+      "filename": "2.2.3_进程状态和转换_陈老师.pptx",
+      "knowledge_point": "2.2.3 进程状态和转换"
+    },
+    {
+      "type": "Video",
+      "teacher": "张老师",
+      "filename": "2.2.4_进程控制_张老师.mp4",
+      "knowledge_point": "2.2.4 进程控制"
+    },
+    {
+      "type": "PPT",
+      "teacher": "张老师",
+      "filename": "2.2.4_进程控制_张老师.pptx",
+      "knowledge_point": "2.2.4 进程控制"
+    },
+    {
+      "type": "PPT",
+      "teacher": "陈老师",
+      "filename": "2.2.4_进程控制_陈老师.pptx",
+      "knowledge_point": "2.2.4 进程控制"
+    },
+    {
+      "type": "Video",
+      "teacher": "张老师",
+      "filename": "2.3.1_线程的概念_张老师.mp4",
+      "knowledge_point": "2.3.1 线程的概念"
+    },
+    {
+      "type": "PPT",
+      "teacher": "李老师",
+      "filename": "2.3.1_线程的概念_李老师.pptx",
+      "knowledge_point": "2.3.1 线程的概念"
+    },
+    {
+      "type": "PPT",
+      "teacher": "张老师",
+      "filename": "2.3.2_线程与进程的比较_张老师.pptx",
+      "knowledge_point": "2.3.2 线程与进程的比较"
+    },
+    {
+      "type": "Video",
+      "teacher": "李老师",
+      "filename": "2.3.2_线程与进程的比较_李老师.mp4",
+      "knowledge_point": "2.3.2 线程与进程的比较"
+    },
+    {
+      "type": "PPT",
+      "teacher": "张老师",
+      "filename": "2.3.3_线程的实现_张老师.pptx",
+      "knowledge_point": "2.3.3 线程的实现"
+    },
+    {
+      "type": "Video",
+      "teacher": "李老师",
+      "filename": "2.3.3_线程的实现_李老师.mp4",
+      "knowledge_point": "2.3.3 线程的实现"
+    },
+    {
+      "type": "PPT",
+      "teacher": "李老师",
+      "filename": "2.3.3_线程的实现_李老师.pptx",
+      "knowledge_point": "2.3.3 线程的实现"
+    },
+    {
+      "type": "PPT",
+      "teacher": "陈老师",
+      "filename": "2.3.3_线程的实现_陈老师.pptx",
+      "knowledge_point": "2.3.3 线程的实现"
+    },
+    {
+      "type": "Video",
+      "teacher": "张老师",
+      "filename": "2.3.4_线程调度激发_张老师.mp4",
+      "knowledge_point": "2.3.4 线程调度激发"
+    },
+    {
+      "type": "PPT",
+      "teacher": "张老师",
+      "filename": "2.3.4_线程调度激发_张老师.pptx",
+      "knowledge_point": "2.3.4 线程调度激发"
+    },
+    {
+      "type": "PPT",
+      "teacher": "李老师",
+      "filename": "2.3.4_线程调度激发_李老师.pptx",
+      "knowledge_point": "2.3.4 线程调度激发"
+    },
+    {
+      "type": "PPT",
+      "teacher": "陈老师",
+      "filename": "2.3.4_线程调度激发_陈老师.pptx",
+      "knowledge_point": "2.3.4 线程调度激发"
+    },
+    {
+      "type": "Video",
+      "teacher": "张老师",
+      "filename": "2.4_多核、多线程与超线程_张老师.mp4",
+      "knowledge_point": "2.4 多核、多线程与超线程"
+    },
+    {
+      "type": "PPT",
+      "teacher": "张老师",
+      "filename": "2.4_多核、多线程与超线程_张老师.pptx",
+      "knowledge_point": "2.4 多核、多线程与超线程"
+    },
+    {
+      "type": "PPT",
+      "teacher": "李老师",
+      "filename": "2.4_多核、多线程与超线程_李老师.pptx",
+      "knowledge_point": "2.4 多核、多线程与超线程"
+    },
+    {
+      "type": "PPT",
+      "teacher": "陈老师",
+      "filename": "2.4_多核、多线程与超线程_陈老师.pptx",
+      "knowledge_point": "2.4 多核、多线程与超线程"
+    },
+    {
+      "type": "Video",
+      "teacher": "张老师",
+      "filename": "2.5_进程、线程管理实例_张老师.mp4",
+      "knowledge_point": "2.5 进程、线程管理实例"
+    },
+    {
+      "type": "PPT",
+      "teacher": "张老师",
+      "filename": "2.5_进程、线程管理实例_张老师.pptx",
+      "knowledge_point": "2.5 进程、线程管理实例"
+    },
+    {
+      "type": "PPT",
+      "teacher": "李老师",
+      "filename": "2.5_进程、线程管理实例_李老师.pptx",
+      "knowledge_point": "2.5 进程、线程管理实例"
+    },
+    {
+      "type": "PPT",
+      "teacher": "陈老师",
+      "filename": "2.5_进程、线程管理实例_陈老师.pptx",
+      "knowledge_point": "2.5 进程、线程管理实例"
+    },
+    {
+      "type": "PPT",
+      "teacher": "张老师",
+      "filename": "3.1.1_并发原理_张老师.pptx",
+      "knowledge_point": "3.1.1 并发原理"
+    },
+    {
+      "type": "PPT",
+      "teacher": "李老师",
+      "filename": "3.1.1_并发原理_李老师.pptx",
+      "knowledge_point": "3.1.1 并发原理"
+    },
+    {
+      "type": "Video",
+      "teacher": "陈老师",
+      "filename": "3.1.1_并发原理_陈老师.mp4",
+      "knowledge_point": "3.1.1 并发原理"
+    },
+    {
+      "type": "PPT",
+      "teacher": "陈老师",
+      "filename": "3.1.1_并发原理_陈老师.pptx",
+      "knowledge_point": "3.1.1 并发原理"
+    },
+    {
+      "type": "Video",
+      "teacher": "张老师",
+      "filename": "3.1.2_临界资源与临界区_张老师.mp4",
+      "knowledge_point": "3.1.2 临界资源与临界区"
+    },
+    {
+      "type": "PPT",
+      "teacher": "张老师",
+      "filename": "3.1.2_临界资源与临界区_张老师.pptx",
+      "knowledge_point": "3.1.2 临界资源与临界区"
+    },
+    {
+      "type": "PPT",
+      "teacher": "陈老师",
+      "filename": "3.1.2_临界资源与临界区_陈老师.pptx",
+      "knowledge_point": "3.1.2 临界资源与临界区"
+    },
+    {
+      "type": "Video",
+      "teacher": "李老师",
+      "filename": "3.1.3_互斥的软、硬件实现方法_李老师.mp4",
+      "knowledge_point": "3.1.3 互斥的软、硬件实现方法"
+    },
+    {
+      "type": "PPT",
+      "teacher": "李老师",
+      "filename": "3.1.3_互斥的软、硬件实现方法_李老师.pptx",
+      "knowledge_point": "3.1.3 互斥的软、硬件实现方法"
+    },
+    {
+      "type": "PPT",
+      "teacher": "陈老师",
+      "filename": "3.1.3_互斥的软、硬件实现方法_陈老师.pptx",
+      "knowledge_point": "3.1.3 互斥的软、硬件实现方法"
+    },
+    {
+      "type": "PPT",
+      "teacher": "张老师",
+      "filename": "3.1.4_信号量和P、V操作_张老师.pptx",
+      "knowledge_point": "3.1.4 信号量和P、V操作"
+    },
+    {
+      "type": "Video",
+      "teacher": "李老师",
+      "filename": "3.1.4_信号量和P、V操作_李老师.mp4",
+      "knowledge_point": "3.1.4 信号量和P、V操作"
+    },
+    {
+      "type": "PPT",
+      "teacher": "李老师",
+      "filename": "3.1.4_信号量和P、V操作_李老师.pptx",
+      "knowledge_point": "3.1.4 信号量和P、V操作"
+    },
+    {
+      "type": "PPT",
+      "teacher": "陈老师",
+      "filename": "3.1.4_信号量和P、V操作_陈老师.pptx",
+      "knowledge_point": "3.1.4 信号量和P、V操作"
+    },
+    {
+      "type": "PPT",
+      "teacher": "张老师",
+      "filename": "3.2.1_进程同步概念_张老师.pptx",
+      "knowledge_point": "3.2.1 进程同步概念"
+    },
+    {
+      "type": "PPT",
+      "teacher": "李老师",
+      "filename": "3.2.1_进程同步概念_李老师.pptx",
+      "knowledge_point": "3.2.1 进程同步概念"
+    },
+    {
+      "type": "Video",
+      "teacher": "陈老师",
+      "filename": "3.2.1_进程同步概念_陈老师.mp4",
+      "knowledge_point": "3.2.1 进程同步概念"
+    },
+    {
+      "type": "PPT",
+      "teacher": "陈老师",
+      "filename": "3.2.1_进程同步概念_陈老师.pptx",
+      "knowledge_point": "3.2.1 进程同步概念"
+    },
+    {
+      "type": "Video",
+      "teacher": "陈老师",
+      "filename": "3.2.2_用P、V操作实现同步_陈老师.mp4",
+      "knowledge_point": "3.2.2 用P、V操作实现同步"
+    },
+    {
+      "type": "PPT",
+      "teacher": "陈老师",
+      "filename": "3.2.2_用P、V操作实现同步_陈老师.pptx",
+      "knowledge_point": "3.2.2 用P、V操作实现同步"
+    },
+    {
+      "type": "Video",
+      "teacher": "陈老师",
+      "filename": "3.3.1_进程通信的类型_陈老师.mp4",
+      "knowledge_point": "3.3.1 进程通信的类型"
+    },
+    {
+      "type": "PPT",
+      "teacher": "陈老师",
+      "filename": "3.3.1_进程通信的类型_陈老师.pptx",
+      "knowledge_point": "3.3.1 进程通信的类型"
+    },
+    {
+      "type": "PPT",
+      "teacher": "张老师",
+      "filename": "3.3.2_进程通信中的问题_张老师.pptx",
+      "knowledge_point": "3.3.2 进程通信中的问题"
+    },
+    {
+      "type": "Video",
+      "teacher": "陈老师",
+      "filename": "3.3.2_进程通信中的问题_陈老师.mp4",
+      "knowledge_point": "3.3.2 进程通信中的问题"
+    },
+    {
+      "type": "Video",
+      "teacher": "李老师",
+      "filename": "3.3.3_消息传递_李老师.mp4",
+      "knowledge_point": "3.3.3 消息传递"
+    },
+    {
+      "type": "PPT",
+      "teacher": "李老师",
+      "filename": "3.3.3_消息传递_李老师.pptx",
+      "knowledge_point": "3.3.3 消息传递"
+    },
+    {
+      "type": "PPT",
+      "teacher": "张老师",
+      "filename": "3.4.1_死锁的概念_张老师.pptx",
+      "knowledge_point": "3.4.1 死锁的概念"
+    },
+    {
+      "type": "PPT",
+      "teacher": "李老师",
+      "filename": "3.4.1_死锁的概念_李老师.pptx",
+      "knowledge_point": "3.4.1 死锁的概念"
+    },
+    {
+      "type": "Video",
+      "teacher": "陈老师",
+      "filename": "3.4.1_死锁的概念_陈老师.mp4",
+      "knowledge_point": "3.4.1 死锁的概念"
+    },
+    {
+      "type": "PPT",
+      "teacher": "陈老师",
+      "filename": "3.4.1_死锁的概念_陈老师.pptx",
+      "knowledge_point": "3.4.1 死锁的概念"
+    },
+    {
+      "type": "Video",
+      "teacher": "张老师",
+      "filename": "3.4.2_死锁的必要条件_张老师.mp4",
+      "knowledge_point": "3.4.2 死锁的必要条件"
+    },
+    {
+      "type": "PPT",
+      "teacher": "张老师",
+      "filename": "3.4.2_死锁的必要条件_张老师.pptx",
+      "knowledge_point": "3.4.2 死锁的必要条件"
+    },
+    {
+      "type": "PPT",
+      "teacher": "李老师",
+      "filename": "3.4.2_死锁的必要条件_李老师.pptx",
+      "knowledge_point": "3.4.2 死锁的必要条件"
+    },
+    {
+      "type": "PPT",
+      "teacher": "陈老师",
+      "filename": "3.4.2_死锁的必要条件_陈老师.pptx",
+      "knowledge_point": "3.4.2 死锁的必要条件"
+    },
+    {
+      "type": "Video",
+      "teacher": "张老师",
+      "filename": "3.4.3_死锁的防止_张老师.mp4",
+      "knowledge_point": "3.4.3 死锁的防止"
+    },
+    {
+      "type": "PPT",
+      "teacher": "李老师",
+      "filename": "3.4.3_死锁的防止_李老师.pptx",
+      "knowledge_point": "3.4.3 死锁的防止"
+    },
+    {
+      "type": "PPT",
+      "teacher": "李老师",
+      "filename": "3.4.4_死锁的避免_李老师.pptx",
+      "knowledge_point": "3.4.4 死锁的避免"
+    },
+    {
+      "type": "Video",
+      "teacher": "陈老师",
+      "filename": "3.4.4_死锁的避免_陈老师.mp4",
+      "knowledge_point": "3.4.4 死锁的避免"
+    },
+    {
+      "type": "PPT",
+      "teacher": "陈老师",
+      "filename": "3.4.4_死锁的避免_陈老师.pptx",
+      "knowledge_point": "3.4.4 死锁的避免"
+    },
+    {
+      "type": "Video",
+      "teacher": "张老师",
+      "filename": "3.4.5_死锁检测与恢复_张老师.mp4",
+      "knowledge_point": "3.4.5 死锁检测与恢复"
+    },
+    {
+      "type": "PPT",
+      "teacher": "张老师",
+      "filename": "3.4.5_死锁检测与恢复_张老师.pptx",
+      "knowledge_point": "3.4.5 死锁检测与恢复"
+    },
+    {
+      "type": "Video",
+      "teacher": "张老师",
+      "filename": "3.4.6_两阶段加锁_张老师.mp4",
+      "knowledge_point": "3.4.6 两阶段加锁"
+    },
+    {
+      "type": "PPT",
+      "teacher": "陈老师",
+      "filename": "3.4.6_两阶段加锁_陈老师.pptx",
+      "knowledge_point": "3.4.6 两阶段加锁"
+    },
+    {
+      "type": "Video",
+      "teacher": "张老师",
+      "filename": "3.4.7_活锁_张老师.mp4",
+      "knowledge_point": "3.4.7 活锁"
+    },
+    {
+      "type": "PPT",
+      "teacher": "张老师",
+      "filename": "3.4.7_活锁_张老师.pptx",
+      "knowledge_point": "3.4.7 活锁"
+    },
+    {
+      "type": "PPT",
+      "teacher": "李老师",
+      "filename": "3.4.7_活锁_李老师.pptx",
+      "knowledge_point": "3.4.7 活锁"
+    },
+    {
+      "type": "PPT",
+      "teacher": "陈老师",
+      "filename": "3.4.7_活锁_陈老师.pptx",
+      "knowledge_point": "3.4.7 活锁"
+    },
+    {
+      "type": "Video",
+      "teacher": "张老师",
+      "filename": "3.4.8_饥饿_张老师.mp4",
+      "knowledge_point": "3.4.8 饥饿"
+    },
+    {
+      "type": "PPT",
+      "teacher": "张老师",
+      "filename": "3.4.8_饥饿_张老师.pptx",
+      "knowledge_point": "3.4.8 饥饿"
+    },
+    {
+      "type": "PPT",
+      "teacher": "李老师",
+      "filename": "3.4.8_饥饿_李老师.pptx",
+      "knowledge_point": "3.4.8 饥饿"
+    },
+    {
+      "type": "Video",
+      "teacher": "陈老师",
+      "filename": "3.5.1_读者-写者问题_陈老师.mp4",
+      "knowledge_point": "3.5.1 读者-写者问题"
+    },
+    {
+      "type": "PPT",
+      "teacher": "陈老师",
+      "filename": "3.5.1_读者-写者问题_陈老师.pptx",
+      "knowledge_point": "3.5.1 读者-写者问题"
+    },
+    {
+      "type": "PPT",
+      "teacher": "张老师",
+      "filename": "3.5.2_哲学家进餐问题_张老师.pptx",
+      "knowledge_point": "3.5.2 哲学家进餐问题"
+    },
+    {
+      "type": "PPT",
+      "teacher": "李老师",
+      "filename": "3.5.2_哲学家进餐问题_李老师.pptx",
+      "knowledge_point": "3.5.2 哲学家进餐问题"
+    },
+    {
+      "type": "Video",
+      "teacher": "陈老师",
+      "filename": "3.5.2_哲学家进餐问题_陈老师.mp4",
+      "knowledge_point": "3.5.2 哲学家进餐问题"
+    },
+    {
+      "type": "PPT",
+      "teacher": "陈老师",
+      "filename": "3.5.2_哲学家进餐问题_陈老师.pptx",
+      "knowledge_point": "3.5.2 哲学家进餐问题"
+    },
+    {
+      "type": "Video",
+      "teacher": "李老师",
+      "filename": "3.5.3_打瞌睡的理发师问题_李老师.mp4",
+      "knowledge_point": "3.5.3 打瞌睡的理发师问题"
+    },
+    {
+      "type": "PPT",
+      "teacher": "陈老师",
+      "filename": "3.5.3_打瞌睡的理发师问题_陈老师.pptx",
+      "knowledge_point": "3.5.3 打瞌睡的理发师问题"
+    },
+    {
+      "type": "Video",
+      "teacher": "张老师",
+      "filename": "3.6_多核环境下的进程同步_张老师.mp4",
+      "knowledge_point": "3.6 多核环境下的进程同步"
+    },
+    {
+      "type": "PPT",
+      "teacher": "张老师",
+      "filename": "3.6_多核环境下的进程同步_张老师.pptx",
+      "knowledge_point": "3.6 多核环境下的进程同步"
+    },
+    {
+      "type": "PPT",
+      "teacher": "张老师",
+      "filename": "3.7_进程同步与通信实例_张老师.pptx",
+      "knowledge_point": "3.7 进程同步与通信实例"
+    },
+    {
+      "type": "Video",
+      "teacher": "李老师",
+      "filename": "3.7_进程同步与通信实例_李老师.mp4",
+      "knowledge_point": "3.7 进程同步与通信实例"
+    },
+    {
+      "type": "PPT",
+      "teacher": "李老师",
+      "filename": "3.7_进程同步与通信实例_李老师.pptx",
+      "knowledge_point": "3.7 进程同步与通信实例"
+    },
+    {
+      "type": "PPT",
+      "teacher": "陈老师",
+      "filename": "3.7_进程同步与通信实例_陈老师.pptx",
+      "knowledge_point": "3.7 进程同步与通信实例"
+    }
+  ]
+}

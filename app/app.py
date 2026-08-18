@@ -5,11 +5,30 @@ from datetime import datetime, timedelta
 import re
 import os
 import json
+import time
+import random
+import functools
 from werkzeug.utils import secure_filename
 
 app = Flask(__name__)
 app.secret_key = 'knowledge_graph_learning_system_2024'
 PATH_RECOMMEND_CACHE = {}
+_PERF_LOG_ENABLED = True
+
+def perf_log(name=None):
+    def decorator(func):
+        @functools.wraps(func)
+        def wrapper(*args, **kwargs):
+            if not _PERF_LOG_ENABLED:
+                return func(*args, **kwargs)
+            _t0 = time.time()
+            result = func(*args, **kwargs)
+            _cost = (time.time() - _t0) * 1000
+            label = name or func.__name__
+            print("[PERF] {} cost={:.0f}ms".format(label, _cost))
+            return result
+        return wrapper
+    return decorator
 NEO4J_OFFLINE_UNTIL = None
 
 driver = GraphDatabase.driver(
@@ -18,12 +37,19 @@ driver = GraphDatabase.driver(
     connection_timeout=1
 )
 
+try:
+    with driver.session() as test_session:
+        test_session.run("RETURN 1").consume()
+except Exception:
+    mark_neo4j_offline(300)
+
 RESOURCE_DIR = os.path.join(os.path.dirname(__file__), "resources")
+TEACHING_MATERIALS_DIR = os.path.join(RESOURCE_DIR, "teaching_materials")
 
 def neo4j_temporarily_offline():
     return NEO4J_OFFLINE_UNTIL is not None and datetime.now() < NEO4J_OFFLINE_UNTIL
 
-def mark_neo4j_offline(seconds=20):
+def mark_neo4j_offline(seconds=300):
     global NEO4J_OFFLINE_UNTIL
     NEO4J_OFFLINE_UNTIL = datetime.now() + timedelta(seconds=seconds)
 
@@ -32,270 +58,14 @@ TEACHERS = {
 }
 
 STUDENTS = {
-    "3220602001": {"password": "123456", "name": "??", "full_id": "3220602001??"},
-    "3220602002": {"password": "123456", "name": "??", "full_id": "3220602002??"},
-    "3220602003": {"password": "123456", "name": "??", "full_id": "3220602003??"},
-    "3220602004": {"password": "123456", "name": "??", "full_id": "3220602004??"},
-    "3220602005": {"password": "123456", "name": "??", "full_id": "3220602005??"},
-    "3220602006": {"password": "123456", "name": "??", "full_id": "3220602006??"},
-    "3220602007": {"password": "123456", "name": "??", "full_id": "3220602007??"}
+    "3220602001": {"password": "123456", "name": "\u5218\u5927", "full_id": "3220602001\u5218\u5927"},
+    "3220602002": {"password": "123456", "name": "\u9648\u4e8c", "full_id": "3220602002\u9648\u4e8c"},
+    "3220602003": {"password": "123456", "name": "\u5f20\u4e09", "full_id": "3220602003\u5f20\u4e09"},
+    "3220602004": {"password": "123456", "name": "\u674e\u56db", "full_id": "3220602004\u674e\u56db"},
+    "3220602005": {"password": "123456", "name": "\u738b\u4e94", "full_id": "3220602005\u738b\u4e94"},
+    "3220602006": {"password": "123456", "name": "\u8d75\u516d", "full_id": "3220602006\u8d75\u516d"},
+    "3220602007": {"password": "123456", "name": "\u5468\u4e03", "full_id": "3220602007\u5468\u4e03"}
 }
-
-def get_user_profile(student_id):
-    """
-    ????????????????????????????????    ???????????????/???/???/????????????
-    """
-    with driver.session() as neo4j_session:
-        # ?????????????????????
-        query = """
-        MATCH (stu:Student {id: $sid})-[r:MASTERED]->(k:Knowledge)
-        WHERE k.name STARTS WITH '1.' OR k.name STARTS WITH '2.' OR k.name STARTS WITH '3.'
-        RETURN k.name AS name, r.mastery AS mastery, r.total_questions AS total,
-               r.correct_questions AS correct, k.difficulty AS difficulty,
-               k.is_key AS is_key
-        """
-        result = neo4j_session.run(query, sid=student_id)
-        
-        total_kps = 0
-        total_mastery = 0
-        easy_mastery = []
-        medium_mastery = []
-        hard_mastery = []
-        key_mastery = []
-        total_correct = 0
-        total_questions = 0
-        
-        for r in result:
-            total_kps += 1
-            mastery = r["mastery"] or 0
-            total_mastery += mastery
-            
-            difficulty = r.get("difficulty") or "medium"
-            if difficulty == "easy":
-                easy_mastery.append(mastery)
-            elif difficulty == "hard":
-                hard_mastery.append(mastery)
-            else:
-                medium_mastery.append(mastery)
-            
-            if r.get("is_key"):
-                key_mastery.append(mastery)
-            
-            total_correct += r.get("correct") or 0
-            total_questions += r.get("total") or 0
-        
-        if total_kps == 0:
-            return {
-                "level": "???",
-                "level_code": 0,
-                "avg_mastery": 0,
-                "accuracy": 0,
-                "easy_avg": 0,
-                "medium_avg": 0,
-                "hard_avg": 0,
-                "key_avg": 0,
-                "total_kps": 0,
-                "description": "?????????"
-            }
-        
-        avg_mastery = total_mastery / total_kps
-        accuracy = total_correct / total_questions if total_questions > 0 else 0
-        
-        easy_avg = sum(easy_mastery) / len(easy_mastery) if easy_mastery else 0
-        medium_avg = sum(medium_mastery) / len(medium_mastery) if medium_mastery else 0
-        hard_avg = sum(hard_mastery) / len(hard_mastery) if hard_mastery else 0
-        key_avg = sum(key_mastery) / len(key_mastery) if key_mastery else 0
-        
-        # ??????????????????????
-        weak_key_points = []
-        weak_general_points = []
-        key_points_total = 0
-        key_points_weak = 0
-        
-        query2 = """
-        MATCH (stu:Student {id: $sid})-[r:MASTERED]->(k:Knowledge)
-        WHERE k.name STARTS WITH '1.' OR k.name STARTS WITH '2.' OR k.name STARTS WITH '3.'
-        RETURN k.name AS name, r.mastery AS mastery, k.is_key AS is_key
-        """
-        result2 = neo4j_session.run(query2, sid=student_id)
-        for r in result2:
-            mastery = r["mastery"] or 0
-            is_key = r.get("is_key") or False
-            if is_key:
-                key_points_total += 1
-                if mastery < 0.5:
-                    key_points_weak += 1
-                    weak_key_points.append({"name": r["name"], "mastery": mastery})
-            elif mastery < 0.5:
-                weak_general_points.append({"name": r["name"], "mastery": mastery})
-        
-        weak_key_points.sort(key=lambda x: x["mastery"])
-        weak_general_points.sort(key=lambda x: x["mastery"])
-        
-        # ????????????40% + ?????0% + ??????20% + ??????10%
-        composite_score = avg_mastery * 0.4 + accuracy * 0.3 + hard_avg * 0.2 + key_avg * 0.1
-        
-        # ??????????????????????????????
-        if avg_mastery >= 0.90:
-            level = "???"
-            level_code = 4
-        elif avg_mastery >= 0.75:
-            level = "???"
-            level_code = 3
-        elif avg_mastery >= 0.60:
-            level = "???"
-            level_code = 2
-        else:
-            level = "???"
-            level_code = 1
-        
-        # ??????????????????????????????
-        suggestions = []
-        
-        # 1. ??????????
-        if key_avg < 0.3:
-            if weak_key_points:
-                names = [display_kp_name(p["name"]) for p in weak_key_points[:3]]
-                suggestions.append("????????????{:.0f}%?????????{}".format(key_avg * 100, "?".join(names)))
-            else:
-                suggestions.append("???????????{:.0f}%????????????".format(key_avg * 100))
-        elif key_avg < 0.6:
-            if weak_key_points:
-                names = [display_kp_name(p["name"]) for p in weak_key_points[:2]]
-                suggestions.append("???????????{}?????????????".format("?".join(names)))
-            else:
-                suggestions.append(f"?????????????????{key_avg*100:.0f}%?????????????????????")
-        elif key_avg < 0.8:
-            suggestions.append(f"???????????????{key_avg*100:.0f}%??????????????????")
-        else:
-            suggestions.append("??????????{:.0f}%????????????????".format(key_avg * 100))
-        
-        # 2. ??????????
-        if weak_general_points:
-            names = [display_kp_name(p["name"]) for p in weak_general_points[:3]]
-            suggestions.append("??????????{}".format("?".join(names)))
-        else:
-            suggestions.append("?????????????????????")
-        
-        # 3. ?????????
-        if easy_avg < 0.5:
-            suggestions.append("??????????????????????????")
-        elif easy_avg < 0.7:
-            suggestions.append(f"??????????????{easy_avg*100:.0f}%???????????????")
-        elif hard_avg < 0.4 and hard_avg > 0:
-            suggestions.append("??????????????????????????")
-        elif hard_avg >= 0.6:
-            suggestions.append(f"????????????{hard_avg*100:.0f}%??????????????????")
-        else:
-            suggestions.append("??????????????????????????????")
-        
-        # 4. ???????????????
-        if level == "???":
-            suggestions.append("???????????????????????")
-        elif level == "???":
-            suggestions.append("?????????????????????????????")
-        elif level == "???":
-            suggestions.append("????????????????????????????????????")
-        else:
-            suggestions.append("???????????????????????????????????????")
-        
-        description = "?".join(suggestions)
-        
-        # ??????????????????????
-        chapter_details = []
-        chapter_query = """
-        MATCH (c:Chapter)-[:???]->(s:Knowledge)
-        WHERE c.name STARTS WITH '?1?' OR c.name STARTS WITH '?2?' OR c.name STARTS WITH '?3?'
-        OPTIONAL MATCH (stu:Student {id: $sid})-[r:MASTERED]->(s)
-        OPTIONAL MATCH (s)-[:???]->(ss:Knowledge)
-        OPTIONAL MATCH (stu2:Student {id: $sid})-[r2:MASTERED]->(ss)
-        RETURN c.name AS chapter, s.name AS section_name, r.mastery AS section_mastery,
-               ss.name AS subsection_name, r2.mastery AS subsection_mastery,
-               s.is_key AS section_is_key, ss.is_key AS subsection_is_key
-        ORDER BY c.name, s.name, ss.name
-        """
-        chapter_result = neo4j_session.run(chapter_query, sid=student_id)
-        
-        current_chapter = None
-        current_section = None
-        chapters_map = {}
-        
-        for record in chapter_result:
-            ch_name = record["chapter"]
-            sec_name = record["section_name"]
-            subsec_name = record["subsection_name"]
-            
-            if ch_name and ch_name not in chapters_map:
-                chapters_map[ch_name] = {
-                    "name": ch_name,
-                    "sections": [],
-                    "avg_mastery": 0,
-                    "total_points": 0,
-                    "weak_count": 0,
-                    "strong_count": 0
-                }
-            
-            if sec_name and subsec_name:
-                # ????????????
-                if not any(s["name"] == sec_name for s in chapters_map[ch_name]["sections"]):
-                    chapters_map[ch_name]["sections"].append({
-                        "name": sec_name,
-                        "mastery": record["section_mastery"] or 0,
-                        "is_key": record.get("section_is_key") or False,
-                        "subsections": []
-                    })
-                
-                for sec in chapters_map[ch_name]["sections"]:
-                    if sec["name"] == sec_name:
-                        sub_mastery = record["subsection_mastery"] or 0
-                        sec["subsections"].append({
-                            "name": subsec_name,
-                            "mastery": sub_mastery,
-                            "is_key": record.get("subsection_is_key") or False
-                        })
-                        
-                        # ???
-                        chapters_map[ch_name]["total_points"] += 1
-                        chapters_map[ch_name]["avg_mastery"] += sub_mastery
-                        if sub_mastery < 0.5:
-                            chapters_map[ch_name]["weak_count"] += 1
-                        elif sub_mastery >= 0.8:
-                            chapters_map[ch_name]["strong_count"] += 1
-        
-        # ?????????????
-        for ch in chapters_map.values():
-            if ch["total_points"] > 0:
-                ch["avg_mastery"] = round(ch["avg_mastery"] / ch["total_points"], 3)
-            else:
-                ch["avg_mastery"] = 0
-            
-            # ?????????????????????????????????
-            for sec in ch["sections"]:
-                if sec["subsections"]:
-                    sec_total = sum(sub["mastery"] for sub in sec["subsections"])
-                    sec["mastery"] = round(sec_total / len(sec["subsections"]), 3)
-                else:
-                    sec["mastery"] = 0
-        
-        chapter_details = list(chapters_map.values())
-        chapter_details.sort(key=lambda x: x["name"])
-        
-        return {
-            "level": level,
-            "level_code": level_code,
-            "avg_mastery": round(avg_mastery, 3),
-            "accuracy": round(accuracy, 3),
-            "easy_avg": round(easy_avg, 3),
-            "medium_avg": round(medium_avg, 3),
-            "hard_avg": round(hard_avg, 3),
-            "key_avg": round(key_avg, 3),
-            "composite_score": round(composite_score, 3),
-            "total_kps": total_kps,
-            "total_questions": total_questions,
-            "total_correct": total_correct,
-            "description": description,
-            "chapter_details": chapter_details
-        }
 
 def get_knowledge_graph(student_id):
     with driver.session() as neo4j_session:
@@ -781,13 +551,14 @@ def get_recommendations(sid):
     return recs
 
 def get_mastery_status(score):
-    if score < 0.4:
-        return "??????"
-    if score < 0.7:
-        return "???"
+    score = float(score or 0)
+    if score <= 0:
+        return "未学习"
+    if score < 0.6:
+        return "薄弱"
     if score < 0.85:
-        return "??????"
-    return "??????"
+        return "良好"
+    return "已掌握"
 
 def get_kp_code(kp_name):
     match = re.match(r"^(\d+(?:\.\d+){0,2})", kp_name or "")
@@ -1063,6 +834,7 @@ def build_path_recommendation(user_id, resources, behavior_profile, target_kp=No
             "resources": rerank_with_diversity(scored_resources)
         })
 
+    level = stats.get("level") or meta.get("level") or level
     return {
         "target_options": target_options,
         "selected_target": target_kp,
@@ -1078,12 +850,12 @@ def build_path_recommendation(user_id, resources, behavior_profile, target_kp=No
 
 def flow_status(score):
     score = float(score or 0)
-    if score < 0.4:
-        return "严重薄弱"
-    if score < 0.7:
-        return "薄弱"
-    if score < 0.85:
-        return "基本掌握"
+    if score <= 0:
+        return "未学习"
+    if score < 0.6:
+        return "需巩固"
+    if score < 0.8:
+        return "良好"
     return "已掌握"
 
 def flow_resource_type(filename):
@@ -1094,10 +866,37 @@ def flow_resource_type(filename):
         return "文档"
     return "资源"
 
+def normalize_resource_type(value):
+    raw = str(value or "").strip().lower()
+    if not raw:
+        return "未知"
+    ext_match = re.match(r"^\.?(\w{2,5})$", raw)
+    ext = (ext_match.group(1) if ext_match else raw.rsplit(".", 1)[-1] if "." in raw else raw)
+    video_kw = {"mp4", "avi", "mov", "mkv", "webm", "video", "视频"}
+    doc_kw = {"ppt", "pptx", "doc", "docx", "pdf", "txt", "md", "document", "文档", "课件"}
+    exercise_kw = {"question", "exercise", "quiz", "练习", "习题"}
+    if ext in video_kw:
+        return "视频"
+    if ext in doc_kw:
+        return "文档"
+    if ext in exercise_kw:
+        return "习题"
+    if raw in video_kw or raw.endswith("mp4") or raw.endswith("avi") or raw.endswith("mov") or raw.endswith("mkv"):
+        return "视频"
+    if raw in doc_kw or raw.endswith("pptx") or raw.endswith("docx") or raw.endswith("pdf") or raw.endswith("doc"):
+        return "文档"
+    if raw in exercise_kw:
+        return "习题"
+    if "mp4" in raw or "视频" in raw or "video" in raw:
+        return "视频"
+    if raw == "ppt":
+        return "文档"
+    return "其他"
+
 def flow_resource_difficulty(filename):
     name = filename or ""
     if any(word in name for word in ["基础", "概述", "入门", "简单"]):
-        return "简单"
+        return "基础"
     if any(word in name for word in ["专题", "死锁", "PV", "P、V", "同步", "互斥", "银行家"]):
         return "困难"
     info = infer_resource_info(name)
@@ -1127,24 +926,33 @@ def flow_content_match(resource_code, kp_code):
     return 0
 
 def display_kp_name(name):
-    return re.sub(r"^\s*\d+(?:\.\d+)+\s*", "", str(name or "")).strip() or str(name or "")
+    return str(name or "").strip()
 
 def fallback_students():
     students = []
+    meta_file = os.path.join(RESOURCE_DIR, "students_meta.json")
+    if os.path.exists(meta_file):
+        try:
+            with open(meta_file, "r", encoding="utf-8") as f:
+                meta = json.load(f)
+            for sid, info in meta.items():
+                students.append({
+                    "id": sid + info.get("name", ""),
+                    "num": sid,
+                    "name": info.get("name", "")
+                })
+            if students:
+                return students
+        except Exception:
+            pass
     for info in STUDENTS.values():
         sid = info.get("full_id") or ""
         students.append({"id": sid, "num": re.sub(r"\D.*$", "", sid), "name": info.get("name", "")})
     return students
 
 def fallback_flow_mastery_data():
-    codes = set()
-    if os.path.exists(RESOURCE_DIR):
-        for filename in os.listdir(RESOURCE_DIR):
-            if not os.path.isfile(os.path.join(RESOURCE_DIR, filename)):
-                continue
-            code = flow_resource_code(filename)
-            if code and code[0] in {"1", "2", "3"}:
-                codes.add(code)
+    catalog_names = build_knowledge_catalog_names()
+    codes = {code for code in catalog_names if code and code[0] in {"1", "2", "3"}}
     if not codes:
         codes = {"1.1.1", "1.1.2", "2.1.1", "3.1.1"}
     points = []
@@ -1153,17 +961,17 @@ def fallback_flow_mastery_data():
         chapter = code.split(".")[0]
         item = {
             "kp_id": code,
-            "name": code,
-            "full_name": code,
+            "name": display_kp_name(catalog_names.get(code, code)),
+            "full_name": catalog_names.get(code, code),
             "chapter": chapter,
             "score": 0,
             "base_score": 0,
-            "mastery_formula": "Neo4j ???????????????????",
+            "mastery_formula": "Neo4j离线待恢复",
             "components": {"exercise": 0, "accuracy": 0, "volume": 0, "video": 0, "resource": 0, "discussion": 0},
             "status": flow_status(0)
         }
         points.append(item)
-        chapters.setdefault(chapter, {"chapter": chapter, "title": "?{}?".format(chapter), "knowledge_points": []})
+        chapters.setdefault(chapter, {"chapter": chapter, "title": "第{}章".format(chapter), "knowledge_points": []})
         chapters[chapter]["knowledge_points"].append(item)
     return {
         "points": points,
@@ -1177,6 +985,7 @@ def fallback_flow_mastery_data():
         "offline": True
     }
 
+@perf_log("get_flow_mastery_data")
 def get_flow_mastery_data(user_id):
     if neo4j_temporarily_offline():
         return fallback_flow_mastery_data()
@@ -1290,6 +1099,16 @@ def get_flow_mastery_data(user_id):
         "stats": stats
     }
 
+def clean_resource_display_title(filename, code):
+    title = os.path.splitext(filename)[0]
+    if code:
+        prefix = code + "_"
+        if title.startswith(prefix):
+            title = title[len(prefix):]
+    return title
+
+
+@perf_log("get_flow_resources")
 def get_flow_resources(user_id=None):
     resources = []
     watched_names = set()
@@ -1304,29 +1123,80 @@ def get_flow_resources(user_id=None):
         except Exception:
             mark_neo4j_offline()
             watched_names = set()
-    if not os.path.exists(RESOURCE_DIR):
+
+    teaching_dir = TEACHING_MATERIALS_DIR
+    if not os.path.isdir(teaching_dir):
         return resources
-    excluded = {"questions.json", "question_history.json"}
-    for filename in os.listdir(RESOURCE_DIR):
-        if filename in excluded or not os.path.isfile(os.path.join(RESOURCE_DIR, filename)):
+
+    manifest_map = {}
+    manifest_path = os.path.join(teaching_dir, "resource_manifest.json")
+    if os.path.exists(manifest_path):
+        try:
+            with open(manifest_path, "r", encoding="utf-8") as f:
+                manifest_data = json.load(f)
+            for item in manifest_data.get("files", []) if isinstance(manifest_data, dict) else []:
+                fn = item.get("filename")
+                if fn:
+                    manifest_map[fn] = item
+        except Exception:
+            pass
+
+    ALLOWED_EXT = {".mp4", ".ppt", ".pptx", ".doc", ".docx", ".pdf", ".txt", ".md"}
+    for entry in os.scandir(teaching_dir):
+        if not entry.is_file():
             continue
+        filename = entry.name
+        if filename == "resource_manifest.json":
+            continue
+        ext = os.path.splitext(filename)[1].lower()
+        if ext not in ALLOWED_EXT:
+            continue
+        if filename.startswith(".") or filename.startswith("~") or filename.endswith(".bak"):
+            continue
+
+        meta = manifest_map.get(filename, {})
+        teacher = meta.get("teacher") or ""
+        rtype = meta.get("type") or flow_resource_type(filename)
+        kp_name_from_manifest = meta.get("knowledge_point") or ""
+
         info = infer_resource_info(filename)
-        if info.get("ch") and info["ch"] > 3:
-            continue
-        code = flow_resource_code(filename)
+        code = flow_kp_code(kp_name_from_manifest or filename)
+
+        chapter_num = info.get("ch") or ""
+        chapter_label = "第{}章".format(chapter_num) if chapter_num else "待分类"
+        if info.get("ch") and info.get("big") and info.get("sec"):
+            section_label = "{}.{}.{}".format(info["ch"], info["big"], info["sec"])
+        elif info.get("ch") and info.get("big"):
+            section_label = "{}.{}".format(info["ch"], info["big"])
+        elif info.get("ch"):
+            section_label = "第{}章整章".format(info["ch"])
+        else:
+            section_label = "待分类"
+
         resources.append({
             "resource_id": filename,
             "name": filename,
-            "title": os.path.splitext(filename)[0],
-            "type": flow_resource_type(filename),
+            "title": clean_resource_display_title(filename, code),
+            "type": rtype,
             "difficulty": flow_resource_difficulty(filename),
-            "chapter": str(info.get("ch") or ""),
-            "chapter_label": "第{}章".format(info.get("ch")) if info.get("ch") else "未分类",
-            "section_label": "{}.{}".format(info.get("ch"), info.get("big")) if info.get("ch") and info.get("big") else ("整章" if info.get("ch") else "未分类"),
-            "knowledge_point": code,
-            "watched": filename in watched_names
+            "chapter": str(chapter_num),
+            "chapter_label": chapter_label,
+            "section_label": section_label,
+            "knowledge_point": kp_name_from_manifest or code,
+            "knowledge_id": code or "",
+            "teacher_name": teacher or "未标注",
+            "watched": filename in watched_names,
+            "completed": False,
+            "resource_quality_score": 0.0,
+            "recommend_score": 0.0,
+            "teacher_adapt_score": 0.55,
+            "explain": "",
         })
-    resources.sort(key=lambda r: (int(r["chapter"]) if r["chapter"].isdigit() else 99, r["name"]))
+
+    resources.sort(key=lambda r: (
+        99 if not r["chapter"] or not str(r["chapter"]).isdigit() else int(r["chapter"]),
+        r["name"]
+    ))
     return resources
 
 def get_flow_pref(user_id):
@@ -1347,25 +1217,48 @@ def explainKnowledgePoint(userId, kpId, targetKpId):
     mastery_data = get_flow_mastery_data(userId)
     score_map = {p["kp_id"]: p["score"] for p in mastery_data["points"]}
     score = score_map.get(kpId, 0)
-    if neo4j_temporarily_offline():
-        is_prereq = None
-    else:
+    status = flow_status(score)
+    is_prereq = None
+    if not neo4j_temporarily_offline():
         try:
             with driver.session() as neo4j_session:
                 is_prereq = neo4j_session.run("""
                 MATCH (kp:Knowledge {name: $kp}), (target:Knowledge {name: $target})
-                RETURN EXISTS((kp)-[:???*1..10]->(target)) AS ok
+                RETURN EXISTS((kp)-[:先修*1..10]->(target)) AS ok
                 """, kp=kpId, target=targetKpId).single()
         except Exception:
             mark_neo4j_offline()
             is_prereq = None
-    prereq_text = "???????????" if (is_prereq and is_prereq["ok"]) else "????????"
+    is_prereq_val = bool(is_prereq and is_prereq["ok"])
+    # 生成具体的推荐理由
+    reasons = []
+    if score <= 0:
+        reasons.append("尚未开始学习此知识点")
+    elif score < 0.6:
+        reasons.append("掌握度仅{:.0f}%，处于薄弱状态，需重点加强".format(score * 100))
+    elif score < 0.85:
+        reasons.append("掌握度{:.0f}%，仍需巩固练习".format(score * 100))
+    
+    if is_prereq_val:
+        reasons.append("该知识点是后续知识点的先修内容，前置掌握度低于60%，优先推荐")
+    
+    if kpId == targetKpId:
+        reasons.append("目标知识点，需优先掌握")
+    
+    # 资源匹配信息
+    resources = recommendResourcesForKnowledgePoint(kpId, userId)
+    if resources:
+        reasons.append("有{}个匹配的学习资源可供学习".format(len(resources)))
+    
+    reason_text = "；".join(reasons) if reasons else "建议学习此知识点"
+    
     return {
         "score": round(score, 3),
-        "status": flow_status(score),
-        "below_threshold": score < 0.7,
-        "is_prerequisite": bool(is_prereq and is_prereq["ok"]),
-        "reason": "????????{:.2f}???????0.70??{}?".format(score, prereq_text)
+        "status": status,
+        "below_threshold": score < 0.6,
+        "is_prerequisite": is_prereq_val,
+        "reason": reason_text,
+        "reasons_detail": reasons
     }
 
 def generateLearningPath(userId, targetKpId):
@@ -1378,10 +1271,10 @@ def generateLearningPath(userId, targetKpId):
             with driver.session() as neo4j_session:
                 rows = list(neo4j_session.run("""
                 MATCH (target:Knowledge {name: $target})
-                MATCH p=(pre:Knowledge)-[:???*0..10]->(target)
+                MATCH p=(pre:Knowledge)-[:先修*0..10]->(target)
                 UNWIND nodes(p) AS n
                 WITH DISTINCT n, target
-                OPTIONAL MATCH sp=(n)-[:???*0..10]->(target)
+                OPTIONAL MATCH sp=(n)-[:先修*0..10]->(target)
                 RETURN n.name AS name, min(length(sp)) AS distance
                 ORDER BY distance DESC, n.name
                 """, target=targetKpId))
@@ -1390,31 +1283,48 @@ def generateLearningPath(userId, targetKpId):
             rows = [{"name": targetKpId, "distance": 0}]
     path = []
     seen = set()
-    for row in rows:
+    # 按距离排序：先修远的排前面（从基础到目标）
+    rows_sorted = sorted(rows, key=lambda r: r.get("distance", 0), reverse=True)
+    
+    for i, row in enumerate(rows_sorted):
         name = row["name"]
         if not name or name in seen:
             continue
         seen.add(name)
         score = score_map.get(name, 0)
-        if score < 0.7:
+        # 只推荐未掌握的知识点（掌握度<85%）
+        if score < 0.85:
             exp = explainKnowledgePoint(userId, name, targetKpId)
+            # 获取推荐资源
+            rec_resources = recommendResourcesForKnowledgePoint(name, userId)[:3]
+            # 获取推荐题目
+            rec_questions = recommendQuestionsForKnowledgePoint(name, userId)[:3]
             path.append({
                 "kp_id": name,
                 "name": display_kp_name(name),
                 "full_name": name,
                 "score": round(score, 3),
                 "status": flow_status(score),
-                "reason": exp["reason"]
+                "priority": i + 1,
+                "reason": exp["reason"],
+                "resources": rec_resources,
+                "questions": rec_questions
             })
-    if targetKpId and targetKpId not in seen and score_map.get(targetKpId, 0) < 0.7:
+    # 确保目标知识点在路径中
+    if targetKpId and targetKpId not in seen and score_map.get(targetKpId, 0) < 0.85:
         exp = explainKnowledgePoint(userId, targetKpId, targetKpId)
+        rec_resources = recommendResourcesForKnowledgePoint(targetKpId, userId)[:3]
+        rec_questions = recommendQuestionsForKnowledgePoint(targetKpId, userId)[:3]
         path.append({
             "kp_id": targetKpId,
             "name": display_kp_name(targetKpId),
             "full_name": targetKpId,
             "score": round(score_map.get(targetKpId, 0), 3),
             "status": flow_status(score_map.get(targetKpId, 0)),
-            "reason": exp["reason"]
+            "priority": len(path) + 1,
+            "reason": exp["reason"],
+            "resources": rec_resources,
+            "questions": rec_questions
         })
     return path
 
@@ -1528,6 +1438,39 @@ def recommendResourcesForKnowledgePoint(userId, kpId, limit=3):
         if len(selected) >= limit:
             break
     return selected
+
+def recommendQuestionsForKnowledgePoint(kpId, userId=None, limit=3):
+    """根据知识点推荐题目，按难度和正确率排序"""
+    questions_data = load_questions()
+    all_qs = questions_data.get("questions", [])
+    kp_code = flow_kp_code(kpId)
+    matched = []
+    for q in all_qs:
+        q_kp = q.get("knowledge_point", "")
+        q_code = flow_kp_code(q_kp)
+        # 匹配知识点
+        if q_code == kp_code or (kp_code and q_code and (q_code.startswith(kp_code) or kp_code.startswith(q_code))):
+            matched.append(q)
+    if not matched:
+        # 放宽匹配：同章节
+        kp_parts = kp_code.split(".")
+        for q in all_qs:
+            q_kp = q.get("knowledge_point", "")
+            q_code = flow_kp_code(q_kp)
+            q_parts = q_code.split(".")
+            if kp_parts and q_parts and kp_parts[0:min(2, len(kp_parts))] == q_parts[0:min(2, len(q_parts))]:
+                matched.append(q)
+    # 去重
+    seen = set()
+    unique = []
+    for q in matched:
+        if q["id"] not in seen:
+            seen.add(q["id"])
+            unique.append(q)
+    # 按难度排序：简单优先
+    diff_order = {"easy": 0, "medium": 1, "hard": 2}
+    unique.sort(key=lambda x: diff_order.get(x.get("difficulty", "medium"), 1))
+    return unique[:limit]
 
 def completeResourceLearning(userId, resourceId, accuracy=None, kpId=None):
     rtype = flow_resource_type(resourceId)
@@ -1802,7 +1745,7 @@ STUDENT_FLOW_HTML = """
 const PAGE="{{ active_page }}";
 const TARGET=new URLSearchParams(location.search).get("target_kp")||"";
 const app=document.getElementById("app");
-const esc=s=>String(s??"").replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+const esc=s=>String(s==null?"":s).replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
 const cls=s=>s==="??????"?"bad":(s==="???"?"video":"doc");
 async function getJson(url){const r=await fetch(url);return await r.json();}
 function bar(v){return `<div class="progress"><div class="bar" style="width:${Math.max(2,Math.min(100,(Number(v)||0)*100))}%"></div></div>`}
@@ -1864,28 +1807,78 @@ def student_dashboard_data():
     if session.get("role") != "student":
         return jsonify({"success": False, "error": "????"})
     user_id = session.get("full_id")
-    data = get_flow_mastery_data(user_id)
-    recent_count = 0
-    latest_message = ""
-    try:
-        if neo4j_temporarily_offline():
-            raise RuntimeError("neo4j offline")
-        with driver.session() as neo4j_session:
-            row = neo4j_session.run("""
-            MATCH (:Student {id:$sid})-[r:VIEWED|WATCHED]->()
-            RETURN count(r) AS c
-            """, sid=user_id).single()
-            recent_count = row["c"] if row else 0
-            msg = neo4j_session.run("""
-            MATCH (:Student {id:$sid})<-[:TO_STUDENT]-(m:TeacherMessage)
-            RETURN m.body AS body
-            ORDER BY m.created_ts DESC
-            LIMIT 1
-            """, sid=user_id).single()
-            latest_message = msg["body"] if msg else ""
-    except Exception:
-        pass
-    return jsonify({"success": True, "stats": data["stats"], "recent_target": session.get("recent_target_kp"), "recent_count": recent_count, "latest_message": latest_message})
+    return jsonify(build_student_dashboard(user_id))
+
+@app.route("/student/profile")
+def student_profile():
+    if session.get("role") != "student":
+        return redirect(url_for("login"))
+    return render_flow_page("学习画像", "profile")
+
+@app.route("/student/profile/data")
+def student_profile_data():
+    if session.get("role") != "student":
+        return jsonify({"success": False, "error": "未登录"})
+    user_id = session.get("full_id")
+    sid = normalize_student_id(user_id)
+    profile = get_user_profile(sid)
+    payload = mastery_points_payload(sid)
+    leaf_points = payload["leaf_points"]
+    stats = payload["stats"]
+    weak_points = sorted(
+        [{"kp_id": p["kp_id"], "name": p["full_name"], "mastery": p["score"], "status": p["status"]} for p in leaf_points if p["score"] < 0.80],
+        key=lambda x: (x["mastery"], natural_sort_key(x["kp_id"]))
+    )[:5]
+    suggestions = []
+    avg_mastery = profile.get("avg_mastery", 0)
+    wrong_count = profile.get("wrong_count", 0)
+    accuracy = profile.get("accuracy", 0)
+    if avg_mastery >= 0.80:
+        suggestions.append("综合表现优秀，建议进行综合题训练，并学习后续相关知识点，挑战更高难度。")
+    elif avg_mastery >= 0.60:
+        if weak_points:
+            names = [display_kp_name(x["name"]) for x in weak_points[:3]]
+            suggestions.append("建议优先巩固 {} 等知识点，完成对应资源学习后再做题巩固。".format("、".join(names)))
+        else:
+            suggestions.append("整体掌握良好，建议继续完成剩余知识点的学习和练习。")
+    else:
+        if weak_points:
+            names = [display_kp_name(x["name"]) for x in weak_points[:3]]
+            suggestions.append("当前掌握度较低，建议从 {} 开始系统学习，先看资源再做基础题。".format("、".join(names)))
+        else:
+            suggestions.append("建议从第1章基本概念开始，按学习路径逐步完成资源学习和练习。")
+    if wrong_count > 0:
+        suggestions.append("错题本中有 {} 道题目待复练，建议优先攻克错题。".format(wrong_count))
+    if accuracy >= 0.8 and avg_mastery >= 0.6:
+        suggestions.append("正确率较高，可尝试中等及以上难度题目，提升综合应用能力。")
+    if not suggestions:
+        suggestions.append("保持学习节奏，按智能学习路径继续完成资源学习和知识点巩固。")
+    mastery_data = {
+        "status": stats,
+        "suggestions": "；".join(suggestions),
+        "basics": {
+            "class_name": profile.get("class_name", ""),
+            "gender": profile.get("gender", "")
+        }
+    }
+    return jsonify({
+        "success": True,
+        "profile": {
+            "student_id": profile.get("student_id", ""),
+            "student_name": profile.get("name", ""),
+            "avg_mastery": profile.get("avg_mastery", 0),
+            "accuracy": profile.get("accuracy", 0),
+            "level": profile.get("level", ""),
+            "wrong_count": profile.get("wrong_count", 0),
+            "completed_resources": profile.get("resource_completed_count", 0),
+            "record_count": profile.get("record_count", 0),
+            "total_questions": profile.get("total_questions", 0),
+            "class_name": profile.get("class_name", ""),
+            "gender": profile.get("gender", "")
+        },
+        "mastery": mastery_data,
+        "weak_points": weak_points
+    })
 
 @app.route("/student/mastery")
 def student_mastery():
@@ -1907,51 +1900,30 @@ def student_goals():
 
 @app.route("/student/path")
 def student_path():
-    if session.get("role") != "student":
-        return redirect(url_for("login"))
-    return render_flow_page("??????", "path")
+    return redirect(url_for("student_recommend"))
 
 @app.route("/student/path/data")
 def student_path_data():
     if session.get("role") != "student":
-        return jsonify({"success": False, "error": "????"})
+        return jsonify({"success": False, "error": "未登录"})
     user_id = session.get("full_id")
     target_kp = request.args.get("target_kp", "").strip()
     if not target_kp:
-        mastery = get_flow_mastery_data(user_id)
-        weak_points = [p for p in mastery["points"] if p["score"] < 0.7]
-        weak_points.sort(key=lambda x: (x["score"], x["kp_id"]))
-        target_kp = weak_points[0]["kp_id"] if weak_points else (mastery["points"][0]["kp_id"] if mastery["points"] else "")
+        score_map, detail_map, name_map, _ = calculate_mastery_tree(user_id)
+        weak_point_codes = [code for code, score in score_map.items() if score < 0.7]
+        target_kp = weak_point_codes[0] if weak_point_codes else (list(score_map.keys())[0] if score_map else "")
     if not target_kp:
-        return jsonify({"success": False, "error": "????????????"})
-    session["recent_target_kp"] = target_kp
-    cache_key = (user_id, target_kp)
-    cached = PATH_RECOMMEND_CACHE.get(cache_key)
-    if cached and (datetime.now() - cached["time"]).total_seconds() < 300:
-        return jsonify(cached["data"])
-    learning_path = generateLearningPath(user_id, target_kp)
-    target_score = {p["kp_id"]: p["score"] for p in get_flow_mastery_data(user_id)["points"]}.get(target_kp, 0)
-    fallback_path = []
-    if not learning_path:
-        fallback_path = [{
-            "kp_id": target_kp,
-            "name": target_kp,
-            "score": round(target_score, 3),
-            "status": flow_status(target_score),
-            "reason": "??????????????????????????",
-            "resources": recommendResourcesForKnowledgePoint(user_id, target_kp, 3)
-        }]
-    for step in learning_path:
-        step["resources"] = recommendResourcesForKnowledgePoint(user_id, step["kp_id"], 3)
-    payload = {
-        "success": True,
-        "target_kp": target_kp,
-        "learning_path": learning_path,
-        "fallback_path": fallback_path,
-        "threshold": 0.7
-    }
-    PATH_RECOMMEND_CACHE[cache_key] = {"time": datetime.now(), "data": payload}
-    return jsonify(payload)
+        return jsonify({"success": True, "learning_path": [], "fallback_path": []})
+    try:
+        learning_path = generate_learning_path(user_id, target_kp)
+        for step in learning_path:
+            code = step.get("code")
+            step["resources"] = hkgcf_like_recommend(user_id, target_knowledge_id=code, limit=3) if code else []
+        return jsonify({"success": True, "learning_path": learning_path, "fallback_path": [], "threshold": 0.7})
+    except Exception as e:
+        import traceback
+        traceback.print_exc()
+        return jsonify({"success": True, "learning_path": [], "fallback_path": [], "error": str(e)})
 
 @app.route("/student/records")
 def student_records():
@@ -2128,6 +2100,9 @@ def student_graph_builder_add():
 
 @app.route("/student/file/<path:filename>")
 def inline_file(filename):
+    tm_path = os.path.join(TEACHING_MATERIALS_DIR, filename)
+    if os.path.isfile(tm_path):
+        return send_from_directory(TEACHING_MATERIALS_DIR, filename, as_attachment=False)
     return send_from_directory(RESOURCE_DIR, filename, as_attachment=False)
 
 @app.route("/student/view/<path:filename>")
@@ -2399,6 +2374,9 @@ def download_file(filename):
             record_resource_activity(session.get("full_id"), filename, "download")
         except Exception as e:
             print("[resource download record] {}".format(str(e)))
+    tm_path = os.path.join(TEACHING_MATERIALS_DIR, filename)
+    if os.path.isfile(tm_path):
+        return send_from_directory(TEACHING_MATERIALS_DIR, filename, as_attachment=True)
     return send_from_directory(RESOURCE_DIR, filename, as_attachment=True)
 
 # =========================
@@ -2693,7 +2671,7 @@ def get_progress_data():
                 "status": "completed" if completion >= 0.8 else ("watching" if completion > 0 else "not_started")
             })
         
-        total_video_files = len([f for f in os.listdir(RESOURCE_DIR) if f.lower().endswith(".mp4")]) if os.path.exists(RESOURCE_DIR) else 0
+        total_video_files = len([f for f in os.listdir(TEACHING_MATERIALS_DIR) if f.lower().endswith(".mp4")]) if os.path.isdir(TEACHING_MATERIALS_DIR) else 0
         progress_data["statistics"]["watched_videos"] = sum(1 for v in progress_data["videos_watched"] if v["status"] in ["completed", "watching"])
         progress_data["statistics"]["total_videos"] = max(total_video_files, progress_data["statistics"]["watched_videos"])
         
@@ -2717,11 +2695,10 @@ def get_progress_data():
             })
         
         resource_files = []
-        if os.path.exists(RESOURCE_DIR):
-            excluded_files = {"questions.json", "question_history.json"}
+        if os.path.isdir(TEACHING_MATERIALS_DIR):
             resource_files = [
-                f for f in os.listdir(RESOURCE_DIR)
-                if os.path.isfile(os.path.join(RESOURCE_DIR, f)) and f not in excluded_files
+                f for f in os.listdir(TEACHING_MATERIALS_DIR)
+                if os.path.isfile(os.path.join(TEACHING_MATERIALS_DIR, f)) and f != "resource_manifest.json"
             ]
         progress_data["statistics"]["viewed_resources"] = sum(1 for r in progress_data["resources_viewed"] if r["status"] in ["viewed", "downloaded"])
         progress_data["statistics"]["total_resources"] = max(len(resource_files), progress_data["statistics"]["viewed_resources"])
@@ -2806,678 +2783,603 @@ def get_progress_data():
 def student_recommend():
     if session.get("role") != "student":
         return redirect(url_for("login"))
-    
-    full_id = session.get("full_id")
-    student_name = session.get("user_name")
+    return render_flow_page("学习资源推荐", "recommend")
 
-    response = make_response(render_template('student_recommend.html',
-                                 student_name=student_name,
-                                 page_title="??????", active_page="recommend"))
-    response.headers['Content-Type'] = 'text/html; charset=utf-8'
-    response.headers['Cache-Control'] = 'no-cache, no-store, must-revalidate'
-    response.headers['Pragma'] = 'no-cache'
-    response.headers['Expires'] = '0'
-    return response
-
+@perf_log("get_recommend_data")
 @app.route("/student/recommend/data")
 def get_recommend_data():
-    print("=== get_recommend_data called ===")
     if session.get("role") != "student":
-        print("Error: not student role")
-        return jsonify({"success": False, "error": "????"})
-    
+        return jsonify({"success": False, "error": "未登录"})
     full_id = session.get("full_id")
-    target_kp = request.args.get("target_kp", "").strip()
-    print(f"full_id: {full_id}")
     if not full_id:
-        return jsonify({"success": False, "error": "???????????????"})
-    
+        return jsonify({"success": False, "error": "未找到学生信息"})
+    if request.args.get("refresh") == "1":
+        cache_key = normalize_student_id(full_id)
+        _KGCF_RECOMMEND_CACHE.pop(cache_key, None)
     try:
-        # ?????????
-        user_profile = get_user_profile(full_id)
-        
-        # ??????????????????
-        with driver.session() as neo4j_session:
-            # ?????????????????60%?
-            weak_query = """
-            MATCH (stu:Student {id: $sid})-[r:MASTERED]->(k:Knowledge)
-            WHERE r.mastery < 0.6
-            AND (k.name STARTS WITH '1.' OR k.name STARTS WITH '2.' OR k.name STARTS WITH '3.')
-            RETURN k.name AS name, r.mastery AS mastery, k.is_key AS is_key
-            ORDER BY r.mastery ASC
-            """
-            weak_result = neo4j_session.run(weak_query, sid=full_id)
-            weak_points = [{"name": r["name"], "mastery": r["mastery"], "is_key": r.get("is_key", False)} for r in weak_result]
-            
-            # ????????????is_key=true?
-            key_query = """
-            MATCH (stu:Student {id: $sid})-[r:MASTERED]->(k:Knowledge)
-            WHERE k.is_key = true
-            AND (k.name STARTS WITH '1.' OR k.name STARTS WITH '2.' OR k.name STARTS WITH '3.')
-            RETURN k.name AS name, r.mastery AS mastery
-            ORDER BY r.mastery ASC
-            """
-            key_result = neo4j_session.run(key_query, sid=full_id)
-            key_points = [{"name": r["name"], "mastery": r["mastery"]} for r in key_result]
-            
-            # ????????????????????????????????????
-            kg_relations_query = """
-            MATCH (k1:Knowledge)-[rel]-(k2:Knowledge)
-            WHERE (k1.name STARTS WITH '1.' OR k1.name STARTS WITH '2.' OR k1.name STARTS WITH '3.')
-            AND (k2.name STARTS WITH '1.' OR k2.name STARTS WITH '2.' OR k2.name STARTS WITH '3.')
-            AND type(rel) IN ['???', '???']
-            RETURN k1.name AS kp1, k2.name AS kp2, type(rel) AS rel_type
-            """
-            kg_result = neo4j_session.run(kg_relations_query)
-            kg_relations = {}
-            for r in kg_result:
-                kp1 = r["kp1"]
-                kp2 = r["kp2"]
-                rel = r["rel_type"]
-                if kp1 not in kg_relations:
-                    kg_relations[kp1] = []
-                kg_relations[kp1].append({"name": kp2, "relation": rel})
-            
-            # ???????????????????????????????????
-            all_mastery_query = """
-            MATCH (stu:Student {id: $sid})-[r:MASTERED]->(k:Knowledge)
-            WHERE k.name STARTS WITH '1.' OR k.name STARTS WITH '2.' OR k.name STARTS WITH '3.'
-            RETURN k.name AS name, r.mastery AS mastery
-            """
-            all_mastery_result = neo4j_session.run(all_mastery_query, sid=full_id)
-            all_mastery = {r["name"]: r["mastery"] for r in all_mastery_result}
-        
-        # ??????????????????
-        resources = []
-        if os.path.exists(RESOURCE_DIR):
-            files = os.listdir(RESOURCE_DIR)
-            for f in files:
-                if f == "questions.json":
-                    continue
-                info = parse_resource_info(f)
-                # ?????????????
-                if info["ch"] and info["ch"] > 3:
-                    continue
-                chapter = None
-                if info["ch"]:
-                    chapter = "?{}?".format(info["ch"])
-                
-                # ??????????
-                kp_match = None
-                if info["big"] and info["sec"]:
-                    kp_match = f"{info['ch']}.{info['big']}.{info['sec']}"
-                elif info["big"]:
-                    kp_match = f"{info['ch']}.{info['big']}"
-                
-                # ????????????????????????????????????
-                name_without_ext = f.rsplit('.', 1)[0]
-                # ?????????????? "2.2.1 " ??"????"
-                name_clean = re.sub(r'^\d+\.\d+\.\d+\s*', '', name_without_ext)
-                name_clean = re.sub(r'^\d+\.\d+\s*', '', name_clean)
-                name_clean = re.sub(r'^??d+??s*', '', name_clean)
-                
-                resources.append({
-                    "name": f,
-                    "chapter": chapter,
-                    "chapter_num": info["ch"],
-                    "knowledge_point": kp_match,
-                    "keyword": name_clean.lower(),
-                    "difficulty": None
-                })
-            
-            resources.sort(key=lambda x: (x["chapter_num"] or 99, x["name"]))
-        
-        # ????????????????????????????????????????????????????????????????????????
-        # ????????esources/ ???????????????????
-        # ????????????????????????????????????????????????????????????????????????
-
-        for res in resources:
-            name_without_ext = res["name"].rsplit('.', 1)[0]
-            name_clean = re.sub(r'^\d+\.\d+\.\d+\s*', '', name_without_ext)
-            name_clean = re.sub(r'^\d+\.\d+\s*', '', name_clean)
-            name_clean = re.sub(r'^??d+??s*', '', name_clean)
-            if not res.get("knowledge_point") and name_clean:
-                res["knowledge_point"] = "{} {}".format(res.get("chapter_num", ""), name_clean) if res.get("chapter_num") else name_clean
-                res["keyword"] = name_clean.lower()
-
-        # ??????????????????
-        questions_data = load_questions()
-        questions = questions_data.get("questions", [])
-        filtered_questions = []
-        for q in questions:
-            kp = q.get("knowledge_point", "")
-            ch_match = re.match(r"^(\d+)", kp)
-            if ch_match:
-                ch_num = int(ch_match.group(1))
-                if ch_num <= 3:
-                    filtered_questions.append(q)
-        
-        # ??????????????????????????????????????????????????????????????????????????????????
-        # ???????????ippleNet + ?????? + ?????? + ?????? + ????????        # ???????????????????????????????????????????????????????????????????????????????????        
-        recommended_items = []
-        max_items = 8
-        
-        user_level = user_profile.get("level_code", 2)
-        
-        if user_level >= 4:
-            target_difficulty, secondary_difficulty = "hard", "medium"
-        elif user_level >= 3:
-            target_difficulty, secondary_difficulty = "medium", "hard"
-        elif user_level >= 2:
-            target_difficulty, secondary_difficulty = "medium", "easy"
-        else:
-            target_difficulty, secondary_difficulty = "easy", "medium"
-        
-        # ???? 1. ????????????????????????????
-        weak_kp_names = set(kp["name"] for kp in weak_points)
-        key_kp_names = set(kp["name"] for kp in key_points)
-        
-        # ????????????????????0????
-        unlearned_chapters = set()
-        learned_chapters = set()
-        for kp_name, mastery in all_mastery.items():
-            ch_num = int(kp_name.split('.')[0])
-            if mastery == 0.0:
-                unlearned_chapters.add(ch_num)
+        data = kgcf_recommend_data(full_id, max_targets=5)
+        for target in data.get("targets", []):
+            mastery = target.get("mastery", 0)
+            student_type = data.get("student", {}).get("type", "medium")
+            if student_type == "weak":
+                target["suggestion"] = "建议从基础知识入手，先观看视频理解概念，再阅读文档加深理解，最后做基础题巩固。"
+            elif student_type == "excellent":
+                target["suggestion"] = "建议通过进阶资源深入理解，结合中高难度题目检验掌握程度，注意知识点的关联和扩展。"
             else:
-                learned_chapters.add(ch_num)
-        
-        # ???????????????????????????0?
-        is_new_student = len(learned_chapters) == 0 and len(unlearned_chapters) > 0
-        
-        # ????????????????????????????????????
-        is_half_learned = len(learned_chapters) > 0 and len(unlearned_chapters) > 0
-        
-        # ??????????????????????????
-        if is_new_student:
-            # ???????????????????????????????
-            all_target_kps = [kp for kp in key_points if kp["name"].startswith("1.")]
-            if len(all_target_kps) < 5:
-                # ???????????????????????????????
-                all_target_kps = [{"name": kp, "mastery": 0.0} for kp in all_mastery if kp.startswith("1.")]
-            print(f"[???????? ????????????????{len(all_target_kps)}?????????")
-        elif is_half_learned:
-            # ???????????????????????????????????????????????
-            # ??????????????????
-            unlearned_key_kps = [kp for kp in key_points if any(kp["name"].startswith(f"{ch}.") for ch in unlearned_chapters)]
-            # ??????????????????
-            learned_weak_kps = [kp for kp in weak_points if any(kp["name"].startswith(f"{ch}.") for ch in learned_chapters)]
-            
-            all_target_kps = unlearned_key_kps + learned_weak_kps
-            # ???????????????????????????
-            if len(all_target_kps) < 5:
-                unlearned_all_kps = [{"name": kp, "mastery": 0.0} for kp in all_mastery if any(kp.startswith(f"{ch}.") for ch in unlearned_chapters)]
-                all_target_kps = unlearned_key_kps + learned_weak_kps + unlearned_all_kps
-            print(f"[????] ????{learned_chapters}?????{unlearned_chapters}??{len(all_target_kps)}??????")
-        elif user_level >= 4:  # ??????????????????????????????
-            # ?????????????????????????????????????
-            all_target_kps = weak_points + [kp for kp in key_points if kp["name"] not in weak_kp_names and kp.get("mastery", 0) >= 0.75]
-            # ???????????????????????
-            if len(all_target_kps) < 5:
-                all_target_kps = weak_points + key_points
-        elif user_level >= 3:  # ????????????????????
-            all_target_kps = weak_points + [kp for kp in key_points if kp["name"] not in weak_kp_names]
-        else:  # ???/??????????????????
-            all_target_kps = weak_points + [kp for kp in key_points if kp["name"] not in weak_kp_names]
-        
-        behavior_profile = compute_behavior_profile(full_id)
-        
-        user_pref_video = behavior_profile.get("pref_video", 0.33)
-        user_pref_ppt = behavior_profile.get("pref_ppt", 0.33)
-        user_pref_practice = behavior_profile.get("pref_practice", 0.33)
-        
-        avoidance_kps = behavior_profile.get("avoidance_kps", [])
-        avoidance_names = set(a["name"] for a in avoidance_kps)
-        
-        # ???? 2. RippleNet: ???????????? ????
-        def ripple_propagation(seed_kp_names, graph_session, max_hops=3, decay=0.6):
-            """RippleNet????????????????????????????????????"""
-            ripples = []
-            current_set = set(seed_kp_names)
-            
-            for hop in range(max_hops):
-                next_set = set()
-                weight = (decay ** hop)
-                
-                for kp_name in current_set:
-                    try:
-                        result = graph_session.run(
-                            """
-                            MATCH (kp:KnowledgePoint {name: $name})-[r]-(related)
-                            RETURN related.name as related_name, type(r) as rel_type,
-                                   CASE WHEN type(r)='BELONGS_TO' THEN 0.3
-                                        WHEN type(r)='PREREQUISITE_OF' THEN 0.8
-                                        WHEN type(r)='SIMILAR_TO' THEN 0.6
-                                        ELSE 0.5 END as rel_weight
-                            """,
-                            name=kp_name
-                        )
-                        
-                        for record in result:
-                            related_name = record["related_name"]
-                            if related_name and related_name not in seed_kp_names:
-                                rel_weight = record["rel_weight"] * weight
-                                ripples.append({
-                                    "kp": related_name,
-                                    "hop": hop + 1,
-                                    "score": rel_weight,
-                                    "source": kp_name,
-                                    "rel_type": record["rel_type"]
-                                })
-                                next_set.add(related_name)
-                    except Exception as e:
-                        pass
-                
-                current_set = next_set
-            
-            return ripples
-        
-        # ???RippleNet???
-        ripple_results = []
-        try:
-            if driver and all_target_kps:
-                with driver.session() as graph_session:
-                    seed_names = [kp["name"] for kp in all_target_kps[:5]]
-                    ripple_results = ripple_propagation(seed_names, graph_session)
-                    print(f"[RippleNet] ??????: ??? {len(ripple_results)} ?????????")
-        except Exception as e:
-            print(f"[RippleNet] ???: {e}")
-        
-        # ???????????????????
-        kg_enhanced_kps = set(weak_kp_names | key_kp_names)
-        for r in ripple_results:
-            if r["score"] > 0.15:
-                kg_enhanced_kps.add(r["kp"])
-        
-        # ???? 3. ??????????????? ????
-        def get_similar_users(current_level, current_weak_count, session, limit=10):
-            """???????????"""
-            similar_users = []
-            try:
-                result = session.run(
-                    """
-                    MATCH (u:Student)-[s:STUDIES]->(kp:KnowledgePoint)
-                    WHERE s.mastery < 0.5
-                    WITH u, count(DISTINCT kp) as weak_cnt
-                    MATCH (u)-[pr:HAS_PROFILE]->(p:Profile)
-                    WHERE abs(pr.level_code - $level) <= 1 AND weak_cnt BETWEEN $weak_min AND $weak_max
-                    OPTIONAL MATCH (u)-[v:VIEWED]->(res:Resource)
-                    RETURN u.id as user_id, pr.level_code as level, 
-                           collect(DISTINCT res.name)[..5] as viewed_resources,
-                           weak_cnt
-                    ORDER BY abs(pr.level_code - $level), abs(weak_cnt - $weak_count)
-                    LIMIT $limit
-                    """,
-                    level=current_level,
-                    weak_min=max(0, current_weak_count - 3),
-                    weak_max=current_weak_count + 5,
-                    weak_count=current_weak_count,
-                    limit=limit
-                )
-                
-                for record in result:
-                    similar_users.append({
-                        "user_id": record["user_id"],
-                        "level": record["level"],
-                        "viewed_resources": record["viewed_resources"] or [],
-                        "weak_count": record["weak_cnt"]
-                    })
-            except Exception as e:
-                print(f"[??????] ???: {e}")
-            
-            return similar_users
-        
-        similar_user_resources = set()
-        try:
-            if driver:
-                with driver.session() as graph_session:
-                    sim_users = get_similar_users(user_level, len(weak_points), graph_session)
-                    print(f"[????] ?? {len(sim_users)} ?????")
-                    
-                    for su in sim_users:
-                        for res_name in su["viewed_resources"]:
-                            similar_user_resources.add(res_name)
-        except Exception as e:
-            print(f"[??????] ???: {e}")
-        
-        # ???? 4. ?????????????????????????????????
-        def compute_resource_score(res, kp_list, ripple_data, cf_resources, viewed_resources):
-            """???????????+ ???????????+ ?????????"""
-            score = {
-                "content_match": 0,
-                "ripple_score": 0,
-                "cf_score": 0,
-                "weak_coverage": 0,
-                "avoidance_bonus": 0,
-                "behavior_preference": 0,
-                "diversity_bonus": 0,
-                "viewed_penalty": 0
-            }
-            
-            res_info = parse_resource_info(res.get("name", ""))
-            res_ch = res_info.get("ch")
-            res_big = res_info.get("big")
-            res_sec = res_info.get("sec")
-            
-            covered_weak = []
-            covered_key = []
-            covered_avoidance = []
-            
-            for kp in kp_list:
-                kp_name = kp["name"]
-                
-                kp_ch_match = re.match(r'^(\d+)', kp_name)
-                if not kp_ch_match: continue
-                kp_ch = kp_ch_match.group(1)
-                
-                if res_ch is None or str(res_ch) != str(kp_ch): continue
-                
-                kp_big_m = re.match(r'^\d+\.(\d+)', kp_name)
-                kp_big = kp_big_m.group(1) if kp_big_m else None
-                kp_sec_m = re.match(r'^\d+\.\d+\.(\d+)', kp_name)
-                kp_sec = kp_sec_m.group(1) if kp_sec_m else None
-                
-                match_depth = 0
-                if kp_sec and res_sec is not None and str(res_sec) == str(kp_sec):
-                    match_depth = 3
-                elif kp_big and res_big is not None and str(res_big) == str(kp_big):
-                    match_depth = 2
-                elif res_ch == int(kp_ch):
-                    match_depth = 1
-                
-                if match_depth > 0:
-                    if kp_name in weak_kp_names:
-                        covered_weak.append((kp, match_depth))
-                    elif kp_name in key_kp_names:
-                        covered_key.append((kp, match_depth))
-                    if kp_name in avoidance_names:
-                        covered_avoidance.append((kp, match_depth))
-            
-            total_coverage = len(covered_weak) * 30 + len(covered_key) * 15
-            depth_bonus = sum(d for _, d in covered_weak) * 10 + sum(d for _, d in covered_key) * 5
-            
-            weak_avg = sum(w[0]["mastery"] for w in covered_weak) / len(covered_weak) if covered_weak else None
-            urgency_factor = (1 - weak_avg) if weak_avg is not None else 1.0
-            
-            score["content_match"] = (total_coverage + depth_bonus) * urgency_factor
-            score["weak_coverage"] = len(covered_weak)
-            
-            avoidance_boost = sum(
-                (0.4 - a[0]["mastery"]) * 40 * a[1] / 3
-                for a in covered_avoidance
-            )
-            score["avoidance_bonus"] = avoidance_boost
-            
-            res_kp = res.get("knowledge_point", "")
-            for ripple in ripple_data:
-                if ripple["kp"] == res_kp or (res_kp and ripple["kp"] in res_kp):
-                    score["ripple_score"] += ripple["score"] * 25
-            
-            if res.get("name") in cf_resources:
-                score["cf_score"] = 20
-            
-            res_ext = res.get("name", "").split(".")[-1]
-            is_video = (res_ext == "mp4")
-            is_ppt = (res_ext == "pptx")
-            
-            if is_video:
-                score["behavior_preference"] = user_pref_video * 12
-            elif is_ppt:
-                score["behavior_preference"] = user_pref_ppt * 10
-            else:
-                score["behavior_preference"] = user_pref_practice * 8
-            
-            score["diversity_bonus"] = 6 if is_video else 4
-            
-            # ?????????????????????
-            difficulty_boost = 0
-            if user_level >= 4:  # ??????????????????
-                if res_info.get("big") and int(res_info.get("big", 0)) >= 3:
-                    difficulty_boost = 15
-                if res_info.get("sec") and int(res_info.get("sec", 0)) >= 3:
-                    difficulty_boost += 10
-            elif user_level >= 3:  # ????????????????????                if res_info.get("big") and int(res_info.get("big", 0)) >= 2:
-                    difficulty_boost = 10
-            
-            # ???????????????????????????
-            res_name = res.get("name", "")
-            if res_name in viewed_resources:
-                view_count = viewed_resources[res_name]
-                # ???????????????????????????
-                score["viewed_penalty"] = min(view_count * 5, 20)
-            
-            # ?????? = ?????????0% + ????????????0% + ???????????????5% + ?????????5% + ?????????0% + ?????????% + ?????????????8 + ????????? - ???????
-            final_score = (
-                score["content_match"] * 0.30 +
-                score["avoidance_bonus"] * 0.20 +
-                score["ripple_score"] * 0.15 +
-                score["behavior_preference"] * 0.15 +
-                score["cf_score"] * 0.10 +
-                score["diversity_bonus"] * 0.05 +
-                score["weak_coverage"] * 8 +
-                difficulty_boost -
-                score["viewed_penalty"]
-            )
-            
-            return {
-                **res,
-                "_scores": score,
-                "final_score": final_score,
-                "covered_weak": [w[0] for w in covered_weak],
-                "covered_key": [k[0] for k in covered_key],
-                "covered_avoidance": [a[0] for a in covered_avoidance],
-                "match_depth": max([w[1] for w in covered_weak] + [k[1] for k in covered_key], default=0),
-                "is_avoidance_target": len(covered_avoidance) > 0
-            }
-        
-        # ????????????
-        viewed_resources = {}
-        try:
-            with driver.session() as neo4j_session:
-                result = neo4j_session.run("""
-                MATCH (s:Student {id: $sid})-[r:VIEWED]->(res:Resource)
-                RETURN res.name as resource_name, COALESCE(r.view_count, 0) as view_count
-                """, sid=full_id)
-                for record in result:
-                    viewed_resources[record["resource_name"]] = record["view_count"] or 0
-        except Exception as e:
-            print(f"[??????] ???: {e}")
-        
-        # ??????????
-        scored_resources = []
-        for res in resources:
-            scored = compute_resource_score(res, all_target_kps, ripple_results, similar_user_resources, viewed_resources)
-            if scored["final_score"] > 5 or len(scored["covered_weak"]) > 0:
-                scored_resources.append(scored)
-        
-        # ??????????
-        scored_resources.sort(key=lambda x: (-x["final_score"], -x["_scores"]["weak_coverage"]))
-        
-        # ???? 5. ??????????????????????????
-        chapter_groups = {}
-        
-        ch_selected = {}
-        for sr in scored_resources:
-            res_info = parse_resource_info(sr.get("name", ""))
-            ch_num = str(res_info.get("ch", 0))
-            
-            if ch_num not in chapter_groups:
-                chapter_groups[ch_num] = {
-                    "chapter_num": ch_num,
-                    "chapter_name": "?{}?".format(ch_num),
-                    "resources": [],
-                    "all_weak": [],
-                    "all_key": [],
-                    "total_score": 0
-                }
-            
-            if len(chapter_groups[ch_num]["resources"]) < 4:
-                chapter_groups[ch_num]["resources"].append(sr)
-                chapter_groups[ch_num]["all_weak"].extend(sr["covered_weak"])
-                chapter_groups[ch_num]["all_key"].extend(sr["covered_key"])
-                chapter_groups[ch_num]["total_score"] += sr["final_score"]
-                
-                if ch_num not in ch_selected:
-                    ch_selected[ch_num] = 0
-                ch_selected[ch_num] += 1
-            
-            if sum(ch_selected.values()) >= max_items * 3 and len(ch_selected) >= 3:
-                break
-        
-        for ch in chapter_groups.values():
-            seen_w, seen_k = set(), set()
-            ch["weak_points"] = [w for w in ch["all_weak"] if not (w["name"] in seen_w or seen_w.add(w["name"]))]
-            ch["key_points"] = [k for k in ch["all_key"] if not (k["name"] in seen_k or seen_k.add(k["name"]))]
-            ch["weak_count"] = len(ch["weak_points"])
-            ch["key_count"] = len(ch["key_points"])
-        
-        sorted_chapters = sorted(chapter_groups.values(), 
-                                  key=lambda x: (-x["total_score"], -x["weak_count"]))
-        
-        # ???????????
-        global_res_idx = 0
-        for ch_group in sorted_chapters[:max_items]:
-            ch_num = ch_group["chapter_num"]
-            weak_list = ch_group["weak_points"]
-            key_list = ch_group["key_points"]
-            
-            avg_mastery = sum(w["mastery"] for w in weak_list) / len(weak_list) if weak_list else None
-            
-            all_ch_kp_names = [kp["name"] for kp in weak_list + key_list]
-            
-            ch_questions = []
-            for q in filtered_questions:
-                if q.get("knowledge_point") in all_ch_kp_names:
-                    q["_kp"] = q.get("knowledge_point", "")
-                    ch_questions.append(q)
-
-            practice_history = load_question_history()
-            student_history = practice_history.get(full_id, {}) if practice_history else {}
-
-            def calc_practice_score(q):
-                qid = q.get("id", "")
-                hist = student_history.get(qid, {})
-                total_attempts = hist.get("total_attempts", 0)
-                correct_count = hist.get("correct_count", 0)
-                wrong_count = hist.get("wrong_count", 0)
-                consecutive_correct = hist.get("consecutive_correct", 0)
-                last_result = hist.get("last_result", None)
-
-                if total_attempts == 0:
-                    return 100, "??"
-                elif consecutive_correct == 0 and wrong_count > 0:
-                    return 150 + wrong_count * 10, "????"
-                elif last_result == "wrong":
-                    return 120 + wrong_count * 5, "????"
-                elif consecutive_correct >= 3:
-                    return max(10, 30 - total_attempts * 3), "???"
-                elif consecutive_correct >= 1:
-                    return 50 - total_attempts * 2, "??????"
+                if mastery < 0.4:
+                    target["suggestion"] = "建议先复习相关基础知识，再学习本知识点，做基础题检验理解。"
+                elif mastery < 0.7:
+                    target["suggestion"] = "建议通过针对性练习巩固薄弱环节，注意知识点之间的关联。"
                 else:
-                    return 70, "?????"
+                    target["suggestion"] = "建议通过综合练习提升应用能力，关注知识点的实际应用场景。"
+        return jsonify({"success": True, **data})
+    except Exception as e:
+        import traceback
+        traceback.print_exc()
+        return jsonify({"success": False, "error": str(e), "student": {}, "recommend_type": "", "avg_mastery": 0, "targets": []})
 
-            for q in ch_questions:
-                q["_practice_score"], q["_practice_tag"] = calc_practice_score(q)
+@app.route("/student/recommend_v2")
+def student_recommend_v2():
+    return redirect(url_for("student_recommend"))
 
-            ch_questions.sort(key=lambda q: (-q["_practice_score"], q.get("difficulty", 2)))
+@perf_log("get_recommend_v2_data")
+@app.route("/student/recommend_v2/data")
+def get_recommend_v2_data():
+    if session.get("role") != "student":
+        return jsonify({"success": False, "error": "未登录"})
+    full_id = session.get("full_id")
+    if not full_id:
+        return jsonify({"success": False, "error": "未找到学生信息"})
+    if request.args.get("refresh") == "1":
+        cache_key = normalize_student_id(full_id)
+        _KGCF_RECOMMEND_CACHE.pop(cache_key, None)
+    try:
+        data = kgcf_recommend_data(full_id, max_targets=5)
+        for target in data.get("targets", []):
+            code = target.get("code", "")
+            name = target.get("name", "")
+            mastery = target.get("mastery", 0)
+            student_type = data.get("student", {}).get("type", "medium")
+            if student_type == "weak":
+                target["suggestion"] = "建议从基础知识入手，先观看视频理解概念，再阅读文档加深理解，最后做基础题巩固。"
+            elif student_type == "excellent":
+                target["suggestion"] = "建议通过进阶资源深入理解，结合中高难度题目检验掌握程度，注意知识点的关联和扩展。"
+            else:
+                if mastery < 0.4:
+                    target["suggestion"] = "建议先复习相关基础知识，再学习本知识点，做基础题检验理解。"
+                elif mastery < 0.7:
+                    target["suggestion"] = "建议通过针对性练习巩固薄弱环节，注意知识点之间的关联。"
+                else:
+                    target["suggestion"] = "建议通过综合练习提升应用能力，关注知识点的实际应用场景。"
+        return jsonify({"success": True, **data})
+    except Exception as e:
+        import traceback
+        traceback.print_exc()
+        return jsonify({"success": False, "error": str(e), "student": {}, "recommend_type": "", "avg_mastery": 0, "targets": []})
 
-            target_qs = [q for q in ch_questions if q.get("difficulty") == target_difficulty]
-            secondary_qs = [q for q in ch_questions if q.get("difficulty") == secondary_difficulty]
-            other_qs = [q for q in ch_questions if q.get("difficulty") not in [target_difficulty, secondary_difficulty]]
-            sorted_qs = target_qs + secondary_qs + other_qs
-            
-            # ??????????
-            ch_resources = []
-            for sr in ch_group["resources"][:3]:
-                global_res_idx += 1
-                match_tag = "????" if sr["match_depth"] >= 3 else ("?????" if sr["match_depth"] >= 2 else "????")
-                
-                ch_resources.append({
-                    "name": sr["name"],
-                    "match_level": sr["match_depth"],
-                    "match_tag": match_tag,
-                    "for_kp": sr["covered_weak"][0]["name"] if sr["covered_weak"] else (sr["covered_key"][0]["name"] if sr["covered_key"] else ""),
-                    "rec_score": round(sr["final_score"], 1),
-                    "algorithms_used": []
-                })
-                
-                # ??????????
-                algos = []
-                if sr["_scores"]["content_match"] > 0: algos.append("??????")
-                if sr["_scores"]["ripple_score"] > 0: algos.append("RippleNet")
-                if sr["_scores"]["cf_score"] > 0: algos.append("??????")
-                ch_resources[-1]["algorithms_used"] = algos
-            
-            weak_point_names = [f"{kp['name']} ({kp['mastery']*100:.0f}%)" for kp in weak_list]
-            key_point_names = [kp["name"] for kp in key_list if kp["name"] not in [w["name"] for w in weak_list]]
-            
-            recommend_reason = []
-            if len(weak_list) >= 3:
-                recommend_reason.append(f"???{len(weak_list)}??????")
-            elif len(weak_list) > 0:
-                recommend_reason.append(f"????: {', '.join(weak_point_names[:3])}")
-            if key_point_names:
-                recommend_reason.append(f"????: {', '.join(key_point_names[:2])}")
+def record_question_history(student_id, question_id, is_correct):
+    history = load_question_history_clean()
+    sid = normalize_student_id(student_id)
+    if sid not in history:
+        history[sid] = {}
+    qid = str(question_id)
+    if qid not in history[sid]:
+        history[sid][qid] = {"correct_count": 0, "wrong_count": 0, "total_attempts": 0}
+    h = history[sid][qid]
+    h["total_attempts"] = int(h.get("total_attempts", 0)) + 1
+    if is_correct:
+        h["correct_count"] = int(h.get("correct_count", 0)) + 1
+    else:
+        h["wrong_count"] = int(h.get("wrong_count", 0)) + 1
+    save_question_history_clean(history)
 
-            wrong_qs = [q for q in sorted_qs if q.get("_practice_tag") in ["????", "????", "?????"]]
-            new_qs = [q for q in sorted_qs if q.get("_practice_tag") == "??"]
-            mastered_qs = [q for q in sorted_qs if q.get("_practice_tag") == "???"]
-            if wrong_qs:
-                recommend_reason.append(f"?{len(wrong_qs)}??????")
-            if new_qs:
-                recommend_reason.append(f"?{len(new_qs)}???")
+def render_practice_page(q, student_name):
+    qid = q.get("id", "")
+    qtype = q.get("type", "single_choice")
+    question_text = q.get("question") or q.get("title", "")
+    options = q.get("options", [])
+    kp = q.get("knowledge_point", "")
+    diff = q.get("difficulty", "medium")
+    diff_label = "基础" if diff == "easy" else ("中等" if diff == "medium" else "提高")
+    options_html = ""
+    if qtype == "blank":
+        options_html = '<input type="text" id="blank-answer" placeholder="请输入答案" style="width:100%;padding:8px;border:1px solid #ddd;border-radius:4px;font-size:14px">'
+    else:
+        input_type = "checkbox" if qtype == "multiple_choice" else "radio"
+        for opt in options:
+            opt_str = str(opt)
+            val = opt_str.split(".")[0].strip() if "." in opt_str else opt_str[0]
+            options_html += '<label style="display:block;padding:10px;margin:6px 0;border:1px solid #e0e0e0;border-radius:6px;cursor:pointer;background:#fafafa"><input type="%s" name="practice-answer" value="%s" style="margin-right:8px">%s</label>' % (input_type, val, opt_str)
 
-            final_questions = []
-            for q in sorted_qs[:10]:
-                final_questions.append({
-                    "id": q.get("id"),
-                    "question": q.get("question"),
-                    "options": q.get("options"),
-                    "answer": q.get("answer"),
-                    "explanation": q.get("explanation", ""),
-                    "difficulty": q.get("difficulty"),
-                    "knowledge_point": q.get("knowledge_point", ""),
-                    "_kp": q.get("_kp", ""),
-                    "_practice_score": q.get("_practice_score", 100),
-                    "_practice_tag": q.get("_practice_tag", "??")
-                })
-            
-            recommended_items.append({
-                "type": "chapter_aggregated",
-                "chapter_num": ch_num,
-                "chapter_name": ch_group["chapter_name"],
-                "avg_mastery": avg_mastery,
-                "weak_points": weak_list,
-                "key_points": key_list,
-                "weak_count": len(weak_list),
-                "key_count": len(key_list),
-                "avoidance_kps": avoidance_kps,
-                "questions": final_questions,
-                "question_count": len(sorted_qs),
-                "resources": ch_resources[:3],
-                "recommend_reason": " | ".join(recommend_reason) if recommend_reason else "????",
-                "mastery_status": "????" if avg_mastery is None else ("??" if avg_mastery < 0.4 else ("???" if avg_mastery < 0.6 else ("??" if avg_mastery < 0.8 else "??"))),
-                "algorithms_used": list(set([a for r in ch_resources for a in r.get("algorithms_used", [])] + ["????"]))
-            })
-        
-        path_recommendation = build_path_recommendation(
-            full_id,
-            resources,
-            behavior_profile,
-            target_kp if target_kp else None
-        )
+    html = """<!DOCTYPE html><html lang="zh-CN"><head><meta charset="UTF-8"><title>练习题 - %s</title>
+<style>
+*{margin:0;padding:0;box-sizing:border-box}
+body{font-family:'Microsoft YaHei','SimHei',Arial,sans-serif;background:#f0f2f5;color:#333;display:flex;justify-content:center;align-items:center;min-height:100vh;padding:20px}
+.card{background:#fff;border-radius:12px;padding:28px;max-width:600px;width:100%%;box-shadow:0 2px 12px rgba(0,0,0,0.08)}
+.card h2{font-size:18px;margin-bottom:6px;color:#2c3e50}
+.card .meta{display:flex;gap:8px;margin:8px 0 16px;flex-wrap:wrap}
+.tag{display:inline-block;padding:3px 10px;border-radius:12px;font-size:12px;font-weight:bold}
+.tag-diff{background:#f3e5f5;color:#7b1fa2}
+.tag-kp{background:#dbeafe;color:#2563eb}
+.tag-type{background:#e8f5e9;color:#2e7d32}
+.question{font-size:16px;line-height:1.6;margin:16px 0;padding:14px;background:#f8f9fa;border-radius:8px;border-left:4px solid #3498db}
+.options{margin:12px 0}
+.btn{padding:10px 24px;border:none;border-radius:6px;cursor:pointer;font-size:14px;font-weight:bold;margin-right:8px}
+.btn-primary{background:#3498db;color:#fff}
+.btn-primary:hover{background:#2980b9}
+.btn-success{background:#27ae60;color:#fff}
+.btn-back{background:#95a5a6;color:#fff;text-decoration:none;padding:10px 24px;border-radius:6px;font-size:14px;display:inline-block}
+.result{margin-top:16px;padding:14px;border-radius:8px;display:none}
+.result.correct{background:#d5f4e6;border:1px solid #27ae60;display:block}
+.result.wrong{background:#fdeaea;border:1px solid #e74c3c;display:block}
+.result h3{margin-bottom:6px;font-size:15px}
+.result p{font-size:13px;line-height:1.6;color:#555}
+.result .mastery{font-size:12px;color:#7f8c8d;margin-top:8px}
+</style></head><body>
+<div class="card">
+<h2>练习题目</h2>
+<div class="meta">
+<span class="tag tag-type">%s</span>
+<span class="tag tag-diff">%s</span>
+<span class="tag tag-kp">%s</span>
+</div>
+<div class="question">%s</div>
+<div class="options" id="options-area">%s</div>
+<div style="margin-top:16px">
+<button class="btn btn-primary" onclick="submitAnswer()">提交答案</button>
+<a href="/student/recommend" class="btn-back">返回推荐页</a>
+</div>
+<div class="result" id="result-area"></div>
+</div>
+<script>
+var QID='%s',QP='%s',QT='%s';
+function submitAnswer(){
+var answer;
+if(QT==='blank'){answer=document.getElementById('blank-answer').value.trim()}
+else if(QT==='multiple_choice'){var checked=document.querySelectorAll('input[name="practice-answer"]:checked');answer=Array.from(checked).map(function(c){return c.value})}
+else{var sel=document.querySelector('input[name="practice-answer"]:checked');answer=sel?sel.value:''}
+if(!answer||(Array.isArray(answer)&&answer.length===0)){alert('请选择或输入答案');return}
+fetch('/student/recommend/practice/submit',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({question_id:QID,answer:answer})}).then(function(r){return r.json()}).then(function(d){
+var area=document.getElementById('result-area');
+if(d.success){
+area.className='result '+(d.correct?'correct':'wrong');
+area.innerHTML='<h3>'+(d.correct?'&#10004; 回答正确！':'&#10008; 回答错误')+'</h3><p><b>正确答案：</b>'+d.correct_answer+'</p><p><b>解析：</b>'+d.analysis+'</p><p class="mastery">知识点：'+d.knowledge_point+' | 掌握度：'+Math.round(d.mastery_before*100)+'%% → '+Math.round(d.mastery_after*100)+'%%</p>'
+}else{area.innerHTML='<p style="color:red">提交失败：'+d.error+'</p>'}
+}).catch(function(e){document.getElementById('result-area').innerHTML='<p style="color:red">网络错误：'+e.message+'</p>'})
+}
+</script>
+</body></html>""" % (question_text[:30], "多选" if qtype == "multiple_choice" else ("填空" if qtype == "blank" else "单选"), diff_label, kp, question_text, options_html, qid, kp, qtype)
+    return html
+
+@app.route("/student/recommend/practice/start")
+def student_recommend_practice_start():
+    if session.get("role") != "student":
+        return redirect(url_for("login"))
+    sid = normalize_student_id(session.get("full_id"))
+    kp = normalize_assessable_code(request.args.get("kp") or "") or (request.args.get("kp") or "")
+    if not sid or not kp:
+        return redirect(url_for("student_recommend"))
+    score_map, _detail_map, _name_map, _children = calculate_mastery_tree(sid)
+    student_type, _avg_mastery = _kgcf_classify_student(score_map)
+    exercise_set = generate_exercise_set(sid, kp, None, 10, student_type)
+    exercise_set_id = exercise_set.get("exercise_set_id", "")
+    if not exercise_set_id:
+        return redirect(url_for("student_recommend"))
+    return redirect(url_for("student_recommend_practice_set", exercise_set_id=exercise_set_id))
+
+@app.route("/student/recommend/practice/<exercise_set_id>")
+def student_recommend_practice_set(exercise_set_id):
+    if session.get("role") != "student":
+        return redirect(url_for("login"))
+    all_sets = _json_load(EXERCISE_SETS_FILE, {})
+    exercise_set = all_sets.get(exercise_set_id) if isinstance(all_sets, dict) else None
+    if not exercise_set:
+        return "<h2>练习套题不存在或已过期</h2><p><a href='/student/recommend'>返回推荐页</a></p>", 404
+    all_questions = load_questions_clean().get("questions", [])
+    q_map = {str(q.get("id")): q for q in all_questions}
+    questions = []
+    for qid in exercise_set.get("question_ids", []):
+        q = q_map.get(str(qid))
+        if q:
+            questions.append(q)
+    if not questions:
+        return "<h2>套题中暂无题目</h2><p><a href='/student/recommend'>返回推荐页</a></p>", 404
+    current_index = int(exercise_set.get("current_index", 0))
+    if current_index >= len(questions):
+        current_index = len(questions) - 1
+    sid = normalize_student_id(session.get("full_id"))
+    history = load_question_history_clean().get(sid, {})
+    wrong_book_data = _get_student_data(_json_load(os.path.join(RESOURCE_DIR, "wrong_book.json"), {}), sid)
+    catalog = build_knowledge_catalog()
+    kp_name_map = {item["code"]: item["name"] for item in catalog}
+    import json as _json_mod
+    qdata_parts = []
+    for q in questions:
+        qid = str(q.get("id"))
+        h = history.get(qid, {})
+        wrong_cnt = int(h.get("wrong_count", 0) or 0)
+        correct_cnt = int(h.get("correct_count", 0) or 0)
+        total_attempts = int(h.get("total_attempts", 0) or 0)
+        consecutive_correct = int(h.get("consecutive_correct", 0) or 0)
+        in_wrong_book = qid in wrong_book_data and consecutive_correct < 2
+        is_new_question = (total_attempts == 0) and (wrong_cnt == 0) and (correct_cnt == 0)
+        qtype = q.get("type") or "single_choice"
+        if qtype == "choice":
+            qtype = "single_choice"
+        qtype_display = {"single_choice": "单选", "multiple_choice": "多选", "judge": "判断", "blank": "填空"}.get(qtype, qtype)
+        diff = q.get("difficulty") or "medium"
+        diff_display = {"easy": "基础", "medium": "中等", "hard": "困难"}.get(diff, diff)
+        kp_raw = q.get("knowledge_point") or q.get("knowledge_name") or ""
+        kp_code = flow_kp_code(kp_raw) or kp_raw
+        kp_display = kp_name_map.get(kp_code, kp_raw)
+        qdata_parts.append(_json_mod.dumps({
+            "id": qid, "title": q.get("title") or q.get("question") or "",
+            "options": q.get("options", []), "answer": q.get("answer") or "",
+            "explanation": q.get("explanation") or q.get("analysis") or "",
+            "type": qtype, "type_display": qtype_display,
+            "difficulty": diff, "difficulty_display": diff_display,
+            "knowledge_code": kp_code, "knowledge_name": kp_display,
+            "wrong_count": wrong_cnt, "correct_count": correct_cnt,
+            "total_attempts": total_attempts, "in_wrong_book": in_wrong_book,
+            "is_new_question": is_new_question,
+        }, ensure_ascii=False))
+    current_q = questions[current_index]
+    cq_h = history.get(str(current_q.get("id")), {})
+    cq_consec = int(cq_h.get("consecutive_correct", 0) or 0)
+    cq_in_wb = str(current_q.get("id")) in wrong_book_data and cq_consec < 2
+    cq_is_new = int(cq_h.get("total_attempts", 0) or 0) == 0
+    cq_type = current_q.get("type") or "single_choice"
+    if cq_type == "choice":
+        cq_type = "single_choice"
+    current_tags_html = _build_question_tags(current_q, cq_h, cq_is_new, cq_in_wb, kp_name_map)
+    cq_options_html = ""
+    for i, opt in enumerate(current_q.get("options", [])):
+        letter = chr(ord("A") + i)
+        input_type = "checkbox" if cq_type == "multiple_choice" else "radio"
+        opt_clean = re.sub(r'^[A-Fa-f][.、．]\s*', '', str(opt).strip())
+        cq_options_html += '<label class="option-label"><input type="{}" name="answer" value="{}"> {}. {}</label>'.format(input_type, letter, letter, opt_clean)
+    html = """<!doctype html><html lang="zh-CN"><meta charset="utf-8"><title>配套练习</title>
+<style>
+*{box-sizing:border-box}
+body{margin:0;font-family:Microsoft YaHei,Arial;background:#f4f7fb}
+.top{height:60px;background:#fff;border-bottom:1px solid #dbe3ef;display:flex;align-items:center;justify-content:space-between;padding:0 24px}
+.wrap{max-width:800px;margin:18px auto;padding:0 18px}
+.card{background:#fff;border:1px solid #dbe3ef;border-radius:12px;padding:24px;margin-bottom:18px}
+.progress{height:6px;background:#e5e7eb;border-radius:3px;margin-bottom:18px;overflow:hidden}
+.progress-fill{height:100%;background:#16a34a;transition:width .3s}
+.tags{margin-bottom:14px;display:flex;flex-wrap:wrap;gap:6px;align-items:center}
+.tag{display:inline-flex;padding:3px 10px;border-radius:12px;font-size:12px;line-height:1.6}
+.tag-type{background:#e8f0fe;color:#1967d2}
+.tag-diff-easy{background:#dcfce7;color:#166534}
+.tag-diff-medium{background:#fef9c3;color:#854d0e}
+.tag-diff-hard{background:#fef2f2;color:#991b1b}
+.tag-kp{background:#f3e8ff;color:#7c3aed}
+.tag-wrong{background:#fef2f2;color:#dc2626;font-weight:bold}
+.tag-correct{background:#dcfce7;color:#16a34a}
+.tag-new{background:#f1f5f9;color:#64748b}
+.tag-consolidate{background:#fff7ed;color:#ea580c;font-weight:bold}
+.q-title{font-size:16px;font-weight:bold;margin-bottom:16px;line-height:1.6}
+.q-hint{font-size:12px;color:#64748b;margin-bottom:8px}
+.option-label{display:block;margin:6px 0;padding:12px 14px;border:2px solid #e5e7eb;border-radius:10px;cursor:pointer;transition:all .15s}
+.option-label:hover{border-color:#93c5fd;background:#f8fafc}
+.option-label.selected{border-color:#3b82f6;background:#eff6ff}
+.option-label input{margin-right:8px;accent-color:#3b82f6}
+.btn{display:inline-flex;padding:10px 18px;border-radius:10px;text-decoration:none;background:#edf5ff;color:#2563eb;border:1px solid #cfe2ff;margin:0 6px;cursor:pointer;font-size:14px;line-height:1.4}
+.btn:disabled{opacity:.5;cursor:not-allowed}
+.btn-primary{background:#16a34a;color:#fff;border-color:#16a34a}
+.btn-submit{border:0;padding:12px 28px;font-size:15px}
+.btn-complete{background:#dbeafe;color:#1d4ed8;border-color:#bfdbfe}
+.btn-back{background:#f1f5f9;color:#475569;border-color:#e2e8f0}
+.feedback{padding:14px;border-radius:8px;margin-top:14px;display:none;line-height:1.6}
+.feedback-correct{background:#dcfce7;color:#166534}
+.feedback-wrong{background:#fef2f2;color:#991b1b}
+.nav-btns{display:flex;justify-content:space-between;align-items:center;margin-top:18px;flex-wrap:wrap;gap:8px}
+.answered-dot{display:inline-block;width:8px;height:8px;border-radius:50%;margin:0 2px;vertical-align:middle}
+.answered-dot-done{background:#16a34a}
+.answered-dot-pending{background:#d1d5db}
+.answered-dot-wrong{background:#ef4444}
+.modal-overlay{position:fixed;top:0;left:0;right:0;bottom:0;background:rgba(0,0,0,.45);display:none;align-items:center;justify-content:center;z-index:1000}
+.modal-body{background:#fff;border-radius:16px;padding:32px;max-width:520px;width:90%;text-align:center}
+.modal-body h2{margin:0 0 16px}
+.result-stat{font-size:28px;font-weight:bold;margin:12px 0}
+.result-stat.good{color:#16a34a}
+.result-stat.medium{color:#d97706}
+.result-stat.poor{color:#dc2626}
+.summary-table{width:100%;border-collapse:collapse;margin:16px 0;font-size:14px}
+.summary-table td{padding:8px 12px;border-bottom:1px solid #e5e7eb;text-align:left}
+.summary-table td+td{text-align:right;font-weight:bold}
+</style>
+<div class="top"><div><b>配套练习</b><span style="margin-left:12px;font-weight:normal;color:#7c3aed" id="mainKp">主知识点：{{ main_kp }}</span></div><div><span id="counter">第1题/共{{ total }}题</span><span style="margin-left:16px" id="answerDots"></span><a class="btn btn-back" href="/student/recommend">返回推荐页</a></div></div>
+<div class="wrap">
+<div class="progress"><div class="progress-fill" id="progress" style="width:{{ pct }}%"></div></div>
+<div class="card">
+<div class="tags" id="tags">{{ current_tags|safe }}</div>
+<div class="q-hint" id="qhint">{{ qhint }}</div>
+<div class="q-title" id="qtitle">{{ qtitle }}</div>
+<div id="options">{{ options|safe }}</div>
+<div class="feedback" id="feedback"></div>
+<div style="margin-top:16px;display:flex;gap:8px">
+<button class="btn btn-primary btn-submit" id="submitBtn" onclick="submitAnswer()">提交答案</button>
+<button class="btn" id="nextBtn" style="display:none" onclick="nextQuestion()">下一题</button>
+</div>
+</div>
+<div class="nav-btns">
+<div><button class="btn" id="prevBtn" onclick="prevQuestion()" {{ prev_disabled }}>上一题</button></div>
+<div><span style="font-size:14px;color:#64748b">已答 <span id="answeredCount">{{ answered_count }}</span>/{{ total }} 题</span></div>
+<div><button class="btn btn-complete" id="completeBtn" onclick="completePractice()">完成练习</button></div>
+</div>
+</div>
+<div class="modal-overlay" id="modalOverlay">
+<div class="modal-body" id="modalBody"></div>
+</div>
+<script>
+var currentIndex={{ idx }};
+var totalQuestions={{ total }};
+var answered={};
+var exerciseSetId='{{ esid }}';
+var questions=[{{ qdata|safe }}];
+function updateDots(){
+  var dots='';
+  for(var i=0;i<totalQuestions;i++){
+    var cls='pending';
+    if(answered[i]){
+      cls=answered[i].correct?'done':'wrong';
+    }
+    dots+='<span class="answered-dot answered-dot-'+cls+'"></span>';
+  }
+  document.getElementById('answerDots').innerHTML=dots;
+}
+updateDots();
+function updateUI(){
+  var q=questions[currentIndex];
+  document.getElementById('qtitle').textContent=(currentIndex+1)+'. '+q.title;
+  document.getElementById('qhint').textContent=q.type==='multiple_choice'?'请选择所有正确答案（多选）':'请选择一个正确答案';
+  var opts='';
+  var isMulti=q.type==='multiple_choice';
+  for(var i=0;i<(q.options||[]).length;i++){
+    var letter=String.fromCharCode(65+i);
+    var inputType=isMulti?'checkbox':'radio';
+    var optText=String(q.options[i]||'').replace(/^[A-Fa-f][.、．：:]\s*/,'');
+    opts+='<label class="option-label" id="optLabel'+i+'"><input type="'+inputType+'" name="answer" value="'+letter+'"> '+letter+'. '+optText+'</label>';
+  }
+  document.getElementById('options').innerHTML=opts;
+  document.getElementById('feedback').style.display='none';
+  document.getElementById('feedback').textContent='';
+  document.getElementById('feedback').className='feedback';
+  document.getElementById('submitBtn').style.display='';
+  document.getElementById('nextBtn').style.display='none';
+  document.getElementById('counter').textContent='第'+(currentIndex+1)+'题/共'+totalQuestions+'题';
+  document.getElementById('progress').style.width=((currentIndex+1)/totalQuestions*100)+'%';
+  document.getElementById('prevBtn').disabled=currentIndex===0;
+  var ac=Object.keys(answered).length;
+  document.getElementById('answeredCount').textContent=ac;
+  var tagsHtml='<span class="tag tag-type">'+q.type_display+'</span>';
+  tagsHtml+='<span class="tag tag-diff-'+q.difficulty+'">'+q.difficulty_display+'</span>';
+  var kpLabel=(q.knowledge_name&&q.knowledge_name.indexOf(q.knowledge_code)===0)?q.knowledge_name:(q.knowledge_code+' '+q.knowledge_name);
+  tagsHtml+='<span class="tag tag-kp">'+kpLabel+'</span>';
+  if(q.in_wrong_book){
+    tagsHtml+='<span class="tag tag-consolidate">错题巩固</span>';
+  }
+  if(q.is_new_question){
+    tagsHtml+='<span class="tag tag-new">未练习</span>';
+  }else{
+    if(q.wrong_count>0)tagsHtml+='<span class="tag tag-wrong">错误'+q.wrong_count+'次</span>';
+    if(q.correct_count>0)tagsHtml+='<span class="tag tag-correct">做对'+q.correct_count+'次</span>';
+  }
+  document.getElementById('tags').innerHTML=tagsHtml;
+  if(answered[currentIndex]){
+    document.getElementById('submitBtn').style.display='none';
+    document.getElementById('nextBtn').style.display='';
+    var ans=answered[currentIndex];
+    var inputs=document.getElementsByName('answer');
+    var sel=ans.selected.split(',');
+    for(var j=0;j<inputs.length;j++){
+      if(sel.indexOf(inputs[j].value)>=0)inputs[j].checked=true;
+      inputs[j].disabled=true;
+    }
+    var fb=document.getElementById('feedback');
+    fb.style.display='block';
+    if(ans.correct){
+      fb.className='feedback feedback-correct';
+      fb.innerHTML='<b>正确！</b>';
+      if(ans.explanation)fb.innerHTML+='<div style="margin-top:4px;font-size:13px">解析：'+ans.explanation+'</div>';
+    }else{
+      fb.className='feedback feedback-wrong';
+      fb.innerHTML='<b>错误</b>。正确答案：<b>'+ans.correct_answer+'</b>';
+      if(ans.explanation)fb.innerHTML+='<div style="margin-top:4px;font-size:13px">解析：'+ans.explanation+'</div>';
+    }
+  }
+  updateDots();
+  if(ac>=totalQuestions){
+    document.getElementById('completeBtn').style.background='#16a34a';
+    document.getElementById('completeBtn').style.color='#fff';
+    document.getElementById('completeBtn').style.borderColor='#16a34a';
+  }
+}
+function getSelectedValues(){
+  var inputs=document.getElementsByName('answer');
+  var sel=[];
+  for(var i=0;i<inputs.length;i++){
+    if(inputs[i].checked)sel.push(inputs[i].value);
+  }
+  return sel.join(',');
+}
+function submitAnswer(){
+  var selected=getSelectedValues();
+  if(!selected){alert('请选择答案');return}
+  var q=questions[currentIndex];
+  fetch('/student/practice_set/submit',{
+    method:'POST',
+    headers:{'Content-Type':'application/json'},
+    body:JSON.stringify({
+      exercise_set_id:exerciseSetId,
+      question_id:q.id,
+      selected:selected,
+      current_index:currentIndex
+    })
+  }).then(function(r){return r.json()}).then(function(data){
+    if(!data.success){alert(data.error||'提交失败');return}
+    answered[currentIndex]={
+      selected:selected,
+      correct:data.correct,
+      correct_answer:data.correct_answer,
+      explanation:data.explanation
+    };
+    document.getElementById('submitBtn').style.display='none';
+    document.getElementById('nextBtn').style.display='';
+    var fb=document.getElementById('feedback');
+    fb.style.display='block';
+    if(data.correct){
+      fb.className='feedback feedback-correct';
+      fb.innerHTML='<b>正确！</b>';
+      if(data.explanation)fb.innerHTML+='<div style="margin-top:4px;font-size:13px">解析：'+data.explanation+'</div>';
+    }else{
+      fb.className='feedback feedback-wrong';
+      fb.innerHTML='<b>错误</b>。正确答案：<b>'+data.correct_answer+'</b>';
+      if(data.explanation)fb.innerHTML+='<div style="margin-top:4px;font-size:13px">解析：'+data.explanation+'</div>';
+    }
+    var inputs=document.getElementsByName('answer');
+    for(var j=0;j<inputs.length;j++)inputs[j].disabled=true;
+    updateDots();
+    var ac=Object.keys(answered).length;
+    document.getElementById('answeredCount').textContent=ac;
+    if(ac>=totalQuestions){
+      document.getElementById('completeBtn').style.background='#16a34a';
+      document.getElementById('completeBtn').style.color='#fff';
+      document.getElementById('completeBtn').style.borderColor='#16a34a';
+    }
+  });
+}
+function nextQuestion(){
+  if(currentIndex<totalQuestions-1){
+    currentIndex++;
+    updateUI();
+  }else{
+    if(confirm('已经是最后一题，是否完成练习？')){
+      completePractice();
+    }
+  }
+}
+function prevQuestion(){
+  if(currentIndex>0){
+    currentIndex--;
+    updateUI();
+  }
+}
+function completePractice(){
+  var ac=Object.keys(answered).length;
+  if(ac===0){
+    alert('请至少完成一道题后再提交');
+    return;
+  }
+  if(ac<totalQuestions){
+    if(!confirm('还有'+(totalQuestions-ac)+'题未答，确定要完成练习吗？')){
+      return;
+    }
+  }
+  fetch('/student/practice_set/complete',{
+    method:'POST',
+    headers:{'Content-Type':'application/json'},
+    body:JSON.stringify({
+      exercise_set_id:exerciseSetId,
+      answered:answered
+    })
+  }).then(function(r){return r.json()}).then(function(data){
+    if(!data.success){alert(data.error||'完成失败');return}
+    var correctCount=0;
+    for(var k in answered){
+      if(answered[k].correct)correctCount++;
+    }
+    var answeredCount=Object.keys(answered).length;
+    var rate=Math.round(correctCount/answeredCount*100);
+    var rateClass=rate>=80?'good':rate>=60?'medium':'poor';
+    var modal=document.getElementById('modalBody');
+    modal.innerHTML='<h2>练习完成！</h2>'+
+      '<div class="result-stat '+rateClass+'">正确率 '+rate+'%</div>'+
+      '<table class="summary-table">'+
+      '<tr><td>总题数</td><td>'+totalQuestions+' 题</td></tr>'+
+      '<tr><td>已完成</td><td>'+answeredCount+' 题</td></tr>'+
+      '<tr><td>答对</td><td style="color:#16a34a">'+correctCount+' 题</td></tr>'+
+      '<tr><td>答错</td><td style="color:#dc2626">'+(answeredCount-correctCount)+' 题</td></tr>'+
+      '<tr><td>练习前掌握度</td><td>'+Math.round((data.mastery_before||0)*100)+'%</td></tr>'+
+      '<tr><td>练习后掌握度</td><td>'+Math.round((data.mastery_after||0)*100)+'%</td></tr>'+
+      '</table>'+
+      '<div style="margin-top:16px"><a class="btn btn-primary" href="/student/recommend">返回推荐页</a></div>';
+    document.getElementById('modalOverlay').style.display='flex';
+  });
+}
+updateUI();
+</script></html>"""
+    target_kp_id = exercise_set.get("target_knowledge_id", "")
+    target_kp_name = exercise_set.get("target_knowledge_name", "")
+    main_kp_display = "{} {}".format(target_kp_id, target_kp_name) if target_kp_id and target_kp_name else (target_kp_id or "未指定")
+    return render_template_string(html, 
+        total=len(questions), 
+        idx=current_index,
+        pct=round((current_index + 1) / len(questions) * 100, 1),
+        current_tags=current_tags_html,
+        qhint="请选择所有正确答案（多选）" if cq_type == "multiple_choice" else "请选择一个正确答案",
+        qtitle=str(current_index + 1) + ". " + (current_q.get("title") or current_q.get("question") or ""),
+        options=cq_options_html,
+        prev_disabled="disabled" if current_index == 0 else "",
+        answered_count=0,
+        esid=exercise_set_id,
+        qdata=",".join(qdata_parts),
+        main_kp=main_kp_display)
+
+@app.route("/student/recommend/practice/submit", methods=["POST"])
+def student_recommend_practice_submit():
+    if session.get("role") != "student":
+        return jsonify({"success": False, "error": "未登录"})
+    full_id = session.get("full_id")
+    if not full_id:
+        return jsonify({"success": False, "error": "未找到学生信息"})
+    try:
+        data = request.get_json()
+        if not data:
+            return jsonify({"success": False, "error": "无效请求"})
+        qid = str(data.get("question_id", ""))
+        answer = data.get("answer")
+        if isinstance(answer, list):
+            answer = [str(a) for a in answer]
+        else:
+            answer = str(answer or "")
+
+        q = None
+        for qq in load_questions_clean().get("questions", []):
+            if str(qq.get("id")) == qid:
+                q = qq
+                break
+        if not q:
+            return jsonify({"success": False, "error": "题目不存在"})
+
+        correct_answer = str(q.get("answer", "")).strip().upper()
+        user_answer = answer
+        if isinstance(user_answer, list):
+            user_answer = "".join(sorted(str(a).strip().upper() for a in user_answer))
+
+        is_correct = (str(user_answer).strip().upper() == correct_answer)
+
+        kp_name = q.get("knowledge_point", "")
+        prev_mastery = None
+        try:
+            prev_mastery = update_student_mastery(full_id, kp_name, is_correct)
+        except Exception:
+            pass
+
+        record_question_history(full_id, qid, is_correct)
+
+        new_score_map, _, _, _ = calculate_mastery_tree(full_id)
+        new_mastery = new_score_map.get(flow_kp_code(kp_name), prev_mastery or 0)
 
         return jsonify({
-            "success": True, 
-            "user_profile": user_profile,
-            "behavior_profile": behavior_profile,
-            "path_recommendation": path_recommendation,
-            "weak_points": weak_points, 
-            "key_points": key_points,
-            "avoidance_kps": avoidance_kps,
-            "recommended_items": recommended_items[:max_items],
-            "resources": resources, 
-            "questions": filtered_questions
+            "success": True,
+            "correct": is_correct,
+            "correct_answer": q.get("answer", ""),
+            "analysis": q.get("analysis") or q.get("explanation", ""),
+            "mastery_before": round(prev_mastery or 0, 3),
+            "mastery_after": round(new_mastery, 3),
+            "knowledge_point": kp_name,
         })
     except Exception as e:
         import traceback
@@ -3508,28 +3410,45 @@ def get_student_resources_data():
             "questions": []
         })
     
-    if not os.path.exists(RESOURCE_DIR):
+    if not os.path.isdir(TEACHING_MATERIALS_DIR):
         return jsonify({"success": True, "resources": [], "questions": []})
     
-    files = os.listdir(RESOURCE_DIR)
+    manifest_map = {}
+    manifest_path = os.path.join(TEACHING_MATERIALS_DIR, "resource_manifest.json")
+    if os.path.exists(manifest_path):
+        try:
+            with open(manifest_path, "r", encoding="utf-8") as f:
+                manifest_data = json.load(f)
+            for item in manifest_data.get("files", []) if isinstance(manifest_data, dict) else []:
+                fn = item.get("filename")
+                if fn:
+                    manifest_map[fn] = item
+        except Exception:
+            pass
+
+    ALLOWED_EXT = {".mp4", ".ppt", ".pptx", ".doc", ".docx", ".pdf", ".txt", ".md"}
     resources = []
-    for f in files:
-        if f == "questions.json":
+    for entry in os.scandir(TEACHING_MATERIALS_DIR):
+        if not entry.is_file():
+            continue
+        f = entry.name
+        if f == "resource_manifest.json":
+            continue
+        ext = os.path.splitext(f)[1].lower()
+        if ext not in ALLOWED_EXT:
             continue
         info = parse_resource_info(f)
-        # ?????????????
-        if info["ch"] and info["ch"] > 3:
-            continue
+        meta = manifest_map.get(f, {})
         chapter = None
         if info["ch"]:
-            chapter = "?{}?".format(info["ch"])
+            chapter = "第{}章".format(info["ch"])
         
-        # ??????????
-        kp_match = None
-        if info["big"] and info["sec"]:
-            kp_match = f"{info['ch']}.{info['big']}.{info['sec']}"
-        elif info["big"]:
-            kp_match = f"{info['ch']}.{info['big']}"
+        kp_match = meta.get("knowledge_point") or ""
+        if not kp_match:
+            if info["big"] and info["sec"]:
+                kp_match = f"{info['ch']}.{info['big']}.{info['sec']}"
+            elif info["big"]:
+                kp_match = f"{info['ch']}.{info['big']}"
         
         resources.append({
             "name": f,
@@ -3541,39 +3460,7 @@ def get_student_resources_data():
     
     resources.sort(key=lambda x: (x["chapter_num"] or 99, x["name"]))
     
-    # ??????????????????????????????
-    questions_data = load_questions()
-    questions = questions_data.get("questions", [])
-    
-    # ????????????????
-    student_id = session.get("full_id")
-    kp_mastery_map = {}
-    if student_id:
-        try:
-            with driver.session() as neo_session:
-                query = """
-                MATCH (s:Student {id: $sid})-[r:MASTERED]->(k:Knowledge)
-                RETURN k.name AS name, r.mastery AS mastery
-                """
-                result = neo_session.run(query, sid=student_id)
-                for r in result:
-                    kp_mastery_map[r["name"]] = r["mastery"]
-        except:
-            pass
-    
-    filtered_questions = []
-    for q in questions:
-        kp = q.get("knowledge_point", "")
-        ch_match = re.match(r"^(\d+)", kp)
-        if ch_match:
-            ch_num = int(ch_match.group(1))
-            if ch_num <= 3:
-                # ???????????????
-                q_with_mastery = q.copy()
-                q_with_mastery["mastery"] = kp_mastery_map.get(kp, 0)
-                filtered_questions.append(q_with_mastery)
-    
-    return jsonify({"success": True, "resources": resources, "questions": filtered_questions})
+    return jsonify({"success": True, "resources": resources, "questions": []})
 
 @app.route("/student/submit", methods=["POST"])
 def submit_practice():
@@ -3642,25 +3529,28 @@ def submit_practice():
 # ????????? & ????????# ????????????????????????????????????????????????????????????
 
 QUESTION_HISTORY_FILE = os.path.join(RESOURCE_DIR, "question_history.json")
+_QUESTION_HISTORY_MEM_CACHE = None
 
 def load_question_history():
-    """??????????"""
+    global _QUESTION_HISTORY_MEM_CACHE
+    if _QUESTION_HISTORY_MEM_CACHE is not None:
+        return _QUESTION_HISTORY_MEM_CACHE
     if os.path.exists(QUESTION_HISTORY_FILE):
         try:
             with open(QUESTION_HISTORY_FILE, "r", encoding="utf-8") as f:
                 data = json.load(f)
                 if isinstance(data, dict) and len(data) > 0:
-                    print(f"[LOAD] Loaded {sum(len(v) for v in data.values())} records")
+                    _QUESTION_HISTORY_MEM_CACHE = data
                     return data
-                print("[LOAD] File exists but empty/invalid")
                 return {}
         except Exception as e:
             print(f"[LOAD] Error: {e}, returning empty dict to prevent data loss")
             return {}
-    print("[LOAD] No history file found")
     return {}
 
 def save_question_history(history):
+    global _QUESTION_HISTORY_MEM_CACHE
+    _QUESTION_HISTORY_MEM_CACHE = None
     try:
         total = sum(len(v) for v in history.values() if isinstance(v, dict))
         print(f"[SAVE] Saving {total} records to {QUESTION_HISTORY_FILE}")
@@ -3842,58 +3732,10 @@ def get_question_history():
         return jsonify({"success": False, "error": str(e)})
 
 @app.route("/student/wrong-questions")
-def get_wrong_questions():
+def student_wrong_questions_page():
     if session.get("role") != "student":
-        return jsonify({"success": False, "error": "????"})
-    
-    full_id = session.get("full_id")
-    if not full_id:
-        return jsonify({"success": False, "error": "????"})
-    
-    try:
-        history = load_question_history()
-        student_history = history.get(full_id, {})
-        
-        questions_data = load_questions()
-        all_questions = {}
-        for q in questions_data.get("questions", []):
-            all_questions[q["id"]] = q
-        
-        wrong_questions = []
-        for qid, q_stats in student_history.items():
-            try:
-                if q_stats.get("wrong_count", 0) > 0 and q_stats.get("consecutive_correct", 0) < 1:
-                    if qid in all_questions:
-                        wrong_q = dict(all_questions[qid])
-                        wrong_q["stats"] = q_stats
-                        wrong_questions.append(wrong_q)
-            except Exception as e:
-                print(f"[WRONG-Q] Error processing {qid}: {e}")
-                continue
-        
-        wrong_questions.sort(key=lambda x: (
-            -x["stats"].get("wrong_count", 0),
-            x["stats"].get("last_attempt_time", "")
-        ))
-        
-        total_wrong = sum(1 for q in student_history.values() if q.get("wrong_count", 0) > 0)
-        mastered = sum(1 for q in student_history.values() if q.get("consecutive_correct", 0) >= 3)
-        
-        return jsonify({
-            "success": True,
-            "wrong_questions": wrong_questions,
-            "total_count": len(wrong_questions),
-            "summary": {
-                "total_wrong": total_wrong,
-                "need_practice": len(wrong_questions),
-                "mastered": mastered
-            }
-        })
-    except Exception as e:
-        print(f"[WRONG-Q] Exception: {e}")
-        import traceback
-        traceback.print_exc()
-        return jsonify({"success": False, "error": str(e)})
+        return redirect(url_for("login"))
+    return render_flow_page("错题集", "wrong")
 
 @app.route("/student/log_behavior", methods=["POST"])
 def log_behavior():
@@ -4216,8 +4058,11 @@ def get_teacher_questions_data():
 
 def resource_safe_path(filename):
     safe = os.path.basename(filename or "")
-    if not safe or safe in {"questions.json", "question_history.json"}:
+    if not safe or safe == "resource_manifest.json":
         return None
+    path = os.path.abspath(os.path.join(TEACHING_MATERIALS_DIR, safe))
+    if os.path.isfile(path):
+        return path
     path = os.path.abspath(os.path.join(RESOURCE_DIR, safe))
     root = os.path.abspath(RESOURCE_DIR)
     if not path.startswith(root + os.sep):
@@ -4257,6 +4102,24 @@ def teacher_resource_update():
         return jsonify({"success": False, "error": "????"})
     os.replace(old_path, new_path)
     return jsonify({"success": True, "message": "?????", "filename": new_name})
+
+@app.route("/teacher/resource/replace-content", methods=["POST"])
+def teacher_resource_replace_content():
+    if session.get("role") != "teacher":
+        return jsonify({"success": False, "error": "未登录"})
+    old_name = (request.form.get("old_name") or "").strip()
+    file = request.files.get("file")
+    old_path = resource_safe_path(old_name)
+    if not old_path or not os.path.exists(old_path):
+        return jsonify({"success": False, "error": "资源不存在"})
+    if not file or not file.filename:
+        return jsonify({"success": False, "error": "请选择新文件"})
+    old_ext = os.path.splitext(old_name)[1].lower()
+    new_ext = os.path.splitext(file.filename)[1].lower()
+    if old_ext and new_ext and old_ext != new_ext:
+        return jsonify({"success": False, "error": "请上传同类型文件，避免资源入口失效"})
+    file.save(old_path)
+    return jsonify({"success": True, "message": "资源内容已更新", "filename": old_name})
 
 @app.route("/teacher/resource/delete", methods=["POST"])
 def teacher_resource_delete():
@@ -4523,6 +4386,9 @@ def play_video(filename):
             record_video_activity(session.get("full_id"), filename)
         except Exception as e:
             print("[video play record] {}".format(str(e)))
+    tm_path = os.path.join(TEACHING_MATERIALS_DIR, filename)
+    if os.path.isfile(tm_path):
+        return send_from_directory(TEACHING_MATERIALS_DIR, filename)
     return send_from_directory(RESOURCE_DIR, filename)
 
 @app.route("/logout")
@@ -5111,7 +4977,7 @@ TEACHER_WORKSPACE_TITLES = {
     "students": "学生管理",
     "resourceManage": "资源管理",
     "questionBank": "题库管理",
-    "graph": "公共图谱",
+    "graph": "知识图谱",
 }
 
 @app.route("/teacher/tools")
@@ -5135,12 +5001,12 @@ def render_teacher_workspace(initial_tab="overview", page_title="????????"):
 <div class="modal" id="studentModal"><div class="dialog"><h3 id="studentModalTitle">??????</h3><input id="editStudentId" type="hidden"><label>???</label><input id="studentNum"><label>???</label><input id="studentName"><div style="margin-top:16px;text-align:right"><button class="btn light" onclick="closeStudentModal()">???</button> <button class="btn green" onclick="saveStudent()">???</button></div></div></div>
 <script>
 let DATA={students:[],summary:{},levels:{},weak_rank:[],resources:{types:{},recent:[]},questions:{difficulty:{},recent:[]},posts:[]}, TAB="{{ initial_tab }}";
-const app=document.getElementById('app');const esc=s=>String(s??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));const pct=v=>Math.round((Number(v)||0)*100)+'%';const levelClass=l=>l==='???'||l==='???'?'ok':(l==='???'?'warn':'bad');const kpName=s=>String(s??'').replace(/^\\s*\\d+(?:\\.\\d+)+\\s*/,'')||String(s??'');let SORT={students:['num',1],resources:['name',1],questions:['id',1]},KPS=[];
+const app=document.getElementById('app');const esc=s=>String(s==null?'':s).replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));const pct=v=>Math.round((Number(v)||0)*100)+'%';const levelClass=l=>l==='???'||l==='???'?'ok':(l==='???'?'warn':'bad');const kpName=s=>String(s==null?'':s).replace(/^\\s*\\d+(?:\\.\\d+)+\\s*/,'')||String(s==null?'':s);let SORT={students:['num',1],resources:['name',1],questions:['id',1]},KPS=[];
 const diffText=d=>({easy:'????,medium:'???',hard:'???'}[d]||d||'???');
 function sorted(list,type,key){let cur=SORT[type]||[key,1],dir=cur[0]===key?-cur[1]:1;SORT[type]=[key,dir];return [...list].sort((a,b)=>{let x=a[key]??'',y=b[key]??'';if(typeof x==='number'||typeof y==='number')return ((Number(x)||0)-(Number(y)||0))*dir;return String(x).localeCompare(String(y),'zh-Hans',{numeric:true})*dir})}
 function sortBy(type,key){if(type==='students'&&document.getElementById('studentTable'))renderStudents(sorted(DATA.students||[],type,key));if(type==='resources')renderResourceTable(window.RESOURCE_LIST=sorted(window.RESOURCE_LIST||[],type,key));if(type==='questions')renderQuestionTable(window.QUESTION_LIST=sorted(window.QUESTION_LIST||[],type,key))}
 function th(type,key,label){let cur=SORT[type]||[],mark=cur[0]===key?`<span class="sort-tri ${cur[1]===1?'up':'down'}"></span>`:'';return `<th onclick="sortBy('${type}','${key}')" title="??????">${label}${mark}</th>`}
-async function loadData(){let r=await fetch('/teacher/tools/data');DATA=await r.json();try{KPS=(await fetch('/teacher/knowledge-points/data').then(r=>r.json())).points||[]}catch(e){KPS=[]}render()}
+async function loadData(){try{let r=await fetch('/teacher/tools/data');if(!r.ok)throw new Error('HTTP '+r.status);DATA=await r.json();}catch(e){console.error('loadData error:',e);DATA={students:[],summary:{student_count:0,avg_mastery:0,avg_accuracy:0,weak_student_count:0,resource_count:0,question_count:0},levels:{},weak_rank:[],resources:{types:{}},questions:{difficulty:{}}};app.innerHTML='<div class="card"><h3>数据加载失败</h3><p>无法连接服务器或数据加载超时，请刷新页面重试。</p><button class="btn" onclick="location.reload()">刷新页面</button></div>';return;}try{KPS=(await fetch('/teacher/knowledge-points/data').then(r=>r.json())).points||[]}catch(e){KPS=[]}render()}
 function render(){({overview,students,resourceManage,questionBank,graph}[TAB]||overview)()}
 function overview(){let s=DATA.summary||{}, weak=(DATA.weak_rank||[]).slice(0,6),lv=DATA.levels||{},rt=(DATA.resources||{}).types||{},qd=(DATA.questions||{}).difficulty||{};let statList=(o,map=x=>x)=>Object.keys(o).map(k=>`<div style="display:flex;justify-content:space-between;border-top:1px solid #eef2f7;padding:9px 0"><span>${esc(map(k))}</span><b>${o[k]}</b></div>`).join('')||'<div class="empty">??????</div>';app.innerHTML=`<div class="grid"><div class="stat">??????<b>${s.student_count||0}</b><span class="muted">??????</span></div><div class="stat">????????b>${pct(s.avg_mastery)}</b><span class="muted">???????????/span></div><div class="stat">??????<b>${s.weak_student_count||0}</b><span class="muted">????????0%</span></div><div class="stat">??? / ???<b>${s.resource_count||0} / ${s.question_count||0}</b><span class="muted">?????????</span></div></div><div class="split"><div class="card"><h2>?????????</h2>${studentRows((DATA.students||[]).slice(0,6),false)}</div><div class="card"><h2>???????????</h2>${weak.map(x=>`<div style="display:flex;justify-content:space-between;border-top:1px solid #eef2f7;padding:11px 0"><span>${esc(kpName(x.name))}</span><b>${x.count}??/b></div>`).join('')||'<div class="empty">?????????</div>'}</div></div><div class="grid"><div class="card"><h2>??????</h2>${statList(lv)}</div><div class="card"><h2>??????</h2>${statList(rt)}</div><div class="card"><h2>??????</h2>${statList(qd,diffText)}</div></div>`}
 function studentRows(list,withActions=true){let heads=withActions?`${th('students','num','学号')}${th('students','name','姓名')}${th('students','level','等级')}${th('students','avg_mastery','掌握度')}${th('students','accuracy','正确率')}`:'<th>学号</th><th>姓名</th><th>等级</th><th>掌握度</th><th>正确率</th>';return `<table class="table"><thead><tr>${heads}<th>薄弱点</th>${withActions?'<th>操作</th>':''}</tr></thead><tbody>${list.map(st=>`<tr><td>${esc(st.num)}</td><td><b>${esc(st.name)}</b></td><td><span class="tag ${levelClass(st.level)}">${esc(st.level)}</span></td><td>${pct(st.avg_mastery)}<div class="bar"><span style="width:${pct(st.avg_mastery)}"></span></div></td><td>${pct(st.accuracy)}</td><td>${(st.weak_points||[]).slice(0,3).map(w=>`<span class="tag bad">${esc(kpName(w.name))} ${pct(w.mastery)}</span>`).join('')||'<span class="muted">暂无</span>'}</td>${withActions?`<td><button class="btn light" onclick="openEditStudent('${esc(st.id)}','${esc(st.num)}','${esc(st.name)}')">编辑</button> <button class="btn danger" onclick="deleteStudent('${esc(st.id)}')">删除</button></td>`:''}</tr>`).join('')}</tbody></table>`}
@@ -5149,18 +5015,19 @@ function renderStudents(list){studentTable.innerHTML=studentRows(list)}
 function filterStudents(){let q=stuSearch.value.trim().toLowerCase();let list=(DATA.students||[]).filter(s=>!q||String(s.num+s.name+s.level).toLowerCase().includes(q));studentTable.innerHTML=studentRows(list)}
 async function resourceManage(){app.innerHTML=`<div class="card"><div style="display:flex;justify-content:space-between;gap:12px;align-items:center"><h2>??????</h2><label class="btn green">??????<input type="file" style="display:none" onchange="uploadResource(this)"></label></div><div class="toolbar"><input id="resSearch" class="search" oninput="filterResources()" placeholder="???????????????????"><select id="resType" onchange="filterResources()"><option>??????</option></select></div><div id="resourceTable"><div class="empty">?????????...</div></div></div>`;let d=await fetch('/teacher/resources/data').then(r=>r.json());window.RESOURCE_ALL=d.resources||[];window.RESOURCE_LIST=[...window.RESOURCE_ALL];let types=[...new Set(window.RESOURCE_ALL.map(r=>r.type||'???'))];resType.innerHTML='<option>??????</option>'+types.map(t=>`<option>${esc(t)}</option>`).join('');renderResourceTable(window.RESOURCE_LIST)}
 function renderResourceTable(list){let chapters={};(list||[]).forEach(r=>{let ch=r.chapter_label||'未分类',sec=r.section_label||'未分类';chapters[ch]=chapters[ch]||{};chapters[ch][sec]=chapters[ch][sec]||[];chapters[ch][sec].push(r)});let tableRows=arr=>`<div class="table-wrap" style="max-height:none"><table class="table"><thead><tr>${th('resources','name','文件名')}${th('resources','type','类型')}${th('resources','knowledge_point','知识点')}${th('resources','updated_at','更新时间')}${th('resources','size','大小')}<th>操作</th></tr></thead><tbody>${arr.map(r=>`<tr><td><b>${esc(r.name)}</b></td><td>${esc(r.type)}</td><td>${esc(kpName(r.knowledge_point)||'未绑定')}</td><td>${esc(r.updated_at)}</td><td>${Math.round((r.size||0)/1024)} KB</td><td><button class="btn light" onclick="renameResource('${esc(r.name)}')">编辑</button> <button class="btn danger" onclick="deleteResource('${esc(r.name)}')">删除</button></td></tr>`).join('')}</tbody></table></div>`;let html=Object.keys(chapters).sort((a,b)=>a.localeCompare(b,'zh-Hans',{numeric:true})).map((ch,ci)=>{let direct=chapters[ch]['整章']||[];let secs=Object.keys(chapters[ch]).filter(s=>s!=='整章').sort((a,b)=>a.localeCompare(b,'zh-Hans',{numeric:true}));return `<details class="card" ${ci===0?'open':''} style="padding:0;overflow:hidden"><summary style="padding:14px 16px;background:#f8fafc;cursor:pointer;font-weight:800">${esc(ch)} · ${Object.values(chapters[ch]).reduce((n,arr)=>n+arr.length,0)} 个资源</summary>${direct.length?tableRows(direct):''}${secs.map(sec=>`<details open style="border-top:1px solid #eef2f7"><summary style="padding:12px 18px;background:#fff;cursor:pointer;font-weight:700;color:#475569">${esc(sec)} · ${chapters[ch][sec].length}</summary>${tableRows(chapters[ch][sec])}</details>`).join('')}</details>`}).join('');resourceTable.innerHTML=html||'<div class="empty">暂无资源</div>'}
-function normSearch(s){return String(s??'').toLowerCase().replace(/\s+/g,'')}
+function normSearch(s){return String(s==null?'':s).toLowerCase().replace(/\s+/g,'')}
 function filterResources(){let q=normSearch(document.getElementById('resSearch')?.value||''),t=document.getElementById('resType')?.value||'??????';window.RESOURCE_LIST=(window.RESOURCE_ALL||[]).filter(r=>{let hay=normSearch([r.name,r.title,r.type,r.knowledge_point,kpName(r.knowledge_point),r.chapter_label,r.section_label].join(' '));return (t==='??????'||r.type===t)&&(!q||hay.includes(q))});renderResourceTable(window.RESOURCE_LIST)}
 async function uploadResource(input){if(!input.files||!input.files[0])return;let fd=new FormData();fd.append('file',input.files[0]);let d=await fetch('/teacher/upload',{method:'POST',body:fd}).then(r=>r.json());alert(d.success?'????????+d.filename:(d.error||'??????'));if(d.success)resourceManage()}
 async function renameResource(name){let next=prompt('???????????,name);if(!next||next===name)return;let d=await fetch('/teacher/resource/update',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({old_name:name,new_name:next})}).then(r=>r.json());alert(d.success?'??????':(d.error||'??????'));if(d.success)resourceManage()}
 async function deleteResource(name){if(!confirm('????????? '+name+' ???'))return;let d=await fetch('/teacher/resource/delete',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({filename:name})}).then(r=>r.json());alert(d.success?'??????':(d.error||'??????'));if(d.success)resourceManage()}
-async function questionBank(){app.innerHTML=`<div class="card"><div style="display:flex;justify-content:space-between;gap:12px;align-items:center"><h2>??????</h2><button class="btn green" onclick="openQuestionEditor()">??????</button></div><div class="toolbar"><input id="qSearch" class="search" oninput="filterQuestions()" placeholder="??????????????D"><select id="qDiff" onchange="filterQuestions()"><option value="">??????</option><option value="easy">????/option><option value="medium">???</option><option value="hard">???</option></select></div><div id="questionTable"><div class="empty">?????????...</div></div></div><div class="modal" id="questionModal"><div class="dialog" style="width:720px"><h3 id="qTitle">??????</h3><label>??????</label><textarea id="qText" rows="4"></textarea><label>?????/label><input id="qKp" list="kpOptions" oninput="filterKpOptions(this.value)" placeholder="?????????????????><datalist id="kpOptions">${KPS.map(k=>`<option value="${esc(k)}"></option>`).join('')}</datalist><label>???</label><select id="qDifficulty"><option value="easy">????/option><option value="medium">???</option><option value="hard">???</option></select><label>????????/label><div id="optionEditor">${['A','B','C','D'].map(l=>`<div style="display:grid;grid-template-columns:54px 1fr 70px;gap:8px;align-items:center;margin:8px 0"><label><input type="checkbox" id="use${l}"> ${l}</label><input id="opt${l}" placeholder="${l} ??????"><label><input type="checkbox" id="ans${l}"> ???</label></div>`).join('')}</div><label>???</label><textarea id="qExplain" rows="3"></textarea><input id="qId" type="hidden"><div style="margin-top:16px;text-align:right"><button class="btn light" onclick="questionModal.classList.remove('open')">???</button> <button class="btn green" onclick="saveQuestion()">???</button></div></div></div>`;let d=await fetch('/teacher/questions/data').then(r=>r.json());window.QUESTION_ALL=d.questions||[];window.QUESTION_LIST=[...window.QUESTION_ALL];renderQuestionTable(window.QUESTION_LIST)}
+async function questionBank(){app.innerHTML=`<div class="card"><div style="display:flex;justify-content:space-between;gap:12px;align-items:center"><h2>题库管理</h2><button class="btn green" onclick="openQuestionEditor()">添加题目</button></div><div class="toolbar"><input id="qSearch" class="search" oninput="filterQuestions()" placeholder="搜索编号、知识点、题目内容"><select id="qDiff" onchange="filterQuestions()"><option value="">全部难度</option><option value="easy">基础</option><option value="medium">中等</option><option value="hard">困难</option></select></div><div id="questionTable"><div class="empty">正在加载题库...</div></div></div><div class="modal" id="questionModal"><div class="dialog" style="width:900px;max-height:90vh;overflow-y:auto"><h3 id="qTitle">添加题目</h3><div style="display:grid;grid-template-columns:1fr 1fr;gap:16px"><div><label>知识点编号</label><input id="qKpCode" placeholder="如 3.4.7"><label>知识点名称</label><input id="qKpName" placeholder="如 活锁"><label>题型</label><select id="qType"><option value="single_choice">单选</option><option value="multiple_choice">多选</option></select><label>难度</label><select id="qDifficulty"><option value="easy">基础</option><option value="medium">中等</option><option value="hard">困难</option></select><label>题干</label><textarea id="qText" rows="3" placeholder="题目内容"></textarea></div><div><label>选项A</label><input id="optA" placeholder="选项A内容"><label>选项B</label><input id="optB" placeholder="选项B内容"><label>选项C</label><input id="optC" placeholder="选项C内容"><label>选项D</label><input id="optD" placeholder="选项D内容"><label>正确答案</label><input id="qAnswer" placeholder="单选填A/B/C/D，多选填A,B或A,C"><label>解析</label><textarea id="qExplain" rows="3" placeholder="答案解析"></textarea></div></div><div style="margin-top:16px;padding-top:16px;border-top:1px solid #e5e7eb"><details><summary style="cursor:pointer;font-weight:bold;color:#475569">大文本快速录入（可选）</summary><textarea id="quickInput" rows="10" style="margin-top:10px;font-family:monospace;font-size:13px" placeholder="粘贴格式示例：&#10;知识点：3.4.7 活锁&#10;题型：单选&#10;难度：中等&#10;题干：活锁与死锁的主要区别是（ ）。&#10;A. 活锁中进程状态不断变化但无法推进&#10;B. 活锁中进程永久阻塞&#10;C. 活锁一定由硬件故障引起&#10;D. 活锁不会影响系统性能&#10;答案：A&#10;解析：活锁中进程仍在运行并改变状态，但整体工作没有实质推进。"></textarea><button class="btn" style="margin-top:10px" onclick="parseQuickInput()">解析并填入表单</button></details></div><input id="qId" type="hidden"><div style="margin-top:16px;text-align:right"><button class="btn light" onclick="questionModal.classList.remove('open')">取消</button> <button class="btn green" onclick="saveQuestion()">保存题目</button></div></div></div>`;let d=await fetch('/teacher/questions/data').then(r=>r.json());window.QUESTION_ALL=d.questions||[];window.QUESTION_LIST=[...window.QUESTION_ALL];renderQuestionTable(window.QUESTION_LIST)}
 function renderQuestionTable(list){questionTable.innerHTML=`<div class="table-wrap"><table class="table"><thead><tr>${th('questions','id','ID')}${th('questions','knowledge_point','知识点')}${th('questions','difficulty','难度')}${th('questions','question','题目')}${th('questions','answer','答案')}<th>操作</th></tr></thead><tbody>${list.map(q=>`<tr><td>${esc(q.id)}</td><td>${esc(kpName(q.knowledge_point))}</td><td>${esc(diffText(q.difficulty))}</td><td>${esc(q.question)}</td><td>${esc(q.answer)}</td><td><button class="btn light" onclick="openQuestionEditor('${esc(q.id)}')">编辑</button> <button class="btn danger" onclick="deleteQuestion('${esc(q.id)}')">删除</button></td></tr>`).join('')}</tbody></table></div>`}
 function filterKpOptions(v){let q=String(v||'').toLowerCase();let opts=(KPS||[]).filter(k=>!q||String(k).toLowerCase().includes(q)||kpName(k).toLowerCase().includes(q)).slice(0,80);let box=document.getElementById('kpOptions');if(box)box.innerHTML=opts.map(k=>`<option value="${esc(k)}"></option>`).join('')}
 function filterQuestions(){let q=normSearch(qSearch.value||''),d=qDiff.value;window.QUESTION_LIST=(window.QUESTION_ALL||[]).filter(x=>(!d||x.difficulty===d)&&(!q||normSearch([x.id,x.question,x.knowledge_point,kpName(x.knowledge_point),x.answer,diffText(x.difficulty)].join(' ')).includes(q)));renderQuestionTable(window.QUESTION_LIST)}
-function openQuestionEditor(id){let q=(window.QUESTION_ALL||[]).find(x=>String(x.id)===String(id));qTitle.textContent=q?'??????':'??????';qId.value=q?q.id:'';qText.value=q?q.question||'':'';qKp.value=q?q.knowledge_point||'':'';qDifficulty.value=q?q.difficulty||'medium':'medium';qExplain.value=q?q.explanation||'':'';['A','B','C','D'].forEach((l,i)=>{let opt=(q&&q.options&&q.options[i])?String(q.options[i]).replace(/^[A-D][\\.??\\s*/,''):'';document.getElementById('use'+l).checked=!!opt;document.getElementById('opt'+l).value=opt;document.getElementById('ans'+l).checked=q?String(q.answer||'').split(/[,????\s]+/).includes(l):false});questionModal.classList.add('open')}
-async function saveQuestion(){let options=[],answers=[];['A','B','C','D'].forEach(l=>{let use=document.getElementById('use'+l).checked,txt=document.getElementById('opt'+l).value.trim();if(use&&txt)options.push(l+'. '+txt);if(document.getElementById('ans'+l).checked)answers.push(l)});if(!qText.value.trim()||!qKp.value.trim()||!answers.length){alert('???????????????????????????);return}let payload={question_id:qId.value,question:qText.value.trim(),knowledge_point:qKp.value.trim(),difficulty:qDifficulty.value,options,answer:answers.join(','),explanation:qExplain.value.trim()};let d=await fetch(qId.value?'/teacher/question/update':'/teacher/question/add',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(payload)}).then(r=>r.json());alert(d.success?'??????':(d.error||'??????'));if(d.success){questionModal.classList.remove('open');questionBank()}}
-async function deleteQuestion(id){if(!confirm('??????????????))return;let d=await fetch('/teacher/question/delete',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({question_id:id})}).then(r=>r.json());alert(d.success?'??????':(d.error||'??????'));if(d.success)questionBank()}
+function openQuestionEditor(id){let q=(window.QUESTION_ALL||[]).find(x=>String(x.id)===String(id));qTitle.textContent=q?'编辑题目':'添加题目';qId.value=q?q.id:'';let kpFull=q?(q.knowledge_point||''):'';let kpMatch=kpFull.match(/^(\d+(?:\.\d+)*)\s+(.+)$/)||kpFull.match(/^(\d+(?:\.\d+)*)$/);if(kpMatch){qKpCode.value=kpMatch[1]||'';qKpName.value=kpMatch[2]||''}else{qKpCode.value='';qKpName.value=kpFull}qType.value=q?(q.type||'single_choice'):'single_choice';qDifficulty.value=q?(q.difficulty||'medium'):'medium';qText.value=q?(q.question||''):'';qExplain.value=q?(q.explanation||''):'';qAnswer.value=q?(q.answer||''):'';['A','B','C','D'].forEach((l,i)=>{let opt=(q&&q.options&&q.options[i])?String(q.options[i]).replace(/^[A-D][\\.、．:\：]\s*/,''):'';document.getElementById('opt'+l).value=opt});if(document.getElementById('quickInput'))quickInput.value='';questionModal.classList.add('open')}
+function parseQuickInput(){let text=quickInput.value.trim();if(!text){alert('请先粘贴题目内容');return}let lines=text.split('\n');let kp='',type='single_choice',diff='medium',stem='',ans='',explain='';let opts={A:'',B:'',C:'',D:''};for(let line of lines){line=line.trim();if(!line)continue;if(line.startsWith('知识点：')||line.startsWith('知识点:')){kp=line.substring(3).trim();let m=kp.match(/^(\d+(?:\.\d+)*)\s+(.+)$/)||kp.match(/^(\d+(?:\.\d+)*)$/);if(m){qKpCode.value=m[1]||'';qKpName.value=m[2]||''}}else if(line.startsWith('题型：')||line.startsWith('题型:')){let t=line.substring(3).trim();qType.value=t.includes('多')?'multiple_choice':'single_choice'}else if(line.startsWith('难度：')||line.startsWith('难度:')){let d=line.substring(3).trim();qDifficulty.value=d.includes('基')?'easy':d.includes('困')?'hard':'medium'}else if(line.startsWith('题干：')||line.startsWith('题干:')){qText.value=line.substring(3).trim()}else if(line.startsWith('答案：')||line.startsWith('答案:')){qAnswer.value=line.substring(3).trim().toUpperCase()}else if(line.startsWith('解析：')||line.startsWith('解析:')){qExplain.value=line.substring(3).trim()}else if(/^[A-D][\\.、．:\：]/.test(line)){let letter=line[0];let content=line.substring(2).trim();document.getElementById('opt'+letter).value=content}else if(stem===''&&!/^[A-D]/.test(line)&&!line.startsWith('答案')&&!line.startsWith('解析')){qText.value=line}}alert('已填入表单，请检查后保存')}
+async function saveQuestion(){let kpCode=qKpCode.value.trim();let kpName=qKpName.value.trim();let kpFull=kpCode&&kpName?(kpCode+' '+kpName):kpCode;let questionText=qText.value.trim();let typeVal=qType.value;let diffVal=qDifficulty.value;let answerVal=qAnswer.value.trim().toUpperCase();let explainVal=qExplain.value.trim();let optAVal=optA.value.trim();let optBVal=optB.value.trim();let optCVal=optC.value.trim();let optDVal=optD.value.trim();if(!kpCode){alert('知识点编号不能为空');return}if(!questionText){alert('题干不能为空');return}if(!optAVal||!optBVal||!optCVal||!optDVal){alert('四个选项都不能为空');return}if(optAVal==='选项A'||optBVal==='选项B'||optCVal==='选项C'||optDVal==='选项D'){alert('选项内容不能是"选项A/选项B/选项C/选项D"');return}if(!answerVal){alert('正确答案不能为空');return}let ansParts=answerVal.split(/[,，、\s]+/).filter(x=>x);let validAns=ansParts.every(a=>['A','B','C','D'].includes(a));if(!validAns||ansParts.length===0){alert('答案必须是A/B/C/D或A,B格式');return}if(typeVal==='single_choice'&&ansParts.length>1){alert('单选题只能有一个答案');return}if(!explainVal){alert('解析不能为空');return}let options=['A. '+optAVal,'B. '+optBVal,'C. '+optCVal,'D. '+optDVal];let payload={question_id:qId.value,question:questionText,knowledge_point:kpFull,type:typeVal,difficulty:diffVal,options:options,answer:ansParts.join(','),explanation:explainVal};let d=await fetch(qId.value?'/teacher/question/update':'/teacher/question/add',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(payload)}).then(r=>r.json());alert(d.success?'保存成功':(d.error||'保存失败'));if(d.success){questionModal.classList.remove('open');questionBank()}}
+async function deleteQuestion(id){if(!confirm('确认删除该题目吗？'))return;let d=await fetch('/teacher/question/delete',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({question_id:id})}).then(r=>r.json());alert(d.success?'删除成功':(d.error||'删除失败'));if(d.success)questionBank()}
 function graph(){let opts=(KPS||[]).map(k=>`<option value="${esc(k)}"></option>`).join('');app.innerHTML=`<div class="card"><h2>????????????</h2><p class="muted">???????????????????????????????????????????/p><div class="toolbar"><input id="fromK" list="graphKps" oninput="filterGraphKps(this.value)" placeholder="???????????><select id="relK"><option>???</option><option>???</option><option>???</option></select><input id="toK" list="graphKps" oninput="filterGraphKps(this.value)" placeholder="???????????><button class="btn" onclick="addKg()">??????</button></div><datalist id="graphKps">${opts}</datalist></div>`}
 function filterGraphKps(v){let q=String(v||'').toLowerCase();let box=document.getElementById('graphKps');if(box)box.innerHTML=(KPS||[]).filter(k=>!q||String(k).toLowerCase().includes(q)||kpName(k).toLowerCase().includes(q)).slice(0,80).map(k=>`<option value="${esc(k)}"></option>`).join('')}
 function openAddStudent(){editStudentId.value='';studentNum.value='';studentName.value='';studentModalTitle.textContent='??????';studentModal.classList.add('open')}
@@ -5198,7 +5065,7 @@ def teacher_question_bank():
 
 @app.route("/teacher/graph-tools")
 def teacher_graph_tools():
-    return render_teacher_workspace("graph", "公共图谱")
+    return render_teacher_workspace("graph", "知识图谱")
 
 TEACHER_DISCUSS_PAGE = """
 <div class="card">
@@ -5255,6 +5122,26 @@ def teacher_discuss():
         return redirect(url_for("login"))
     template = TEACHER_BASE_HTML.replace("<!--PAGE_CONTENT-->", TEACHER_DISCUSS_PAGE)
     return render_template_string(template, teacher_name=session.get("user_name", "???"), page_title="??????", active_page="discuss")
+
+@app.route("/teacher/discuss/data")
+def teacher_discuss_data():
+    if session.get("role") != "teacher":
+        return jsonify({"success": False, "error": "未登录"})
+    try:
+        data = student_discuss_list()
+        return jsonify({"success": True, "posts": data.get("posts", [])})
+    except Exception as e:
+        return jsonify({"success": True, "posts": []})
+
+@app.route("/teacher/students/data")
+def teacher_students_data():
+    if session.get("role") != "teacher":
+        return jsonify({"success": False, "error": "未登录"})
+    try:
+        data = teacher_collect_dashboard_data()
+        return jsonify({"success": True, "students": data.get("students", [])})
+    except Exception as e:
+        return jsonify({"success": True, "students": []})
 
 @app.route("/teacher/discuss/post", methods=["POST"])
 def teacher_discuss_post():
@@ -5322,6 +5209,26 @@ def teacher_discuss_comment_delete(comment_id):
         RETURN 1 AS deleted
         """, cid=comment_id).single()
     return jsonify({"success": bool(row), "error": "" if row else "?????"})
+
+@app.route("/teacher/discuss/comment/<path:post_id>", methods=["POST"])
+def teacher_discuss_comment(post_id):
+    if session.get("role") != "teacher":
+        return jsonify({"success": False, "error": "未登录"})
+    data = request.get_json() or {}
+    body = (data.get("body") or "").strip()
+    reply_to = (data.get("reply_to") or "").strip()
+    if not body:
+        return jsonify({"success": False, "error": "请填写评论内容"})
+    with driver.session() as neo4j_session:
+        row = neo4j_session.run("""
+        MATCH (p:DiscussionPost)
+        WHERE elementId(p)=$pid
+        CREATE (p)-[:HAS_COMMENT]->(:DiscussionComment {body:$body, author:$author, role:'teacher',
+                                                        reply_to:$reply_to, created_at:datetime(),
+                                                        created_ts:datetime().epochSeconds})
+        RETURN elementId(p) AS id
+        """, pid=post_id, body=body, reply_to=reply_to, author=session.get("user_name", "教师")).single()
+    return jsonify({"success": bool(row), "error": "" if row else "问题不存在"})
 
 @app.route("/teacher")
 def teacher_home_redirect():
@@ -5442,8 +5349,8 @@ STUDENT_FLOW_HTML = """
 </nav><div class="logout"><a href="/logout">???????/a></div></aside><main><header class="top"><h1>{{ page_title }}</h1><span class="muted">???????????/span></header><section class="content" id="app"></section></main></div>
 <script>
 const PAGE="{{active_page}}", app=document.getElementById("app"), TARGET=new URLSearchParams(location.search).get("target_kp")||"";
-const esc=s=>String(s??"").replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
-const kpName=s=>String(s??"").replace(/^\s*\d+(?:\.\d+)+\s*/,'')||String(s??"");
+const esc=s=>String(s==null?"":s).replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+const kpName=s=>String(s==null?"":s).replace(/^\s*\d+(?:\.\d+)+\s*/,'')||String(s==null?"":s);
 const diffText=d=>({easy:'????,medium:'???',hard:'???'}[d]||d||'???');
 async function getJson(u){try{let r=await fetch(u);if(!r.ok)throw new Error(r.status);return await r.json()}catch(e){console.warn('?????????',u,e);if(u.includes('/mastery/data'))return {success:true,points:[],chapters:[],stats:{total:0,mastered:0,weak:0,severe:0}};if(u.includes('/resources/data'))return {success:true,resources:[],questions:[]};if(u.includes('/records/data'))return {success:true,records:[],groups:[],summary:{total:0,video:0,document:0,week:0}};if(u.includes('/discuss'))return {success:true,posts:[],comments:[]};if(u.includes('/messages'))return {success:true,messages:[]};if(u.includes('/flow-graph/data'))return {success:true,nodes:[],edges:[]};return {success:true,stats:{total:0,mastered:0,weak:0,severe:0},learning_path:[],fallback_path:[],target_kp:''}}}
 function cls(s){return s==="??????"?"bad":(s==="???"?"warn":"ok")}
@@ -5467,17 +5374,17 @@ if(PAGE==='dashboard')dashboard();if(PAGE==='path')pathPage();if(PAGE==='resourc
 
 STUDENT_FLOW_HTML = r"""
 <!doctype html><html lang="zh-CN"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>{{ page_title }} - OS</title><script src="https://cdn.jsdelivr.net/npm/vis-network@9.1.2/standalone/umd/vis-network.min.js"></script><style>
-*{box-sizing:border-box}body{margin:0;background:#f3f5f8;color:#111827;font-family:"Microsoft YaHei",Arial,sans-serif}.layout{display:grid;grid-template-columns:216px 1fr;min-height:100vh}.side{background:#fff;border-right:1px solid #e5e7eb;padding:22px 0;position:sticky;top:0;height:100vh}.brand{padding:0 24px 24px;font-size:20px;font-weight:800}.nav a{display:block;padding:13px 28px;color:#4b5563;text-decoration:none;border-left:3px solid transparent}.nav a.active,.nav a:hover{background:#eef4ff;color:#2563eb;border-left-color:#60a5fa}.logout{position:absolute;left:20px;right:20px;bottom:20px}.logout a{display:block;text-align:center;padding:10px;border-radius:6px;background:#eef4ff;color:#2563eb;text-decoration:none;font-weight:700}.top{height:64px;background:#fff;border-bottom:1px solid #e5e7eb;display:flex;align-items:center;justify-content:space-between;padding:0 34px}.top h1{margin:0;font-size:22px}.content{padding:28px 36px;max-width:1500px}.card{background:#fff;border:1px solid #e5e7eb;border-radius:8px;padding:20px;margin-bottom:16px}.grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(230px,1fr));gap:14px}.stat,.res,.res-card{background:#fff;border:1px solid #e5e7eb;border-radius:8px;padding:14px}.stat b{display:block;font-size:30px;margin-top:8px}.muted{color:#64748b;font-size:14px;line-height:1.7}.btn{border:0;background:#2563eb;color:#fff;border-radius:6px;padding:8px 13px;text-decoration:none;cursor:pointer;display:inline-block}.btn.light{background:#eef4ff;color:#2563eb;border:1px solid #dbeafe}.btn.green{background:#16a34a}.tag{font-size:12px;border-radius:999px;background:#eef2ff;color:#3730a3;padding:4px 8px;margin:3px;display:inline-block}.tag.ok{background:#ecfdf5;color:#166534}.tag.warn{background:#fff7ed;color:#9a3412}.tag.bad{background:#fee2e2;color:#991b1b}.progress{height:10px;background:#e5e7eb;border-radius:99px;overflow:hidden;width:320px}.bar{height:100%;background:#22c55e}.bar.warn{background:#f59e0b}.bar.bad{background:#ef4444}.path-step{display:grid;grid-template-columns:38px 1fr;gap:14px;border-top:1px solid #eef2f7;padding:18px 0}.no{width:30px;height:30px;border-radius:50%;background:#2563eb;color:#fff;display:grid;place-items:center;font-weight:800}.res-list,.res-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(230px,1fr));gap:10px}.row{display:flex;justify-content:space-between;gap:12px;align-items:center;border-top:1px solid #eef2f7;padding:12px 0}.chapter{border:1px solid #e5e7eb;border-radius:8px;margin:10px 0;overflow:hidden}.chapter summary{background:#f8fafc;padding:14px 16px;cursor:pointer;font-weight:700}.kp-row{display:grid;grid-template-columns:minmax(220px,1fr) 70px 340px;gap:14px;align-items:center;border-top:1px solid #eef2f7;padding:12px 16px}.empty{padding:34px;text-align:center;color:#94a3b8;border:1px dashed #cbd5e1;border-radius:8px}.search,input,select,textarea{border:1px solid #cbd5e1;border-radius:6px;background:#fff;padding:9px 11px}.search{min-width:280px}.toolbar{display:flex;gap:10px;flex-wrap:wrap;margin:12px 0}.post{border-top:1px solid #eef2f7;padding:14px 0}.post-head{display:flex;justify-content:space-between;gap:12px}.graph-detail{min-width:0}.graph-detail .progress{width:100%;min-width:0}@media(max-width:900px){.layout{grid-template-columns:1fr}.side{height:auto;position:relative}.logout{position:relative}.content{padding:18px}.kp-row,.path-step{grid-template-columns:1fr}.progress{width:100%}}
+*{box-sizing:border-box}body{margin:0;background:#f3f5f8;color:#111827;font-family:"Microsoft YaHei",Arial,sans-serif}.layout{display:grid;grid-template-columns:216px 1fr;min-height:100vh}.side{background:#1e293b;border-right:1px solid #334155;padding:0;position:sticky;top:0;height:100vh;display:flex;flex-direction:column}.brand{padding:20px 16px 8px;font-size:14px;font-weight:600;color:#f1f5f9;border-bottom:1px solid #334155}.student{padding:4px 16px 16px;font-size:12px;color:#94a3b8}.nav a{display:block;padding:10px 16px;color:#94a3b8;text-decoration:none;border-left:3px solid transparent;font-size:13px}.nav a.active,.nav a:hover{background:#1e3a5f;color:#60a5fa;border-left-color:#3b82f6}.logout{position:absolute;left:16px;right:16px;bottom:16px;border-top:1px solid #334155;padding-top:12px}.logout a{display:block;text-align:center;padding:8px;border-radius:4px;background:#dc2626;color:#fff;text-decoration:none;font-weight:600;font-size:13px}.logout a:hover{background:#b91c1c}.top{height:64px;background:#fff;border-bottom:1px solid #e5e7eb;display:flex;align-items:center;justify-content:space-between;padding:0 34px}.top h1{margin:0;font-size:22px}.content{padding:28px 36px;max-width:1500px}.card{background:#fff;border:1px solid #e5e7eb;border-radius:8px;padding:20px;margin-bottom:16px}.grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(230px,1fr));gap:14px}.stat,.res,.res-card{background:#fff;border:1px solid #e5e7eb;border-radius:8px;padding:14px}.stat b{display:block;font-size:30px;margin-top:8px}.muted{color:#64748b;font-size:14px;line-height:1.7}.btn{border:0;background:#2563eb;color:#fff;border-radius:6px;padding:8px 13px;text-decoration:none;cursor:pointer;display:inline-block}.btn.light{background:#eef4ff;color:#2563eb;border:1px solid #dbeafe}.btn.green{background:#16a34a}.tag{font-size:12px;border-radius:999px;background:#eef2ff;color:#3730a3;padding:4px 8px;margin:3px;display:inline-block}.tag.ok{background:#ecfdf5;color:#166534}.tag.warn{background:#fff7ed;color:#9a3412}.tag.bad{background:#fee2e2;color:#991b1b}.progress{height:10px;background:#e5e7eb;border-radius:99px;overflow:hidden;width:320px}.bar{height:100%;background:#22c55e}.bar.warn{background:#f59e0b}.bar.bad{background:#ef4444}.path-step{display:grid;grid-template-columns:38px 1fr;gap:14px;border-top:1px solid #eef2f7;padding:18px 0}.no{width:30px;height:30px;border-radius:50%;background:#2563eb;color:#fff;display:grid;place-items:center;font-weight:800}.res-list,.res-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(230px,1fr));gap:10px}.row{display:flex;justify-content:space-between;gap:12px;align-items:center;border-top:1px solid #eef2f7;padding:12px 0}.chapter{border:1px solid #e5e7eb;border-radius:8px;margin:10px 0;overflow:hidden}.chapter summary{background:#f8fafc;padding:14px 16px;cursor:pointer;font-weight:700}.kp-row{display:grid;grid-template-columns:minmax(220px,1fr) 70px 340px;gap:14px;align-items:center;border-top:1px solid #eef2f7;padding:12px 16px}.empty{padding:34px;text-align:center;color:#94a3b8;border:1px dashed #cbd5e1;border-radius:8px}.search,input,select,textarea{border:1px solid #cbd5e1;border-radius:6px;background:#fff;padding:9px 11px}.search{min-width:280px}.toolbar{display:flex;gap:10px;flex-wrap:wrap;margin:12px 0}.post{border-top:1px solid #eef2f7;padding:14px 0}.post-head{display:flex;justify-content:space-between;gap:12px}.graph-detail{min-width:0}.graph-detail .progress{width:100%;min-width:0}@media(max-width:900px){.layout{grid-template-columns:1fr}.side{height:auto;position:relative}.logout{position:relative}.content{padding:18px}.kp-row,.path-step{grid-template-columns:1fr}.progress{width:100%}}
 </style></head><body><div class="layout"><aside class="side"><div class="brand">&#25805;&#20316;&#31995;&#32479;</div><nav class="nav"><a href="/student/dashboard" class="{% if active_page=='dashboard' %}active{% endif %}">&#39318;&#39029;</a><a href="/student/path" class="{% if active_page=='path' %}active{% endif %}">&#26234;&#33021;&#23398;&#20064;&#36335;&#24452;</a><a href="/student/resources" class="{% if active_page=='resources' %}active{% endif %}">&#23398;&#20064;&#36164;&#28304;&#24211;</a><a href="/student/mastery" class="{% if active_page=='mastery' %}active{% endif %}">&#30693;&#35782;&#28857;&#25484;&#25569;&#24230;</a><a href="/student/graph" class="{% if active_page=='graph' %}active{% endif %}">&#30693;&#35782;&#22270;&#35889;</a><a href="/student/discuss" class="{% if active_page=='discuss' %}active{% endif %}">&#38382;&#39064;&#35752;&#35770;</a><a href="/student/records" class="{% if active_page=='records' %}active{% endif %}">&#23398;&#20064;&#35760;&#24405;</a></nav><div class="logout"><a href="/logout">&#36864;&#20986;&#30331;&#24405;</a></div></aside><main><header class="top"><h1>{{ page_title }}</h1><div>{{ student_name }}</div></header><section class="content" id="app"></section></main></div>
 <script>
 var PAGE="{{active_page}}",app=document.getElementById('app'),TARGET=new URLSearchParams(location.search).get('target_kp')||'';
-var Z={home:'\u9996\u9875',path:'\u667a\u80fd\u5b66\u4e60\u8def\u5f84',resources:'\u5b66\u4e60\u8d44\u6e90\u5e93',mastery:'\u77e5\u8bc6\u70b9\u638c\u63e1\u5ea6',graph:'\u77e5\u8bc6\u56fe\u8c31',discuss:'\u95ee\u9898\u8ba8\u8bba',records:'\u5b66\u4e60\u8bb0\u5f55',video:'\u89c6\u9891',doc:'\u6587\u6863',exercise:'\u4e60\u9898',resource:'\u8d44\u6e90',weak:'\u8584\u5f31',severe:'\u4e25\u91cd\u8584\u5f31',good:'\u826f\u597d',mastered:'\u5df2\u638c\u63e1',doing:'\u8fdb\u884c\u4e2d',unlearned:'\u672a\u5b66\u4e60',normal:'\u666e\u901a',easy:'\u7b80\u5355',medium:'\u4e2d\u7b49',hard:'\u56f0\u96be'};
+var Z={home:'\u9996\u9875',path:'\u667a\u80fd\u5b66\u4e60\u8def\u5f84',resources:'\u5b66\u4e60\u8d44\u6e90\u5e93',mastery:'\u77e5\u8bc6\u70b9\u638c\u63e1\u5ea6',graph:'\u77e5\u8bc6\u56fe\u8c31',discuss:'\u95ee\u9898\u8ba8\u8bba',records:'\u5b66\u4e60\u8bb0\u5f55',video:'\u89c6\u9891',doc:'\u6587\u6863',exercise:'\u4e60\u9898',resource:'\u8d44\u6e90',weak:'\u9700\u5de9\u56fa',severe:'\u4e25\u91cd\u8584\u5f31',good:'\u826f\u597d',mastered:'\u5df2\u638c\u63e1',doing:'\u9700\u5de9\u56fa',unlearned:'\u672a\u5b66\u4e60',normal:'\u666e\u901a',easy:'\u7b80\u5355',medium:'\u4e2d\u7b49',hard:'\u56f0\u96be'};
 function esc(s){return String(s==null?'':s).replace(/[&<>"']/g,function(c){return {'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]})}
-function kpName(s){return String(s==null?'':s).replace(/^\s*\d+(?:\.\d+)+\s*/,'')||String(s==null?'':s)}
+function kpName(s){return String(s==null?'':s)}
 async function getJson(u){try{var r=await fetch(u);return await r.json()}catch(e){return {success:false,learning_path:[],fallback_path:[],resources:[],chapters:[],records:[],posts:[],nodes:[],edges:[],stats:{}}}}
 function cleanText(s){s=String(s==null?'':s);if(s.indexOf('\u6d93')>=0||s.indexOf('\u4e25\u91cd')>=0)return Z.severe;if(s.indexOf('\u9496')>=0||s.indexOf('\u8584\u5f31')>=0)return Z.weak;if(s.indexOf('\u5df2')>=0&&s.indexOf('\u638c')>=0)return Z.mastered;if(s.indexOf('\u826f')>=0)return Z.good;if(s.indexOf('\u8fdb')>=0||s.indexOf('\u675e')>=0)return Z.doing;if(s.indexOf('\u7459')>=0||s.indexOf('\u89c6')>=0)return Z.video;if(s.indexOf('\u93c2')>=0||s.indexOf('\u6587')>=0)return Z.doc;if(s.indexOf('\u4e60\u9898')>=0)return Z.exercise;return s}
 function normType(t){t=cleanText(t);return t===Z.video||t===Z.doc||t===Z.exercise?t:Z.resource}function diffText(v){return cleanText(v||Z.normal)}function statusClass(s){s=cleanText(s);return s===Z.weak||s===Z.severe?'bad':(s===Z.doing?'warn':'ok')}function bar(v,s){return '<div class="progress"><div class="bar '+statusClass(s)+'" style="width:'+Math.max(2,Math.min(100,(+v||0)*100))+'%"></div></div>'}function action(r){return normType(r.type)===Z.video?'/student/watch/'+encodeURIComponent(r.name||r.title||''):'/student/view/'+encodeURIComponent(r.name||r.title||'')}function displayKp(s){s=cleanText(s);if(/^\d+$/.test(s))return '\u7b2c'+s+'\u7ae0\u76f8\u5173\u77e5\u8bc6\u70b9';return kpName(s)}function displayTarget(d,steps){var t=String(d.target_kp||TARGET||'').trim();if(/^\d+$/.test(t))return '\u7b2c'+t+'\u7ae0\u76f8\u5173\u8584\u5f31\u77e5\u8bc6\u70b9';if(t)return displayKp(t);return steps&&steps[0]?displayKp(steps[0].name||steps[0].kp_id):'\u6839\u636e\u5f53\u524d\u8584\u5f31\u70b9\u81ea\u52a8\u63a8\u8350'}
-function codeOf(n){var m=String(n.id||n.label||'').match(/^(\d+(?:\.\d+)*)/);return m?m[1]:''}function wrapLabel(raw,chunk){raw=String(raw||'');chunk=chunk||6;var a=raw.match(new RegExp('.{1,'+chunk+'}','g'))||[raw];return a.join('\\\\n')}function buildLayeredGraph(rawNodes,rawEdges){var map=new Map(),edges=[];function add(n){if(!map.has(n.id))map.set(n.id,n);return map.get(n.id)}add({id:'root',label:'\u64cd\u4f5c\u7cfb\u7edf',drawLabel:'\u64cd\u4f5c\u7cfb\u7edf',level:-1,shape:'diamond',size:42,fontSize:18,mastery:1,levelName:'\u8bfe\u7a0b'});rawNodes.forEach(function(n){var code=codeOf(n),parts=code.split('.').filter(Boolean);if(parts.length){var ch='chapter-'+parts[0];add({id:ch,label:'\u7b2c'+parts[0]+'\u7ae0',drawLabel:'\u7b2c'+parts[0]+'\u7ae0',level:0,shape:'hexagon',size:38,fontSize:18,mastery:n.mastery||0,levelName:'\u7ae0\u8282'});edges.push({from:'root',to:ch,type:'\u5305\u542b'});if(parts.length>=2){var sec=parts[0]+'.'+parts[1];var secNode=rawNodes.find(function(x){return codeOf(x)===sec});add({id:sec,label:displayKp(secNode&&secNode.label||secNode&&secNode.id||sec),drawLabel:wrapLabel(displayKp(secNode&&secNode.label||secNode&&secNode.id||sec),5),level:1,shape:'box',size:24,fontSize:14,mastery:(secNode&&secNode.mastery)||n.mastery||0,total_questions:(secNode&&secNode.total_questions)||0,correct_questions:(secNode&&secNode.correct_questions)||0,levelName:'\u5927\u8282'});edges.push({from:ch,to:sec,type:'\u5305\u542b'});if(parts.length>=3){add({id:n.id,label:n.label||n.id,drawLabel:wrapLabel(displayKp(n.label||n.id),5),level:2,shape:'circle',size:20,fontSize:13,mastery:n.mastery||0,total_questions:n.total_questions||0,correct_questions:n.correct_questions||0,levelName:'\u77e5\u8bc6\u70b9'});edges.push({from:sec,to:n.id,type:'\u5305\u542b'})}}}else add({id:n.id,label:n.label||n.id,drawLabel:wrapLabel(displayKp(n.label||n.id),5),level:2,shape:'circle',size:20,fontSize:13,mastery:n.mastery||0,levelName:'\u77e5\u8bc6\u70b9'})});(rawEdges||[]).forEach(function(e){edges.push({from:e.from,to:e.to,type:cleanText(e.type||'\u76f8\u5173')})});var uniq=[],seen=new Set();edges.forEach(function(e){var k=e.from+'>'+e.to+'>'+e.type;if(e.from!==e.to&&!seen.has(k)&&map.has(e.from)&&map.has(e.to)){seen.add(k);uniq.push(e)}});return {nodes:Array.from(map.values()),edges:uniq}}
+function codeOf(n){var m=String(n.id||n.label||'').match(/^(\d+(?:\.\d+)*)/);return m?m[1]:''}function wrapLabel(raw,chunk,maxLines){raw=String(raw||'');chunk=chunk||6;maxLines=maxLines||2;var a=raw.match(new RegExp('.{1,'+chunk+'}','g'))||[raw];if(a.length>maxLines){a=a.slice(0,maxLines);a[maxLines-1]+='...'}return a.join('\\\\n')}function buildLayeredGraph(rawNodes,rawEdges){var map=new Map(),edges=[];function add(n){if(!map.has(n.id))map.set(n.id,n);return map.get(n.id)}add({id:'root',label:'\u64cd\u4f5c\u7cfb\u7edf',drawLabel:'\u64cd\u4f5c\u7cfb\u7edf',level:-1,shape:'diamond',size:42,fontSize:18,mastery:1,levelName:'\u8bfe\u7a0b'});rawNodes.forEach(function(n){var code=codeOf(n),parts=code.split('.').filter(Boolean);if(parts.length){var ch='chapter-'+parts[0];add({id:ch,label:'\u7b2c'+parts[0]+'\u7ae0',drawLabel:'\u7b2c'+parts[0]+'\u7ae0',level:0,shape:'hexagon',size:64,fontSize:13,mastery:n.mastery||0,levelName:'\u7ae0\u8282'});edges.push({from:'root',to:ch,type:'\u5305\u542b'});if(parts.length>=2){var sec=parts[0]+'.'+parts[1];var secNode=rawNodes.find(function(x){return codeOf(x)===sec});add({id:sec,label:displayKp(secNode&&secNode.label||secNode&&secNode.id||sec),drawLabel:wrapLabel(displayKp(secNode&&secNode.label||secNode&&secNode.id||sec),7,2),level:1,shape:'box',size:58,fontSize:14,mastery:(secNode&&secNode.mastery)||n.mastery||0,total_questions:(secNode&&secNode.total_questions)||0,correct_questions:(secNode&&secNode.correct_questions)||0,levelName:'\u5927\u8282'});edges.push({from:ch,to:sec,type:'\u5305\u542b'});if(parts.length>=3){add({id:n.id,label:n.label||n.id,drawLabel:wrapLabel(displayKp(n.label||n.id),6,2),level:2,shape:'circle',size:46,fontSize:13,mastery:n.mastery||0,total_questions:n.total_questions||0,correct_questions:n.correct_questions||0,levelName:'\u77e5\u8bc6\u70b9'});edges.push({from:sec,to:n.id,type:'\u5305\u542b'})}}}else add({id:n.id,label:n.label||n.id,drawLabel:wrapLabel(displayKp(n.label||n.id),6,2),level:2,shape:'circle',size:46,fontSize:13,mastery:n.mastery||0,levelName:'\u77e5\u8bc6\u70b9'})});(rawEdges||[]).forEach(function(e){edges.push({from:e.from,to:e.to,type:cleanText(e.type||'\u76f8\u5173')})});var uniq=[],seen=new Set();edges.forEach(function(e){var k=e.from+'>'+e.to+'>'+e.type;if(e.from!==e.to&&!seen.has(k)&&map.has(e.from)&&map.has(e.to)){seen.add(k);uniq.push(e)}});return {nodes:Array.from(map.values()),edges:uniq}}
 async function dashboard(){var d=await getJson('/student/dashboard/data'),r=await getJson('/student/resources/data'),st=d.stats||{};app.innerHTML='<div class="grid"><a class="stat" href="/student/mastery"><span>'+Z.mastered+'</span><b>'+(st.mastered||0)+'</b><span class="muted">'+Z.weak+' '+(st.weak||0)+'</span></a><a class="stat" href="/student/path"><span>'+Z.path+'</span><b>Start</b></a><a class="stat" href="/student/resources"><span>'+Z.resources+'</span><b>'+((r.resources||[]).length)+'</b></a><a class="stat" href="/student/graph"><span>'+Z.graph+'</span><b>Go</b></a></div>'}
 async function pathPage(){var d=await getJson('/student/path/data'+(TARGET?'?target_kp='+encodeURIComponent(TARGET):'')),steps=(d.learning_path&&d.learning_path.length?d.learning_path:(d.fallback_path||[])),target=displayTarget(d,steps);app.innerHTML='<div class="card"><h2>'+Z.path+'</h2><p class="muted">\u76ee\u6807\uff1a'+esc(target)+'</p></div><div class="card">'+(steps.map(function(st,i){var rs=st.resources||[],score=Number(st.score||st.mastery||0),status=cleanText(st.status||'\u5f85\u5b66\u4e60');return '<div class="path-step"><div class="no">'+(i+1)+'</div><div><b>'+esc(displayKp(st.name||st.title||st.kp_id||target))+'</b><div><span class="tag '+statusClass(status)+'">'+esc(status)+'</span><span class="tag">'+Z.mastery+' '+Math.round(score*100)+'%</span></div>'+bar(score,status)+'<p class="muted">'+esc(cleanText(st.reason||''))+'</p><div class="res-list">'+rs.map(function(r){return '<div class="res"><b>'+esc(r.title||r.name)+'</b><p><span class="tag">'+esc(normType(r.type))+'</span><span class="tag">'+esc(diffText(r.difficulty))+'</span></p><a class="btn light" href="'+action(r)+'">\u5b66\u4e60</a> <button class="btn green" disabled>\\u5b8c\\u6210</button><div class="muted after"></div></div>'}).join('')+'</div></div></div>'}).join('')||'<div class="empty">No data</div>')+'</div>'}
 async function completeResource(r,k,b){b.disabled=true;var d=await fetch('/student/resource/complete',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({resource_id:decodeURIComponent(r),kp_id:decodeURIComponent(k)})}).then(function(x){return x.json()}).catch(function(){return {success:false}});b.parentElement.querySelector('.after').textContent=d.success?'OK':'Done'}
@@ -5485,8 +5392,8 @@ async function resourcesPage(){var d=await getJson('/student/resources/data'),al
 async function mastery(){var d=await getJson('/student/mastery/data'),chs=d.chapters||[];app.innerHTML='<div class="card"><h2>'+Z.mastery+'</h2>'+(chs.map(function(ch){return '<details class="chapter" open><summary>'+esc(ch.title)+' ? '+((ch.knowledge_points||[]).length)+'</summary>'+(ch.knowledge_points||[]).map(function(k){var status=cleanText(k.status||'');return '<div class="kp-row"><div><b>'+esc(displayKp(k.name))+'</b><div class="muted">'+esc(status)+'</div></div><b>'+Math.round((k.score||0)*100)+'%</b>'+bar(k.score,status)+'</div>'}).join('')+'</details>'}).join('')||'<div class="empty">No data</div>')+'</div>'}
 async function records(){var d=await getJson('/student/records/data'),s=d.summary||{};app.innerHTML='<div class="grid"><div class="stat"><span>'+Z.video+'</span><b>'+(s.video||0)+'</b></div><div class="stat"><span>'+Z.doc+'</span><b>'+(s.document||0)+'</b></div></div><div class="card"><h2>'+Z.records+'</h2>'+((d.records||[]).map(function(r){return '<div class="row"><div><b>'+esc(r.name)+'</b><div class="muted">'+esc(displayKp(r.knowledge_point))+'</div></div><span class="tag">'+esc(normType(r.type))+'</span></div>'}).join('')||'<div class="empty">No data</div>')+'</div>'}
 async function discuss(){var d=await getJson('/student/discuss/list');app.innerHTML='<div class="card"><h2>'+Z.discuss+'</h2>'+(d.posts||[]).map(function(p){return '<div class="post"><div class="post-head"><b>'+esc(p.title)+'</b><span class="tag">'+esc(cleanText(p.status||''))+'</span></div><p>'+esc(p.body||'')+'</p></div>'}).join('')+'</div>'}async function myDiscussPage(){discuss()}
-async function graphPage(){var d=await getJson('/student/flow-graph/data'),built=buildLayeredGraph(d.nodes||[],d.edges||[]),nodes=built.nodes,edges=built.edges;app.innerHTML='<div class="card"><h2>'+Z.graph+'</h2><div class="muted"><b>\u989c\u8272 = \u5b66\u4e60\u72b6\u6001\uff1a</b><span class="tag ok">'+Z.mastered+'>=80%</span><span class="tag">'+Z.good+'>=60%</span><span class="tag warn">'+Z.doing+'>=40%</span><span class="tag bad">'+Z.weak+'&lt;40%</span><span class="tag">'+Z.unlearned+'</span><b style="margin-left:12px">\u8fb9\uff1a</b>\u5305\u542b / \u76f8\u5173 / \u5148\u4fee</div><div style="display:grid;grid-template-columns:minmax(0,1fr) 360px;gap:18px;margin-top:14px"><div style="position:relative"><div id="mynetwork" style="height:720px;border:1px solid #e5e7eb;background:#fafafa"></div><div style="position:absolute;right:18px;top:18px;width:62px;background:#fff;border:1px solid #dbe3ef;border-radius:14px;box-shadow:0 8px 24px rgba(15,23,42,.12);padding:10px;display:grid;gap:6px;place-items:center"><button class="btn light" style="width:40px;height:40px;padding:0" onclick="zoomGraph(.03)">+</button><input id="graphZoom" type="range" min="0" max="100" step="1" value="26" oninput="setGraphZoom(this.value)" style="writing-mode:vertical-lr;direction:rtl;-webkit-appearance:slider-vertical;appearance:slider-vertical;width:40px;height:250px;margin:0;touch-action:none"><button class="btn light" style="width:40px;height:40px;padding:0" onclick="zoomGraph(-.03)">-</button></div></div><div id="nodeDetail" class="res-card graph-detail"><b>\u8282\u70b9\u8be6\u60c5</b><p class="muted">\u5355\u51fb\u8282\u70b9\u67e5\u770b\u638c\u63e1\u5ea6\u3002</p></div></div></div>';if(!window.vis){document.getElementById('mynetwork').innerHTML='<div class="empty">vis load failed</div>';return}function color(m){return m>=.8?{background:'#d4f0dc',border:'#a8ddb8'}:m>=.6?{background:'#dbeafe',border:'#93c5fd'}:m>=.4?{background:'#ffedd5',border:'#fdba74'}:m>0?{background:'#fee2e2',border:'#fca5a5'}:{background:'#eceff1',border:'#cfd8dc'}}var visNodes=new vis.DataSet(nodes.map(function(n){return {id:n.id,label:n.drawLabel||displayKp(n.label||n.id),shape:n.shape,size:n.size,color:n.id==='root'?{background:'#1f2937',border:'#111827'}:color(n.mastery||0),font:{size:n.fontSize,face:'Microsoft YaHei',color:n.id==='root'?'#fff':'#111827',bold:true,multi:true},borderWidth:n.level<=0?4:3,mass:n.level<=0?6:(n.level===1?3:1),widthConstraint:n.shape==='box'?{minimum:120,maximum:150}:undefined,heightConstraint:n.shape==='box'?{minimum:60}:undefined}}));var visEdges=new vis.DataSet(edges.map(function(e,i){return {id:i,from:e.from,to:e.to,arrows:'to',color:{color:e.type==='\u5148\u4fee'?'#9b59b6':(e.type==='\u76f8\u5173'?'#f59e0b':'#94a3b8')},dashes:e.type!=='\u5305\u542b',width:e.type==='\u5305\u542b'?2.2:1.7,smooth:{type:'dynamic'}}}));var network=new vis.Network(document.getElementById('mynetwork'),{nodes:visNodes,edges:visEdges},{physics:{solver:'forceAtlas2Based',forceAtlas2Based:{gravitationalConstant:-240,centralGravity:.018,springLength:170,springConstant:.04,avoidOverlap:1},stabilization:{iterations:600}},interaction:{zoomView:true,dragView:true,dragNodes:true}});window.graphNetwork=network;window.graphZoomMin=.24;window.graphZoomMax=.55;window.graphScale=.32;network.once('stabilizationIterationsDone',function(){network.stopSimulation();applyGraphZoom(.32,true)});network.on('click',function(p){var id=p.nodes&&p.nodes[0],n=nodes.find(function(x){return x.id===id});if(!n)return;var m=Number(n.mastery||0),state=m>=.8?Z.mastered:m>=.6?Z.good:m>=.4?Z.doing:m>0?Z.weak:Z.unlearned;document.getElementById('nodeDetail').innerHTML='<b>'+esc(displayKp(n.label||n.id))+'</b><p><span class="tag '+statusClass(state)+'">'+state+'</span><span class="tag">'+Z.mastery+' '+Math.round(m*100)+'%</span></p>'+bar(m,state)+'<p class="muted">'+esc(n.levelName||'')+'</p>'})}
-function graphSliderToScale(v){var min=window.graphZoomMin||.24,max=window.graphZoomMax||.55,t=Math.max(0,Math.min(100,parseFloat(v)||0))/100;return min+(max-min)*t}function graphScaleToSlider(s){var min=window.graphZoomMin||.24,max=window.graphZoomMax||.55;return Math.round((Math.max(min,Math.min(max,parseFloat(s)||min))-min)/(max-min)*100)}function applyGraphZoom(scale,animate){var min=window.graphZoomMin||.24,max=window.graphZoomMax||.55;window.graphScale=Math.max(min,Math.min(max,parseFloat(scale)||.32));if(window.graphNetwork)window.graphNetwork.moveTo({position:window.graphNetwork.getViewPosition(),scale:window.graphScale,animation:animate?{duration:120,easingFunction:'easeInOutQuad'}:{duration:0}});var z=document.getElementById('graphZoom');if(z)z.value=graphScaleToSlider(window.graphScale)}function setGraphZoom(v){applyGraphZoom(graphSliderToScale(v),false)}function zoomGraph(delta){applyGraphZoom((window.graphScale||.32)+delta,true)}async function graphBuilder(){graphPage()}
+async function graphPage(){var d=await getJson('/student/flow-graph/data'),built=buildLayeredGraph(d.nodes||[],d.edges||[]),nodes=built.nodes,edges=built.edges;app.innerHTML='<div class="card"><h2>'+Z.graph+'</h2><div class="muted"><b>\u989c\u8272 = \u5b66\u4e60\u72b6\u6001\uff1a</b><span class="tag ok">'+Z.mastered+'>=85%</span><span class="tag">'+Z.good+'>=60%</span><span class="tag warn">'+Z.weak+'1~59%</span><span class="tag bad">'+Z.unlearned+'0%</span><b style="margin-left:12px">\u8fb9\uff1a</b>\u5305\u542b / \u76f8\u5173 / \u5148\u4fee</div><div style="display:grid;grid-template-columns:minmax(0,1fr) 360px;gap:18px;margin-top:14px"><div style="position:relative"><div id="mynetwork" style="height:720px;border:1px solid #e5e7eb;background:#fafafa"></div><div style="position:absolute;right:18px;top:18px;width:62px;background:#fff;border:1px solid #dbe3ef;border-radius:14px;box-shadow:0 8px 24px rgba(15,23,42,.12);padding:10px;display:grid;gap:6px;place-items:center"><button class="btn light" style="width:40px;height:40px;padding:0" onclick="zoomGraph(.03)">+</button><input id="graphZoom" type="range" min="0" max="100" step="1" value="13" oninput="setGraphZoom(this.value)" style="writing-mode:vertical-lr;direction:rtl;-webkit-appearance:slider-vertical;appearance:slider-vertical;width:40px;height:250px;margin:0;touch-action:none"><button class="btn light" style="width:40px;height:40px;padding:0" onclick="zoomGraph(-.03)">-</button></div></div><div id="nodeDetail" class="res-card graph-detail"><b>\u8282\u70b9\u8be6\u60c5</b><p class="muted">\u5355\u51fb\u8282\u70b9\u67e5\u770b\u638c\u63e1\u5ea6\u3002</p></div></div></div>';if(!window.vis){document.getElementById('mynetwork').innerHTML='<div class="empty">vis load failed</div>';return}function color(m){return m>=.85?{background:'#d4f0dc',border:'#a8ddb8'}:m>=.6?{background:'#dbeafe',border:'#93c5fd'}:m>0?{background:'#fce7f3',border:'#f9a8d4'}:{background:'#f3e8ff',border:'#d8b4fe'}}var visNodes=new vis.DataSet(nodes.map(function(n){return {id:n.id,label:n.drawLabel||displayKp(n.label||n.id),shape:n.shape,size:n.size,color:n.id==='root'?{background:'#1f2937',border:'#111827'}:color(n.mastery||0),font:{size:n.fontSize,face:'Microsoft YaHei',color:n.id==='root'?'#fff':'#111827',bold:true,multi:true},borderWidth:n.level<=0?4:3,mass:n.level<=0?6:(n.level===1?3:1)}}));var visEdges=new vis.DataSet(edges.map(function(e,i){return {id:i,from:e.from,to:e.to,arrows:'to',color:{color:e.type==='\u5148\u4fee'?'#9b59b6':(e.type==='\u76f8\u5173'?'#f59e0b':'#94a3b8')},dashes:e.type!=='\u5305\u542b',width:e.type==='\u5305\u542b'?2.2:1.7,smooth:{type:'dynamic'}}}));var network=new vis.Network(document.getElementById('mynetwork'),{nodes:visNodes,edges:visEdges},{physics:{solver:'forceAtlas2Based',forceAtlas2Based:{gravitationalConstant:-240,centralGravity:.018,springLength:170,springConstant:.04,avoidOverlap:1},stabilization:{iterations:600}},interaction:{zoomView:true,dragView:true,dragNodes:true}});window.graphNetwork=network;window.graphZoomMin=.24;window.graphZoomMax=.55;window.graphScale=.28;network.once('stabilizationIterationsDone',function(){network.stopSimulation();applyGraphZoom(.28,true)});network.on('click',function(p){var id=p.nodes&&p.nodes[0],n=nodes.find(function(x){return x.id===id});if(!n)return;var m=Number(n.mastery||0),state=m>=.85?Z.mastered:m>=.6?Z.good:m>0?Z.weak:Z.unlearned;document.getElementById('nodeDetail').innerHTML='<b>'+esc(displayKp(n.label||n.id))+'</b><p><span class="tag '+statusClass(state)+'">'+state+'</span><span class="tag">'+Z.mastery+' '+Math.round(m*100)+'%</span></p>'+bar(m,state)+'<p class="muted">'+esc(n.levelName||'')+'</p>'})}
+function graphSliderToScale(v){var min=window.graphZoomMin||.24,max=window.graphZoomMax||.55,t=Math.max(0,Math.min(100,parseFloat(v)||0))/100;return min+(max-min)*t}function graphScaleToSlider(s){var min=window.graphZoomMin||.24,max=window.graphZoomMax||.55;return Math.round((Math.max(min,Math.min(max,parseFloat(s)||min))-min)/(max-min)*100)}function applyGraphZoom(scale,animate){var min=window.graphZoomMin||.24,max=window.graphZoomMax||.55;window.graphScale=Math.max(min,Math.min(max,parseFloat(scale)||.28));if(window.graphNetwork)window.graphNetwork.moveTo({position:window.graphNetwork.getViewPosition(),scale:window.graphScale,animation:animate?{duration:120,easingFunction:'easeInOutQuad'}:{duration:0}});var z=document.getElementById('graphZoom');if(z)z.value=graphScaleToSlider(window.graphScale)}function setGraphZoom(v){applyGraphZoom(graphSliderToScale(v),false)}function zoomGraph(delta){applyGraphZoom((window.graphScale||.28)+delta,true)}async function graphBuilder(){graphPage()}
 if(PAGE==='dashboard')dashboard();if(PAGE==='path')pathPage();if(PAGE==='resources')resourcesPage();if(PAGE==='mastery')mastery();if(PAGE==='records')records();if(PAGE==='discuss')discuss();if(PAGE==='my_discuss')myDiscussPage();if(PAGE==='graph')graphPage();if(PAGE==='graph_builder')graphBuilder();
 </script></body></html>
 """
@@ -5537,13 +5444,14 @@ def _safe_points(student_id):
 
 def _safe_resources():
     items = []
-    if not os.path.exists(RESOURCE_DIR):
+    teaching_dir = TEACHING_MATERIALS_DIR
+    if not os.path.isdir(teaching_dir):
         return items
-    for f in os.listdir(RESOURCE_DIR):
-        if f in {"questions.json", "question_history.json"} or f.endswith(".bak"):
+    for entry in os.scandir(teaching_dir):
+        if not entry.is_file():
             continue
-        path = os.path.join(RESOURCE_DIR, f)
-        if not os.path.isfile(path):
+        f = entry.name
+        if f == "resource_manifest.json" or f.endswith(".bak"):
             continue
         code = flow_resource_code(f) or _kp_code(f)
         info = infer_resource_info(f)
@@ -5554,8 +5462,8 @@ def _safe_resources():
             "type": flow_resource_type(f),
             "difficulty": flow_resource_difficulty(f),
             "knowledge_point": code,
-            "chapter_label": ("\u7b2c%s\u7ae0" % ch) if ch else "未分类",
-            "section_label": ("%s.%s" % (info.get("ch"), info.get("big"))) if info.get("ch") and info.get("big") else ("整章" if info.get("ch") else "未分类"),
+            "chapter_label": ("第%s章" % ch) if ch else "待分类",
+            "section_label": ("%s.%s" % (info.get("ch"), info.get("big"))) if info.get("ch") and info.get("big") else ("整章" if info.get("ch") else "待分类"),
             "resource_id": f,
         })
     return items
@@ -5589,7 +5497,7 @@ def _safe_path_response():
         code = _kp_code(p["name"])
         rel = [r for r in resources if r.get("knowledge_point") and (code.startswith(r["knowledge_point"]) or r["knowledge_point"].startswith(code))]
         if not rel:
-            rel = resources[:3]
+            continue
         steps.append({
             "kp_id": p["name"],
             "name": p["name"],
@@ -5658,19 +5566,19 @@ def render_teacher_workspace(initial_tab="overview", page_title="教师工作台
 <style>
 *{box-sizing:border-box}body{margin:0;background:#f3f5f8;color:#152238;font-family:"Microsoft YaHei",Arial,sans-serif}.layout{display:grid;grid-template-columns:226px 1fr;min-height:100vh}.side{background:#fff;border-right:1px solid #e5e7eb;padding:20px 0;position:sticky;top:0;height:100vh}.brand{padding:0 24px 22px;font-size:21px;font-weight:800}.brand small{display:block;color:#64748b;font-size:12px;margin-top:6px}.nav a{display:block;text-decoration:none;color:#4b5563;padding:13px 28px;border-left:3px solid transparent;font-size:16px}.nav a:hover,.nav a.active{background:#eef4ff;color:#2563eb;border-left-color:#60a5fa}.logout{position:absolute;bottom:20px;left:20px;right:20px}.logout a{display:block;text-align:center;background:#eef4ff;color:#2563eb;padding:10px;border-radius:6px;text-decoration:none;font-weight:700}.top{height:64px;background:#fff;border-bottom:1px solid #e5e7eb;display:flex;align-items:center;justify-content:space-between;padding:0 34px}.top h1{font-size:22px;margin:0}.content{padding:26px 34px;max-width:1480px}.card{background:#fff;border:1px solid #e5e7eb;border-radius:8px;padding:20px;margin-bottom:16px}.grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(220px,1fr));gap:14px}.stat{background:#fff;border:1px solid #e5e7eb;border-radius:8px;padding:18px}.stat b{display:block;font-size:30px;margin-top:8px}.muted{color:#64748b;font-size:13px;line-height:1.7}.btn{border:0;background:#2563eb;color:#fff;border-radius:6px;padding:8px 13px;text-decoration:none;cursor:pointer;display:inline-block;font-weight:700}.btn.light{background:#eef4ff;color:#2563eb;border:1px solid #dbeafe}.btn.green{background:#16a34a}.btn.danger{background:#ef4444}.btn.back{font-size:15px;padding:10px 15px;margin-bottom:12px}.toolbar{display:flex;gap:10px;flex-wrap:wrap;margin-bottom:14px}select,input,textarea{border:1px solid #cbd5e1;border-radius:6px;background:#fff;padding:9px 11px}.search{min-width:280px}.table-wrap{max-height:calc(100vh - 230px);overflow:auto}.table{width:100%;border-collapse:collapse}.table th,.table td{padding:11px;border-bottom:1px solid #eef2f7;text-align:left;vertical-align:top}.table th{background:#f8fafc;color:#475569;font-weight:700;cursor:pointer;position:sticky;top:0;z-index:1}.sort-tri{display:inline-block;margin-left:6px;width:0;height:0;vertical-align:middle}.sort-tri.up{border-left:5px solid transparent;border-right:5px solid transparent;border-bottom:8px solid #2563eb}.sort-tri.down{border-left:5px solid transparent;border-right:5px solid transparent;border-top:8px solid #2563eb}.tag{font-size:12px;border-radius:999px;background:#eef2ff;color:#3730a3;padding:4px 8px;display:inline-block;margin:0 4px 4px 0}.tag.ok{background:#dcfce7;color:#166534}.tag.warn{background:#fff7ed;color:#9a3412}.tag.bad{background:#fee2e2;color:#991b1b}.bar{height:8px;background:#e5e7eb;border-radius:99px;overflow:hidden;width:130px}.bar span{display:block;height:100%;background:#2563eb}.split{display:grid;grid-template-columns:minmax(0,1fr) 360px;gap:16px}.empty{padding:34px;text-align:center;color:#94a3b8;border:1px dashed #cbd5e1;border-radius:8px}.modal{display:none;position:fixed;inset:0;background:rgba(15,23,42,.45);z-index:50;align-items:center;justify-content:center}.modal.open{display:flex}.dialog{background:#fff;border-radius:8px;width:420px;max-width:92vw;padding:22px}.dialog label{display:block;font-size:13px;color:#475569;margin:12px 0 5px}.dialog input,.dialog textarea{width:100%}.graph-detail .bar{width:100%}@media(max-width:960px){.layout{grid-template-columns:1fr}.side{position:relative;height:auto}.logout{position:relative}.split{grid-template-columns:1fr}.content{padding:18px}}
 </style></head><body><div class="layout"><aside class="side"><div class="brand">教师工作台<small>{{ teacher_name }}</small></div><nav class="nav">
-<a class="{% if initial_tab == 'overview' %}active{% endif %}" href="/teacher/tools">工作台总览</a><a class="{% if initial_tab == 'students' %}active{% endif %}" href="/teacher/manage">学生管理</a><a class="{% if initial_tab == 'profiles' %}active{% endif %}" href="/teacher/students">学生画像</a><a class="{% if initial_tab == 'resourceManage' %}active{% endif %}" href="/teacher/resource-manage">资源管理</a><a class="{% if initial_tab == 'questionBank' %}active{% endif %}" href="/teacher/question-bank">题库管理</a><a class="{% if initial_tab == 'graph' %}active{% endif %}" href="/teacher/graph-tools">公共图谱</a><a href="/teacher/discuss">问题讨论</a>
+<a class="{% if initial_tab == 'overview' %}active{% endif %}" href="/teacher/tools">工作台总览</a><a class="{% if initial_tab == 'students' %}active{% endif %}" href="/teacher/manage">学生管理</a><a class="{% if initial_tab == 'profiles' %}active{% endif %}" href="/teacher/students">学生画像</a><a class="{% if initial_tab == 'resourceManage' %}active{% endif %}" href="/teacher/resource-manage">资源管理</a><a class="{% if initial_tab == 'questionBank' %}active{% endif %}" href="/teacher/question-bank">题库管理</a><a class="{% if initial_tab == 'graph' %}active{% endif %}" href="/teacher/graph-tools">知识图谱</a><a href="/teacher/discuss">问题讨论</a>
 </nav><div class="logout"><a href="/logout">退出登录</a></div></aside><main><header class="top"><h1 id="pageTitle">{{ page_title }}</h1><span class="muted">操作系统课程管理</span></header><section class="content"><div id="app"><div class="empty">加载中...</div></div></section></main></div>
 <div class="modal" id="questionModal"><div class="dialog" style="width:720px"><h3 id="qTitle">添加题目</h3><label>题目内容</label><textarea id="qText" rows="4"></textarea><label>知识点</label><input id="qKp" list="kpOptions" oninput="filterKpOptions(this.value)" placeholder="输入关键词后选择知识点"><datalist id="kpOptions"></datalist><label>难度</label><select id="qDifficulty"><option value="easy">简单</option><option value="medium">中等</option><option value="hard">困难</option></select><label>选项和答案</label><div id="optionEditor"></div><label>解析</label><textarea id="qExplain" rows="3"></textarea><input id="qId" type="hidden"><div style="margin-top:16px;text-align:right"><button class="btn light" onclick="questionModal.classList.remove('open')">取消</button> <button class="btn green" onclick="saveQuestion()">保存</button></div></div></div>
 <div class="modal" id="studentModal"><div class="dialog"><h3 id="studentModalTitle">添加学生</h3><input id="editStudentId" type="hidden"><label>学号</label><input id="studentNum"><label>姓名</label><input id="studentName"><div style="margin-top:16px;text-align:right"><button class="btn light" onclick="closeStudentModal()">取消</button> <button class="btn green" onclick="saveStudent()">保存</button></div></div></div>
 <script>
 let DATA={students:[],summary:{},levels:{},weak_rank:[],resources:{types:{},recent:[]},questions:{difficulty:{},recent:[]}}, TAB="{{ initial_tab }}", SID=new URLSearchParams(location.search).get('sid')||'';let SORT={students:['num',1],profiles:['num',1],kp:['name',1],resources:['name',1],questions:['id',1]},KPS=[];
-const app=document.getElementById('app'), esc=s=>String(s??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c])), pct=v=>Math.round((Number(v)||0)*100)+'%', kpName=s=>String(s??'').replace(/^\s*\d+(?:\.\d+)+\s*/,'')||String(s??'');
+const app=document.getElementById('app'), esc=s=>String(s==null?'':s).replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c])), pct=v=>Math.round((Number(v)||0)*100)+'%', kpName=s=>String(s==null?'':s).replace(/^\s*\d+(?:\.\d+)+\s*/,'')||String(s==null?'':s);
 const diffText=d=>({easy:'简单',medium:'中等',hard:'困难','简单':'简单','中等':'中等','困难':'困难'}[d]||d||'中等'), levelClass=l=>String(l).includes('优秀')||String(l).includes('良好')?'ok':(String(l).includes('中')?'warn':'bad');
-function normSearch(s){return String(s??'').toLowerCase().replace(/\s+/g,'')}function bar(v){return `<div class="bar"><span style="width:${pct(v)}"></span></div>`}
+function normSearch(s){return String(s==null?'':s).toLowerCase().replace(/\s+/g,'')}function bar(v){return `<div class="bar"><span style="width:${pct(v)}"></span></div>`}
 function sorted(list,type,key){let cur=SORT[type]||[key,1],dir=cur[0]===key?-cur[1]:1;SORT[type]=[key,dir];return [...list].sort((a,b)=>{let x=a[key]??'',y=b[key]??'';if(typeof x==='number'||typeof y==='number')return ((Number(x)||0)-(Number(y)||0))*dir;return String(x).localeCompare(String(y),'zh-Hans',{numeric:true})*dir})}
 function th(type,key,label){let cur=SORT[type]||[],mark=cur[0]===key?`<span class="sort-tri ${cur[1]===1?'up':'down'}"></span>`:'';return `<th onclick="sortBy('${type}','${key}')">${label}${mark}</th>`}
 function sortBy(type,key){if(type==='students')renderStudents(sorted(window.STUDENT_LIST||DATA.students,type,key));if(type==='profiles')renderProfilesTable(sorted(window.PROFILE_LIST||DATA.students,type,key));if(type==='kp')renderKpRows(sorted(window.KP_LIST||[],type,key));if(type==='resources')renderResourceTable(window.RESOURCE_LIST=sorted(window.RESOURCE_LIST||[],type,key));if(type==='questions')renderQuestionTable(window.QUESTION_LIST=sorted(window.QUESTION_LIST||[],type,key))}
-async function loadData(){DATA=await fetch('/teacher/tools/data').then(r=>r.json());try{KPS=(await fetch('/teacher/knowledge-points/data').then(r=>r.json())).points||[]}catch(e){KPS=[]}render()}
+async function loadData(){try{let r=await fetch('/teacher/tools/data');if(!r.ok)throw new Error('HTTP '+r.status);DATA=await r.json();}catch(e){console.error('loadData error:',e);DATA={students:[],summary:{student_count:0,avg_mastery:0,avg_accuracy:0,weak_student_count:0,resource_count:0,question_count:0},levels:{},weak_rank:[],resources:{types:{}},questions:{difficulty:{}}};app.innerHTML='<div class="card"><h3>数据加载失败</h3><p>无法连接服务器或数据加载超时，请刷新页面重试。</p><button class="btn" onclick="location.reload()">刷新页面</button></div>';return;}try{KPS=(await fetch('/teacher/knowledge-points/data').then(r=>r.json())).points||[]}catch(e){KPS=[]}render()}
 function render(){({overview,students,profiles,resourceManage,questionBank,graph}[TAB]||overview)()}
 function overview(){let s=DATA.summary||{}, weak=(DATA.weak_rank||[]).slice(0,6),lv=DATA.levels||{},rt=(DATA.resources||{}).types||{},qd=(DATA.questions||{}).difficulty||{};let statList=(o,map=x=>x)=>Object.keys(o).map(k=>`<div style="display:flex;justify-content:space-between;border-top:1px solid #eef2f7;padding:9px 0"><span>${esc(map(k))}</span><b>${o[k]}</b></div>`).join('')||'<div class="empty">暂无数据</div>';app.innerHTML=`<div class="grid"><div class="stat">学生人数<b>${s.student_count||0}</b><span class="muted">当前班级</span></div><div class="stat">平均掌握度<b>${pct(s.avg_mastery)}</b><span class="muted">基于知识点画像</span></div><div class="stat">薄弱学生<b>${s.weak_student_count||0}</b><span class="muted">掌握度低于70%</span></div><div class="stat">资源 / 题目<b>${s.resource_count||0} / ${s.question_count||0}</b><span class="muted">课程材料规模</span></div></div><div class="split"><div class="card"><h2>重点关注学生</h2>${studentRows((DATA.students||[]).slice(0,6),false)}</div><div class="card"><h2>共性薄弱知识点</h2>${weak.map(x=>`<div style="display:flex;justify-content:space-between;border-top:1px solid #eef2f7;padding:11px 0"><span>${esc(kpName(x.name))}</span><b>${x.count}人</b></div>`).join('')||'<div class="empty">暂无薄弱统计</div>'}</div></div><div class="grid"><div class="card"><h2>等级分布</h2>${statList(lv)}</div><div class="card"><h2>资源类型</h2>${statList(rt)}</div><div class="card"><h2>题目难度</h2>${statList(qd,diffText)}</div></div>`}
 function studentRows(list,withActions=true){let heads=withActions?`${th('students','num','学号')}${th('students','name','姓名')}${th('students','level','等级')}${th('students','avg_mastery','掌握度')}${th('students','accuracy','正确率')}`:'<th>学号</th><th>姓名</th><th>等级</th><th>掌握度</th><th>正确率</th>';return `<table class="table"><thead><tr>${heads}<th>薄弱点</th>${withActions?'<th>操作</th>':''}</tr></thead><tbody>${list.map(st=>`<tr><td>${esc(st.num)}</td><td><b>${esc(st.name)}</b></td><td><span class="tag ${levelClass(st.level)}">${esc(st.level)}</span></td><td>${pct(st.avg_mastery)}${bar(st.avg_mastery)}</td><td>${pct(st.accuracy)}</td><td>${(st.weak_points||[]).slice(0,3).map(w=>`<span class="tag bad">${esc(kpName(w.name))} ${pct(w.mastery)}</span>`).join('')||'<span class="muted">暂无</span>'}</td>${withActions?`<td><button class="btn light" onclick="openProfile('${esc(st.id)}')">详情</button> <button class="btn light" onclick="openEditStudent('${esc(st.id)}','${esc(st.num)}','${esc(st.name)}')">编辑</button> <button class="btn danger" onclick="deleteStudent('${esc(st.id)}')">删除</button></td>`:''}</tr>`).join('')}</tbody></table>`}
@@ -5695,6 +5603,13 @@ loadData();
     """
     return render_template_string(html, teacher_name=session.get("user_name", "教师"), initial_tab=initial_tab, page_title=page_title)
 
+def teacher_discuss_final():
+    if session.get("role") != "teacher":
+        return redirect(url_for("login"))
+    return render_teacher_workspace("discuss", "问题讨论")
+
+app.view_functions["teacher_discuss"] = teacher_discuss_final
+
 def teacher_students_new():
     return render_teacher_workspace("profiles", "学生画像")
 
@@ -5711,30 +5626,30 @@ STUDENT_FLOW_HTML = r"""
 <!doctype html><html lang="zh-CN"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
 <title>{{ page_title }} - 操作系统</title><script src="https://cdn.jsdelivr.net/npm/vis-network@9.1.2/standalone/umd/vis-network.min.js"></script>
 <style>
-*{box-sizing:border-box}body{margin:0;background:#f3f5f8;color:#111827;font-family:"Microsoft YaHei",Arial,sans-serif}.layout{display:grid;grid-template-columns:216px 1fr;min-height:100vh}.side{background:#fff;border-right:1px solid #e5e7eb;padding:22px 0;position:sticky;top:0;height:100vh}.brand{padding:0 24px 24px;font-size:20px;font-weight:800}.nav a{display:block;padding:13px 28px;color:#4b5563;text-decoration:none;border-left:3px solid transparent}.nav a.active,.nav a:hover{background:#eef4ff;color:#2563eb;border-left-color:#60a5fa}.logout{position:absolute;left:20px;right:20px;bottom:20px}.logout a{display:block;text-align:center;padding:10px;border-radius:6px;background:#eef4ff;color:#2563eb;text-decoration:none;font-weight:700}.top{height:64px;background:#fff;border-bottom:1px solid #e5e7eb;display:flex;align-items:center;justify-content:space-between;padding:0 34px}.top h1{margin:0;font-size:22px}.content{padding:28px 36px;max-width:1500px}.card{background:#fff;border:1px solid #e5e7eb;border-radius:8px;padding:20px;margin-bottom:16px}.grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(230px,1fr));gap:14px}.stat,.res,.res-card{background:#fff;border:1px solid #e5e7eb;border-radius:8px;padding:14px}.stat b{display:block;font-size:30px;margin-top:8px}.muted{color:#64748b;font-size:14px;line-height:1.7}.btn{border:0;background:#2563eb;color:#fff;border-radius:6px;padding:8px 13px;text-decoration:none;cursor:pointer;display:inline-block}.btn.light{background:#eef4ff;color:#2563eb;border:1px solid #dbeafe}.btn.green{background:#16a34a}.tag{font-size:12px;border-radius:999px;background:#eef2ff;color:#3730a3;padding:4px 8px;margin:3px;display:inline-block}.tag.ok{background:#ecfdf5;color:#166534}.tag.warn{background:#fff7ed;color:#9a3412}.tag.bad{background:#fee2e2;color:#991b1b}.progress{height:10px;background:#e5e7eb;border-radius:99px;overflow:hidden;width:320px}.bar{height:100%;background:#22c55e}.bar.warn{background:#f59e0b}.bar.bad{background:#ef4444}.path-step{display:grid;grid-template-columns:38px 1fr;gap:14px;border-top:1px solid #eef2f7;padding:18px 0}.no{width:30px;height:30px;border-radius:50%;background:#2563eb;color:#fff;display:grid;place-items:center;font-weight:800}.res-list,.res-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(230px,1fr));gap:10px}.row{display:flex;justify-content:space-between;gap:12px;align-items:center;border-top:1px solid #eef2f7;padding:12px 0}.chapter{border:1px solid #e5e7eb;border-radius:8px;margin:10px 0;overflow:hidden}.chapter summary{background:#f8fafc;padding:14px 16px;cursor:pointer;font-weight:700}.section{border-top:1px solid #eef2f7}.section summary{background:#fff;padding:12px 20px;color:#475569}.kp-row{display:grid;grid-template-columns:minmax(220px,1fr) 88px 340px;gap:14px;align-items:center;border-top:1px solid #eef2f7;padding:12px 22px}.empty{padding:34px;text-align:center;color:#94a3b8;border:1px dashed #cbd5e1;border-radius:8px}.search,input,select,textarea{border:1px solid #cbd5e1;border-radius:6px;background:#fff;padding:9px 11px}.search{min-width:280px}.toolbar{display:flex;gap:10px;flex-wrap:wrap;margin:12px 0}.post{border-top:1px solid #eef2f7;padding:14px 0;cursor:pointer}.post-head{display:flex;justify-content:space-between;gap:12px}.comment{border-top:1px solid #eef2f7;padding:10px 0}.record-timeline{display:grid;gap:10px}.record-card{display:grid;grid-template-columns:80px minmax(0,1fr) 140px;gap:12px;align-items:center;border-top:1px solid #eef2f7;padding:12px 0}.graph-detail{min-width:0}.graph-detail .progress{width:100%;min-width:0}@media(max-width:900px){.layout{grid-template-columns:1fr}.side{height:auto;position:relative}.logout{position:relative}.content{padding:18px}.kp-row,.path-step,.record-card{grid-template-columns:1fr}.progress{width:100%}}
-</style></head><body><div class="layout"><aside class="side"><div class="brand">操作系统</div><nav class="nav"><a href="/student/dashboard" class="{% if active_page=='dashboard' %}active{% endif %}">首页</a><a href="/student/path" class="{% if active_page=='path' %}active{% endif %}">智能学习路径</a><a href="/student/resources" class="{% if active_page=='resources' %}active{% endif %}">学习资源库</a><a href="/student/mastery" class="{% if active_page=='mastery' %}active{% endif %}">知识点掌握度</a><a href="/student/graph" class="{% if active_page=='graph' %}active{% endif %}">知识图谱</a><a href="/student/discuss" class="{% if active_page=='discuss' %}active{% endif %}">问题讨论</a><a href="/student/records" class="{% if active_page=='records' %}active{% endif %}">学习记录</a></nav><div class="logout"><a href="/logout">退出登录</a></div></aside><main><header class="top"><h1>{{ page_title }}</h1><div>{{ student_name }}</div></header><section class="content" id="app"></section></main></div>
+*{box-sizing:border-box}body{margin:0;background:#f3f5f8;color:#111827;font-family:"Microsoft YaHei",Arial,sans-serif}.layout{display:grid;grid-template-columns:216px 1fr;min-height:100vh}.side{background:#1e293b;border-right:1px solid #334155;padding:0;position:sticky;top:0;height:100vh;display:flex;flex-direction:column}.brand{padding:20px 16px 8px;font-size:14px;font-weight:600;color:#f1f5f9;border-bottom:1px solid #334155}.student{padding:4px 16px 16px;font-size:12px;color:#94a3b8}.nav a{display:block;padding:10px 16px;color:#94a3b8;text-decoration:none;border-left:3px solid transparent;font-size:13px}.nav a.active,.nav a:hover{background:#1e3a5f;color:#60a5fa;border-left-color:#3b82f6}.logout{position:absolute;left:16px;right:16px;bottom:16px;border-top:1px solid #334155;padding-top:12px}.logout a{display:block;text-align:center;padding:8px;border-radius:4px;background:#dc2626;color:#fff;text-decoration:none;font-weight:600;font-size:13px}.logout a:hover{background:#b91c1c}.top{height:64px;background:#fff;border-bottom:1px solid #e5e7eb;display:flex;align-items:center;justify-content:space-between;padding:0 34px}.top h1{margin:0;font-size:22px}.content{padding:28px 36px;max-width:1500px}.card{background:#fff;border:1px solid #e5e7eb;border-radius:8px;padding:20px;margin-bottom:16px}.grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(230px,1fr));gap:14px}.stat,.res,.res-card{background:#fff;border:1px solid #e5e7eb;border-radius:8px;padding:14px}.stat b{display:block;font-size:30px;margin-top:8px}.muted{color:#64748b;font-size:14px;line-height:1.7}.btn{border:0;background:#2563eb;color:#fff;border-radius:6px;padding:8px 13px;text-decoration:none;cursor:pointer;display:inline-block}.btn.light{background:#eef4ff;color:#2563eb;border:1px solid #dbeafe}.btn.green{background:#16a34a}.tag{font-size:12px;border-radius:999px;background:#eef2ff;color:#3730a3;padding:4px 8px;margin:3px;display:inline-block}.tag.ok{background:#ecfdf5;color:#166534}.tag.warn{background:#fff7ed;color:#9a3412}.tag.bad{background:#fee2e2;color:#991b1b}.progress{height:10px;background:#e5e7eb;border-radius:99px;overflow:hidden;width:320px}.bar{height:100%;background:#22c55e}.bar.warn{background:#f59e0b}.bar.bad{background:#ef4444}.path-step{display:grid;grid-template-columns:38px 1fr;gap:14px;border-top:1px solid #eef2f7;padding:18px 0}.no{width:30px;height:30px;border-radius:50%;background:#2563eb;color:#fff;display:grid;place-items:center;font-weight:800}.res-list,.res-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(230px,1fr));gap:10px}.row{display:flex;justify-content:space-between;gap:12px;align-items:center;border-top:1px solid #eef2f7;padding:12px 0}.chapter{border:1px solid #e5e7eb;border-radius:8px;margin:10px 0;overflow:hidden}.chapter summary{background:#f8fafc;padding:14px 16px;cursor:pointer;font-weight:700}.section{border-top:1px solid #eef2f7}.section summary{background:#fff;padding:12px 20px;color:#475569}.kp-row{display:grid;grid-template-columns:minmax(220px,1fr) 88px 340px;gap:14px;align-items:center;border-top:1px solid #eef2f7;padding:12px 22px}.empty{padding:34px;text-align:center;color:#94a3b8;border:1px dashed #cbd5e1;border-radius:8px}.search,input,select,textarea{border:1px solid #cbd5e1;border-radius:6px;background:#fff;padding:9px 11px}.search{min-width:280px}.toolbar{display:flex;gap:10px;flex-wrap:wrap;margin:12px 0}.post{border-top:1px solid #eef2f7;padding:14px 0;cursor:pointer}.post-head{display:flex;justify-content:space-between;gap:12px}.comment{border-top:1px solid #eef2f7;padding:10px 0}.record-timeline{display:grid;gap:10px}.record-card{display:grid;grid-template-columns:80px minmax(0,1fr) 140px;gap:12px;align-items:center;border-top:1px solid #eef2f7;padding:12px 0}.graph-detail{min-width:0}.graph-detail .progress{width:100%;min-width:0}@media(max-width:900px){.layout{grid-template-columns:1fr}.side{height:auto;position:relative}.logout{position:relative}.content{padding:18px}.kp-row,.path-step,.record-card{grid-template-columns:1fr}.progress{width:100%}}
+</style></head><body><div class="layout"><aside class="side"><div class="brand">学习推荐系统</div><div class="student">{{ student_name }}</div><nav class="nav"><a href="/student/dashboard" class="{% if active_page=='dashboard' %}active{% endif %}">首页</a><a href="/student/profile" class="{% if active_page=='profile' %}active{% endif %}">学习画像</a><a href="/student/recommend" class="{% if active_page=='recommend' %}active{% endif %}">学习资源推荐</a><a href="/student/resources" class="{% if active_page=='resources' %}active{% endif %}">学习资源库</a><a href="/student/mastery" class="{% if active_page=='mastery' %}active{% endif %}">知识点掌握度</a><a href="/student/graph" class="{% if active_page=='graph' %}active{% endif %}">知识图谱</a><a href="/student/discuss" class="{% if active_page=='discuss' %}active{% endif %}">讨论区</a><a href="/student/wrong-questions" class="{% if active_page=='wrong' %}active{% endif %}">错题集</a><a href="/student/records" class="{% if active_page=='records' %}active{% endif %}">学习记录</a></nav><div class="logout"><a href="/logout">退出登录</a></div></aside><main><header class="top"><h1>{{ page_title }}</h1><div>{{ student_name }}</div></header><section class="content" id="app"></section></main></div>
 <script>
 var PAGE="{{ active_page }}",app=document.getElementById('app'),TARGET=new URLSearchParams(location.search).get('target_kp')||'';
-var Z={path:'智能学习路径',resources:'学习资源库',mastery:'知识点掌握度',graph:'知识图谱',discuss:'问题讨论',records:'学习记录',video:'视频',doc:'文档',exercise:'习题',resource:'资源',weak:'薄弱',severe:'严重薄弱',good:'良好',mastered:'已掌握',doing:'进行中',unlearned:'未学习',normal:'普通',easy:'简单',medium:'中等',hard:'困难'};
+var Z={path:'智能学习路径',resources:'学习资源库',mastery:'知识点掌握度',graph:'知识图谱',discuss:'问题讨论',records:'学习记录',video:'视频',doc:'文档',exercise:'习题',resource:'资源',weak:'需巩固',severe:'严重薄弱',good:'良好',mastered:'已掌握',doing:'需巩固',unlearned:'未学习',normal:'普通',easy:'简单',medium:'中等',hard:'困难'};
 function esc(s){return String(s==null?'':s).replace(/[&<>"']/g,function(c){return {'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]})}
-function kpName(s){return String(s==null?'':s).replace(/^\s*\d+(?:\.\d+)+\s*/,'')||String(s==null?'':s)}
+function kpName(s){return String(s==null?'':s)}
 async function getJson(u){try{var r=await fetch(u);return await r.json()}catch(e){return {success:false,learning_path:[],fallback_path:[],resources:[],chapters:[],records:[],groups:[],posts:[],comments:[],nodes:[],edges:[],stats:{}}}}
 function cleanText(s){s=String(s==null?'':s);if(s.indexOf('严重')>=0)return Z.severe;if(s.indexOf('薄弱')>=0)return Z.weak;if(s.indexOf('已')>=0&&s.indexOf('掌')>=0)return Z.mastered;if(s.indexOf('良')>=0)return Z.good;if(s.indexOf('进')>=0)return Z.doing;if(s==='easy')return Z.easy;if(s==='medium')return Z.medium;if(s==='hard')return Z.hard;return s}
 function normType(t){t=cleanText(t);return t===Z.video||t===Z.doc||t===Z.exercise?t:(String(t).endsWith('mp4')?Z.video:Z.doc)}function diffText(v){return cleanText(v||Z.normal)}function statusClass(s){s=cleanText(s);return s===Z.weak||s===Z.severe?'bad':(s===Z.doing?'warn':'ok')}function bar(v,s){return '<div class="progress"><div class="bar '+statusClass(s)+'" style="width:'+Math.max(2,Math.min(100,(+v||0)*100))+'%"></div></div>'}function action(r){return normType(r.type)===Z.video?'/student/watch/'+encodeURIComponent(r.name||r.title||''):'/student/view/'+encodeURIComponent(r.name||r.title||'')}
 function displayKp(s){s=cleanText(s);if(/^\d+$/.test(s))return '第'+s+'章相关知识点';return kpName(s)}
-function codeOf(n){var m=String(n.id||n.label||'').match(/^(\d+(?:\.\d+)*)/);return m?m[1]:''}function wrapLabel(raw,chunk){raw=String(raw||'');chunk=chunk||6;var a=raw.match(new RegExp('.{1,'+chunk+'}','g'))||[raw];return a.join('\\n')}
-function buildLayeredGraph(rawNodes,rawEdges){var map=new Map(),edges=[];function add(n){if(!map.has(n.id))map.set(n.id,n);return map.get(n.id)}add({id:'root',label:'操作系统',drawLabel:'操作系统',level:-1,shape:'diamond',size:42,fontSize:18,mastery:1,levelName:'课程'});rawNodes.forEach(function(n){var code=codeOf(n),parts=code.split('.').filter(Boolean);if(parts.length){var ch='chapter-'+parts[0];add({id:ch,label:'第'+parts[0]+'章',drawLabel:'第'+parts[0]+'章',level:0,shape:'hexagon',size:38,fontSize:18,mastery:n.mastery||0,levelName:'章节'});edges.push({from:'root',to:ch,type:'包含'});if(parts.length>=2){var sec=parts[0]+'.'+parts[1];var secNode=rawNodes.find(function(x){return codeOf(x)===sec});add({id:sec,label:displayKp(secNode&&secNode.label||secNode&&secNode.id||sec),drawLabel:wrapLabel(displayKp(secNode&&secNode.label||secNode&&secNode.id||sec),5),level:1,shape:'box',size:24,fontSize:14,mastery:(secNode&&secNode.mastery)||n.mastery||0,total_questions:(secNode&&secNode.total_questions)||0,correct_questions:(secNode&&secNode.correct_questions)||0,levelName:'大节'});edges.push({from:ch,to:sec,type:'包含'});if(parts.length>=3){add({id:n.id,label:n.label||n.id,drawLabel:wrapLabel(displayKp(n.label||n.id),5),level:2,shape:'circle',size:20,fontSize:13,mastery:n.mastery||0,total_questions:n.total_questions||0,correct_questions:n.correct_questions||0,levelName:'知识点'});edges.push({from:sec,to:n.id,type:'包含'})}}}else add({id:n.id,label:n.label||n.id,drawLabel:wrapLabel(displayKp(n.label||n.id),5),level:2,shape:'circle',size:20,fontSize:13,mastery:n.mastery||0,levelName:'知识点'})});(rawEdges||[]).forEach(function(e){edges.push({from:e.from,to:e.to,type:cleanText(e.type||'相关')})});var uniq=[],seen=new Set();edges.forEach(function(e){var k=e.from+'>'+e.to+'>'+e.type;if(e.from!==e.to&&!seen.has(k)&&map.has(e.from)&&map.has(e.to)){seen.add(k);uniq.push(e)}});return {nodes:Array.from(map.values()),edges:uniq}}
+function codeOf(n){var m=String(n.id||n.label||'').match(/^(\d+(?:\.\d+)*)/);return m?m[1]:''}function wrapLabel(raw,chunk,maxLines){raw=String(raw||'');chunk=chunk||6;maxLines=maxLines||2;var a=raw.match(new RegExp('.{1,'+chunk+'}','g'))||[raw];if(a.length>maxLines){a=a.slice(0,maxLines);a[maxLines-1]+='...'}return a.join('\\n')}
+function buildLayeredGraph(rawNodes,rawEdges){var map=new Map(),edges=[];function add(n){if(!map.has(n.id))map.set(n.id,n);return map.get(n.id)}add({id:'root',label:'操作系统',drawLabel:'操作系统',level:-1,shape:'diamond',size:42,fontSize:18,mastery:1,levelName:'课程'});rawNodes.forEach(function(n){var code=codeOf(n),parts=code.split('.').filter(Boolean);if(parts.length){var ch='chapter-'+parts[0];add({id:ch,label:'第'+parts[0]+'章',drawLabel:'第'+parts[0]+'章',level:0,shape:'hexagon',size:46,fontSize:13,mastery:n.mastery||0,levelName:'章节'});edges.push({from:'root',to:ch,type:'包含'});if(parts.length>=2){var sec=parts[0]+'.'+parts[1];var secNode=rawNodes.find(function(x){return codeOf(x)===sec});add({id:sec,label:displayKp(secNode&&secNode.label||secNode&&secNode.id||sec),drawLabel:wrapLabel(displayKp(secNode&&secNode.label||secNode&&secNode.id||sec),7,2),level:1,shape:'box',size:24,fontSize:14,mastery:(secNode&&secNode.mastery)||n.mastery||0,total_questions:(secNode&&secNode.total_questions)||0,correct_questions:(secNode&&secNode.correct_questions)||0,levelName:'大节'});edges.push({from:ch,to:sec,type:'包含'});if(parts.length>=3){add({id:n.id,label:n.label||n.id,drawLabel:wrapLabel(displayKp(n.label||n.id),6,2),level:2,shape:'circle',size:32,fontSize:13,mastery:n.mastery||0,total_questions:n.total_questions||0,correct_questions:n.correct_questions||0,levelName:'知识点'});edges.push({from:sec,to:n.id,type:'包含'})}}}else add({id:n.id,label:n.label||n.id,drawLabel:wrapLabel(displayKp(n.label||n.id),6,2),level:2,shape:'circle',size:32,fontSize:13,mastery:n.mastery||0,levelName:'知识点'})});(rawEdges||[]).forEach(function(e){edges.push({from:e.from,to:e.to,type:cleanText(e.type||'相关')})});var uniq=[],seen=new Set();edges.forEach(function(e){var k=e.from+'>'+e.to+'>'+e.type;if(e.from!==e.to&&!seen.has(k)&&map.has(e.from)&&map.has(e.to)){seen.add(k);uniq.push(e)}});return {nodes:Array.from(map.values()),edges:uniq}}
 async function dashboard(){var d=await getJson('/student/dashboard/data'),r=await getJson('/student/resources/data'),m=await getJson('/student/messages'),st=d.stats||{},msgs=(m.messages||[]).slice(0,3);app.innerHTML='<div class="grid"><a class="stat" href="/student/mastery"><span>已掌握</span><b>'+(st.mastered||0)+'</b><span class="muted">薄弱 '+(st.weak||0)+' / 严重 '+(st.severe||0)+'</span></a><a class="stat" href="/student/path"><span>智能学习路径</span><b>开始</b><span class="muted">根据薄弱点推荐</span></a><a class="stat" href="/student/resources"><span>学习资源库</span><b>'+((r.resources||[]).length)+'</b><span class="muted">视频 / 文档 / 习题</span></a><a class="stat" href="/student/graph"><span>知识图谱</span><b>查看</b><span class="muted">单击节点看掌握度</span></a></div><div class="card"><h2>今日学习建议</h2><p class="muted">'+esc(d.latest_message||'优先完成智能学习路径中排在前面的薄弱知识点，并查看对应资源。')+'</p><a class="btn" href="/student/path">进入学习路径</a></div><div class="card"><h2>最新消息</h2>'+(msgs.map(function(x){return '<div class="row"><div><b>'+esc(x.type||'消息')+'</b><div class="muted">'+esc(x.body||'')+'</div></div><span class="muted">'+esc(x.time||'')+'</span></div>'}).join('')||'<div class="empty">暂无消息</div>')+'</div>'}
 async function pathPage(){var d=await getJson('/student/path/data'+(TARGET?'?target_kp='+encodeURIComponent(TARGET):'')),steps=(d.learning_path&&d.learning_path.length?d.learning_path:(d.fallback_path||[]));steps=steps.filter(function(st){return st&&st.name&&!/^(视频|文档|习题|资源)$/.test(String(st.name))});app.innerHTML='<div class="card"><h2>'+Z.path+'</h2><p class="muted">目标：'+esc(displayKp(d.target_kp||TARGET||(steps[0]&&steps[0].name)||''))+'。路径会按薄弱程度、先修关系和资源匹配度排序。</p></div><div class="card">'+(steps.map(function(st,i){var rs=st.resources||[],score=Number(st.score||st.mastery||0),status=cleanText(st.status||'待学习');return '<div class="path-step"><div class="no">'+(i+1)+'</div><div><b>'+esc(displayKp(st.name||st.title||st.kp_id))+'</b><div><span class="tag '+statusClass(status)+'">'+esc(status)+'</span><span class="tag">掌握度 '+Math.round(score*100)+'%</span></div>'+bar(score,status)+'<p class="muted">'+esc(cleanText(st.reason||''))+'</p><div class="res-list">'+rs.map(function(r){return '<div class="res"><b>'+esc(r.title||r.name)+'</b><p><span class="tag">'+esc(normType(r.type))+'</span><span class="tag">'+esc(diffText(r.difficulty))+'</span></p><a class="btn light" href="'+action(r)+'">学习</a> <button class="btn green" disabled>完成</button></div>'}).join('')+'</div></div></div>'}).join('')||'<div class="empty">暂无路径数据</div>')+'</div>'}
 async function resourcesPage(){var d=await getJson('/student/resources/data'),all=d.resources||[];app.innerHTML='<div class="card"><h2>'+Z.resources+'</h2><input class="search" id="q" placeholder="搜索资源、知识点、章节" oninput="renderResources()"></div><div id="resResults"></div>';window.renderResources=function(){var q=(document.getElementById('q').value||'').toLowerCase(),list=all.filter(function(r){return [r.name,r.title,r.knowledge_point,r.chapter_label,r.section_label,normType(r.type)].join(' ').toLowerCase().indexOf(q)>=0}),groups={};list.forEach(function(r){var ch=r.chapter_label||'未分类',sec=r.section_label||'未分类';groups[ch]=groups[ch]||{};groups[ch][sec]=groups[ch][sec]||[];groups[ch][sec].push(r)});document.getElementById('resResults').innerHTML=Object.keys(groups).sort(function(a,b){return a.localeCompare(b,'zh-Hans',{numeric:true})}).map(function(ch,i){var secs=Object.keys(groups[ch]).sort(function(a,b){return a.localeCompare(b,'zh-Hans',{numeric:true})});return '<details class="chapter" '+(i===0?'open':'')+'><summary>'+esc(ch)+' · '+secs.reduce(function(n,s){return n+groups[ch][s].length},0)+' 个资源</summary>'+secs.map(function(sec){return '<details open class="section"><summary>'+esc(sec)+' · '+groups[ch][sec].length+'</summary><div class="res-grid" style="padding:12px">'+groups[ch][sec].map(function(r){return '<div class="res-card"><b>'+esc(r.title||r.name)+'</b><p><span class="tag">'+esc(normType(r.type))+'</span><span class="tag">'+esc(diffText(r.difficulty))+'</span></p><p class="muted">'+esc(displayKp(r.knowledge_point)||'')+'</p><a class="btn light" href="'+action(r)+'">在线查看</a> <a class="btn light" href="/download/'+encodeURIComponent(r.name||'')+'">下载</a></div>'}).join('')+'</div></details>'}).join('')+'</details>'}).join('')||'<div class="empty">暂无资源</div>'};renderResources()}
 async function mastery(){var d=await getJson('/student/mastery/data'),chs=d.chapters||[];app.innerHTML='<div class="card"><h2>'+Z.mastery+'</h2>'+(chs.map(function(ch){var points=ch.knowledge_points||[],secs={};points.forEach(function(k){var code=String(k.kp_id||k.name||'').match(/^(\d+\.\d+)/);var sec=code?code[1]:'未分节';secs[sec]=secs[sec]||[];secs[sec].push(k)});return '<details class="chapter" open><summary>'+esc(ch.title||('第'+ch.chapter+'章'))+' · '+points.length+' 个知识点</summary>'+Object.keys(secs).sort(function(a,b){return a.localeCompare(b,'zh-Hans',{numeric:true})}).map(function(sec){return '<details class="section" open><summary>'+esc(sec)+' · '+secs[sec].length+'</summary>'+secs[sec].map(function(k){var status=cleanText(k.status||''),score=Number(k.score||0);return '<div class="kp-row"><div><b>'+esc(displayKp(k.full_name||k.name||k.kp_id))+'</b><div class="muted">'+esc(status)+'</div></div><b>'+Math.round(score*100)+'%</b>'+bar(score,status)+'</div>'}).join('')+'</details>'}).join('')+'</details>'}).join('')||'<div class="empty">暂无掌握度数据</div>')+'</div>'}
 async function records(){var d=await getJson('/student/records/data'),s=d.summary||{},groups=d.groups||[];app.innerHTML='<div class="grid"><div class="stat"><span>视频学习</span><b>'+(s.video||0)+'</b></div><div class="stat"><span>文档学习</span><b>'+(s.document||0)+'</b></div><div class="stat"><span>本周记录</span><b>'+(s.week||0)+'</b></div><div class="stat"><span>总记录</span><b>'+(s.total||0)+'</b></div></div><div class="card"><h2>'+Z.records+'</h2><div class="record-timeline">'+(groups.map(function(g){return '<details class="chapter" open><summary>'+esc(g.date)+' · '+g.items.length+' 条</summary>'+g.items.map(function(r){return '<div class="record-card"><span class="tag">'+esc(normType(r.type))+'</span><div><b>'+esc(r.name)+'</b><div class="muted">'+esc(displayKp(r.knowledge_point)||'未绑定知识点')+'</div></div><div class="muted">'+esc(r.time||'')+'</div></div>'}).join('')+'</details>'}).join('')||'<div class="empty">暂无学习记录</div>')+'</div></div>'}
-async function discuss(){var d=await getJson('/student/discuss/list');app.innerHTML='<div class="card"><h2>'+Z.discuss+'</h2><div class="toolbar"><input id="topicTitle" class="search" placeholder="问题标题"><button class="btn" onclick="postTopic()">发布</button></div><textarea id="topicBody" style="width:100%" rows="3" placeholder="描述你的问题、卡点或学习经验"></textarea></div><div class="card">'+((d.posts||[]).map(function(p){return '<div class="post" onclick="openPost(&quot;'+esc(p.id)+'&quot;)"><div class="post-head"><b>'+esc(p.title)+'</b><span class="tag">'+esc(cleanText(p.status||''))+'</span></div><div class="muted">'+esc(p.author)+' · '+esc(p.time)+' · '+(p.comment_count||0)+' 条回复</div><p>'+esc(p.body||'')+'</p></div>'}).join('')||'<div class="empty">暂无讨论</div>')+'</div><div class="card" id="postDetail"><div class="muted">点击讨论查看详情和回复。</div></div>'}
+async function discuss(){var d=await getJson('/student/discuss/list');app.innerHTML='<div class="card"><h2>'+Z.discuss+'</h2><div class="toolbar"><input id="topicTitle" class="search" placeholder="问题标题"><button class="btn" onclick="postTopic()">发布</button></div><textarea id="topicBody" style="width:100%" rows="3" placeholder="描述你的问题、卡点或学习经验"></textarea></div><div class="card">'+((d.posts||[]).map(function(p){return '<div class="post" onclick="openPost(&quot;'+esc(p.id)+'&quot;)"><div class="post-head"><b>#'+esc(p.display_id||p.no)+' '+esc(p.title)+'</b><span class="tag">'+esc(cleanText(p.status||''))+'</span></div><div class="muted">'+esc(p.author)+' · '+esc(p.time)+' · '+(p.comment_count||0)+' 条回复</div><p>'+esc(p.body||'')+'</p></div>'}).join('')||'<div class="empty">暂无讨论</div>')+'</div><div class="card" id="postDetail"><div class="muted">点击讨论查看详情和回复。</div></div>'}
 async function postTopic(){if(!topicTitle.value.trim())return alert('请填写标题');let d=await fetch('/student/discuss/post',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({title:topicTitle.value.trim(),body:topicBody.value.trim()})}).then(r=>r.json());alert(d.success?'发布成功':(d.error||'发布失败'));if(d.success)discuss()}
-async function openPost(id){let d=await getJson('/student/discuss/detail/'+encodeURIComponent(id)),p=d.post||{};postDetail.innerHTML='<h2>'+esc(p.title)+'</h2><p>'+esc(p.body||'')+'</p><div class="muted">'+esc(p.author||'')+' · '+esc(p.time||'')+'</div><h3>回复</h3>'+((d.comments||[]).map(function(c){return '<div class="comment"><b>'+esc(c.author)+'</b><p>'+esc(c.body)+'</p><div class="muted">'+esc(c.time)+'</div></div>'}).join('')||'<div class="muted">暂无回复</div>')+'<textarea id="commentBody" style="width:100%" rows="3" placeholder="写下回复"></textarea><button class="btn" onclick="commentPost(\\''+id+'\\')">提交回复</button>'}
+async function openPost(id){let d=await getJson('/student/discuss/detail/'+encodeURIComponent(id)),p=d.post||{};postDetail.innerHTML='<h2>#'+esc(p.display_id||p.no)+' '+esc(p.title)+'</h2><p>'+esc(p.body||'')+'</p><div class="muted">'+esc(p.author||'')+' · '+esc(p.time||'')+'</div><h3>回复</h3>'+((d.comments||[]).map(function(c){return '<div class="comment"><b>'+esc(c.author)+'</b><p>'+esc(c.body)+'</p><div class="muted">'+esc(c.time)+'</div></div>'}).join('')||'<div class="muted">暂无回复</div>')+'<textarea id="commentBody" style="width:100%" rows="3" placeholder="写下回复"></textarea><button class="btn" onclick="commentPost(\\''+id+'\\')">提交回复</button>'}
 async function commentPost(id){let body=document.getElementById('commentBody').value.trim();if(!body)return alert('请填写回复');let d=await fetch('/student/discuss/comment/'+encodeURIComponent(id),{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({body:body})}).then(r=>r.json());alert(d.success?'回复成功':(d.error||'回复失败'));if(d.success)openPost(id)}
-async function graphPage(){var d=await getJson('/student/flow-graph/data'),built=buildLayeredGraph(d.nodes||[],d.edges||[]),nodes=built.nodes,edges=built.edges;app.innerHTML='<div class="card"><h2>'+Z.graph+'</h2><div class="muted"><b>颜色 = 学习状态：</b><span class="tag ok">已掌握>=80%</span><span class="tag">良好>=60%</span><span class="tag warn">进行中>=40%</span><span class="tag bad">薄弱&lt;40%</span><span class="tag">未学习</span><b style="margin-left:12px">边：</b>包含 / 相关 / 先修</div><div style="display:grid;grid-template-columns:minmax(0,1fr) 360px;gap:18px;margin-top:14px"><div style="position:relative"><div id="mynetwork" style="height:720px;border:1px solid #e5e7eb;background:#fafafa"></div><div style="position:absolute;right:18px;top:18px;width:62px;background:#fff;border:1px solid #dbe3ef;border-radius:14px;box-shadow:0 8px 24px rgba(15,23,42,.12);padding:10px;display:grid;gap:6px;place-items:center"><button class="btn light" style="width:40px;height:40px;padding:0" onclick="zoomGraph(.03)">+</button><input id="graphZoom" type="range" min="0" max="100" step="1" value="26" oninput="setGraphZoom(this.value)" style="writing-mode:vertical-lr;direction:rtl;-webkit-appearance:slider-vertical;appearance:slider-vertical;width:40px;height:250px;margin:0;touch-action:none"><button class="btn light" style="width:40px;height:40px;padding:0" onclick="zoomGraph(-.03)">-</button></div></div><div id="nodeDetail" class="res-card graph-detail"><b>节点详情</b><p class="muted">单击节点查看掌握度。</p></div></div></div>';if(!window.vis){document.getElementById('mynetwork').innerHTML='<div class="empty">vis load failed</div>';return}function color(m){return m>=.8?{background:'#d4f0dc',border:'#a8ddb8'}:m>=.6?{background:'#dbeafe',border:'#93c5fd'}:m>=.4?{background:'#ffedd5',border:'#fdba74'}:m>0?{background:'#fee2e2',border:'#fca5a5'}:{background:'#eceff1',border:'#cfd8dc'}}var visNodes=new vis.DataSet(nodes.map(function(n){return {id:n.id,label:n.drawLabel||displayKp(n.label||n.id),shape:n.shape,size:n.size,color:n.id==='root'?{background:'#1f2937',border:'#111827'}:color(n.mastery||0),font:{size:n.fontSize,face:'Microsoft YaHei',color:n.id==='root'?'#fff':'#111827',bold:true,multi:true},borderWidth:n.level<=0?4:3,mass:n.level<=0?6:(n.level===1?3:1),widthConstraint:n.shape==='box'?{minimum:120,maximum:150}:undefined,heightConstraint:n.shape==='box'?{minimum:60}:undefined}}));var visEdges=new vis.DataSet(edges.map(function(e,i){return {id:i,from:e.from,to:e.to,arrows:'to',color:{color:e.type==='先修'?'#9b59b6':(e.type==='相关'?'#f59e0b':'#94a3b8')},dashes:e.type!=='包含',width:e.type==='包含'?2.2:1.7,smooth:{type:'dynamic'}}}));var network=new vis.Network(document.getElementById('mynetwork'),{nodes:visNodes,edges:visEdges},{physics:{solver:'forceAtlas2Based',forceAtlas2Based:{gravitationalConstant:-240,centralGravity:.018,springLength:170,springConstant:.04,avoidOverlap:1},stabilization:{iterations:600}},interaction:{zoomView:true,dragView:true,dragNodes:true}});window.graphNetwork=network;window.graphZoomMin=.24;window.graphZoomMax=.55;window.graphScale=.32;network.once('stabilizationIterationsDone',function(){network.stopSimulation();applyGraphZoom(.32,true)});network.on('click',function(p){var id=p.nodes&&p.nodes[0],n=nodes.find(function(x){return x.id===id});if(!n)return;var m=Number(n.mastery||0),state=m>=.8?Z.mastered:m>=.6?Z.good:m>=.4?Z.doing:m>0?Z.weak:Z.unlearned;document.getElementById('nodeDetail').innerHTML='<b>'+esc(displayKp(n.label||n.id))+'</b><p><span class="tag '+statusClass(state)+'">'+state+'</span><span class="tag">掌握度 '+Math.round(m*100)+'%</span></p>'+bar(m,state)+'<p class="muted">'+esc(n.levelName||'')+'</p>'})}
-function graphSliderToScale(v){var min=window.graphZoomMin||.24,max=window.graphZoomMax||.55,t=Math.max(0,Math.min(100,parseFloat(v)||0))/100;return min+(max-min)*t}function graphScaleToSlider(s){var min=window.graphZoomMin||.24,max=window.graphZoomMax||.55;return Math.round((Math.max(min,Math.min(max,parseFloat(s)||min))-min)/(max-min)*100)}function applyGraphZoom(scale,animate){var min=window.graphZoomMin||.24,max=window.graphZoomMax||.55;window.graphScale=Math.max(min,Math.min(max,parseFloat(scale)||.32));if(window.graphNetwork)window.graphNetwork.moveTo({position:window.graphNetwork.getViewPosition(),scale:window.graphScale,animation:animate?{duration:120,easingFunction:'easeInOutQuad'}:{duration:0}});var z=document.getElementById('graphZoom');if(z)z.value=graphScaleToSlider(window.graphScale)}function setGraphZoom(v){applyGraphZoom(graphSliderToScale(v),false)}function zoomGraph(delta){applyGraphZoom((window.graphScale||.32)+delta,true)}async function graphBuilder(){graphPage()}
+async function graphPage(){var d=await getJson('/student/flow-graph/data'),built=buildLayeredGraph(d.nodes||[],d.edges||[]),nodes=built.nodes,edges=built.edges;app.innerHTML='<div class="card"><h2>'+Z.graph+'</h2><div class="muted"><b>颜色 = 学习状态：</b><span class="tag ok">已掌握>=80%</span><span class="tag">良好>=60%</span><span class="tag warn">需巩固&lt;60%</span><span class="tag bad">未学习</span><b style="margin-left:12px">边：</b>包含 / 相关 / 先修</div><div style="display:grid;grid-template-columns:minmax(0,1fr) 360px;gap:18px;margin-top:14px"><div style="position:relative"><div id="mynetwork" style="height:720px;border:1px solid #e5e7eb;background:#fafafa"></div><div style="position:absolute;right:18px;top:18px;width:62px;background:#fff;border:1px solid #dbe3ef;border-radius:14px;box-shadow:0 8px 24px rgba(15,23,42,.12);padding:10px;display:grid;gap:6px;place-items:center"><button class="btn light" style="width:40px;height:40px;padding:0" onclick="zoomGraph(.03)">+</button><input id="graphZoom" type="range" min="0" max="100" step="1" value="13" oninput="setGraphZoom(this.value)" style="writing-mode:vertical-lr;direction:rtl;-webkit-appearance:slider-vertical;appearance:slider-vertical;width:40px;height:250px;margin:0;touch-action:none"><button class="btn light" style="width:40px;height:40px;padding:0" onclick="zoomGraph(-.03)">-</button></div></div><div id="nodeDetail" class="res-card graph-detail"><b>节点详情</b><p class="muted">单击节点查看掌握度。</p></div></div></div>';if(!window.vis){document.getElementById('mynetwork').innerHTML='<div class="empty">vis load failed</div>';return}function color(m){return m>=.8?{background:'#d4f0dc',border:'#a8ddb8'}:m>=.6?{background:'#dbeafe',border:'#93c5fd'}:m>0?{background:'#ffedd5',border:'#fdba74'}:{background:'#eceff1',border:'#cfd8dc'}}var visNodes=new vis.DataSet(nodes.map(function(n){return {id:n.id,label:n.drawLabel||displayKp(n.label||n.id),shape:n.shape,size:n.size,color:n.id==='root'?{background:'#1f2937',border:'#111827'}:color(n.mastery||0),font:{size:n.fontSize,face:'Microsoft YaHei',color:n.id==='root'?'#fff':'#111827',bold:true,multi:true},borderWidth:n.level<=0?4:3,mass:n.level<=0?6:(n.level===1?3:1),widthConstraint:(n.shape==='box'?{minimum:80,maximum:80}:n.shape==='circle'?{minimum:64,maximum:64}:n.shape==='hexagon'?{minimum:92,maximum:92}:undefined),heightConstraint:(n.shape==='box'?{minimum:52,maximum:52}:n.shape==='circle'?{minimum:64,maximum:64}:n.shape==='hexagon'?{minimum:60,maximum:60}:undefined)}}));var visEdges=new vis.DataSet(edges.map(function(e,i){return {id:i,from:e.from,to:e.to,arrows:'to',color:{color:e.type==='先修'?'#9b59b6':(e.type==='相关'?'#f59e0b':'#94a3b8')},dashes:e.type!=='包含',width:e.type==='包含'?2.2:1.7,smooth:{type:'dynamic'}}}));var network=new vis.Network(document.getElementById('mynetwork'),{nodes:visNodes,edges:visEdges},{physics:{solver:'forceAtlas2Based',forceAtlas2Based:{gravitationalConstant:-240,centralGravity:.018,springLength:170,springConstant:.04,avoidOverlap:1},stabilization:{iterations:600}},interaction:{zoomView:true,dragView:true,dragNodes:true}});window.graphNetwork=network;window.graphZoomMin=.24;window.graphZoomMax=.55;window.graphScale=.28;network.once('stabilizationIterationsDone',function(){network.stopSimulation();applyGraphZoom(.28,true)});network.on('click',function(p){var id=p.nodes&&p.nodes[0],n=nodes.find(function(x){return x.id===id});if(!n)return;var m=Number(n.mastery||0),state=m>=.8?Z.mastered:m>=.6?Z.good:m>0?Z.weak:Z.unlearned;document.getElementById('nodeDetail').innerHTML='<b>'+esc(displayKp(n.label||n.id))+'</b><p><span class="tag '+statusClass(state)+'">'+state+'</span><span class="tag">掌握度 '+Math.round(m*100)+'%</span></p>'+bar(m,state)+'<p class="muted">'+esc(n.levelName||'')+'</p>'})}
+function graphSliderToScale(v){var min=window.graphZoomMin||.24,max=window.graphZoomMax||.55,t=Math.max(0,Math.min(100,parseFloat(v)||0))/100;return min+(max-min)*t}function graphScaleToSlider(s){var min=window.graphZoomMin||.24,max=window.graphZoomMax||.55;return Math.round((Math.max(min,Math.min(max,parseFloat(s)||min))-min)/(max-min)*100)}function applyGraphZoom(scale,animate){var min=window.graphZoomMin||.24,max=window.graphZoomMax||.55;window.graphScale=Math.max(min,Math.min(max,parseFloat(scale)||.28));if(window.graphNetwork)window.graphNetwork.moveTo({position:window.graphNetwork.getViewPosition(),scale:window.graphScale,animation:animate?{duration:120,easingFunction:'easeInOutQuad'}:{duration:0}});var z=document.getElementById('graphZoom');if(z)z.value=graphScaleToSlider(window.graphScale)}function setGraphZoom(v){applyGraphZoom(graphSliderToScale(v),false)}function zoomGraph(delta){applyGraphZoom((window.graphScale||.28)+delta,true)}async function graphBuilder(){graphPage()}
 if(PAGE==='dashboard')dashboard();if(PAGE==='path')pathPage();if(PAGE==='resources')resourcesPage();if(PAGE==='mastery')mastery();if(PAGE==='records')records();if(PAGE==='discuss')discuss();if(PAGE==='my_discuss')discuss();if(PAGE==='graph')graphPage();if(PAGE==='graph_builder')graphBuilder();
 </script></body></html>
 """
@@ -5769,37 +5684,105 @@ def build_mastery_chapters(points):
     return [chapters[k] for k in sorted(chapters.keys(), key=natural_sort_key)]
 
 def fallback_flow_mastery_data():
-    catalog = knowledge_point_catalog()
+    user_id = session.get("full_id")
+    if not user_id:
+        catalog = knowledge_point_catalog()
+        points = []
+        for entry in catalog:
+            name = entry.get("name") if isinstance(entry, dict) else str(entry or "")
+            code = flow_kp_code(name)
+            if not code or code.count(".") < 2 or re.fullmatch(r"\d+(?:\.\d+){0,2}", name.strip()):
+                continue
+            item = {
+                "kp_id": name,
+                "name": display_kp_name(name),
+                "full_name": name,
+                "chapter": code.split(".")[0],
+                "score": 0,
+                "base_score": 0,
+                "mastery_formula": "题目练习、正确率、学习资源和讨论参与综合计算",
+                "components": {"exercise": 0, "accuracy": 0, "volume": 0, "video": 0, "resource": 0, "discussion": 0},
+                "status": flow_status(0),
+                "total_questions": 0,
+                "answered_questions": 0,
+                "correct_questions": 0,
+                "stats_display": "未学习 · 0/0/0 题"
+            }
+            points.append(item)
+        if not points:
+            for code in ["1.1.1 基本概念", "1.1.2 计算机系统的视图", "2.1.1 进程的概念", "3.4.1 死锁的概念"]:
+                item = {
+                    "kp_id": code, "name": display_kp_name(code), "full_name": code,
+                    "chapter": flow_kp_code(code).split(".")[0], "score": 0, "base_score": 0,
+                    "mastery_formula": "题目练习、正确率、学习资源和讨论参与综合计算",
+                    "components": {"exercise": 0, "accuracy": 0, "volume": 0, "video": 0, "resource": 0, "discussion": 0},
+                    "status": flow_status(0),
+                    "total_questions": 0,
+                    "answered_questions": 0,
+                    "correct_questions": 0,
+                    "stats_display": "未学习 · 0/0/0 题"
+                }
+                points.append(item)
+        points.sort(key=lambda p: natural_sort_key(p["kp_id"]))
+        return {"points": points, "chapters": build_mastery_chapters(points), "stats": {"total": len(points), "mastered": 0, "weak": 0, "severe": len(points)}, "offline": True}
+    
+    score_map, detail_map, name_map, children = calculate_mastery_tree(user_id)
+    
     points = []
-    for entry in catalog:
-        name = entry.get("name") if isinstance(entry, dict) else str(entry or "")
-        code = flow_kp_code(name)
-        if not code or code.count(".") < 2 or re.fullmatch(r"\d+(?:\.\d+){0,2}", name.strip()):
+    for code, name in name_map.items():
+        if code.count(".") < 2:
             continue
+        
+        detail = detail_map.get(code, {})
+        mastery = detail.get("mastery", 0)
+        total_questions = detail.get("total_questions", 0)
+        answered_questions = detail.get("answered_questions", 0)
+        correct_questions = detail.get("correct_questions", 0)
+        
+        status = get_mastery_status(mastery)
+        stats_display = f"{status} · {correct_questions}/{answered_questions}/{total_questions} 题"
+        
         item = {
             "kp_id": name,
             "name": display_kp_name(name),
             "full_name": name,
             "chapter": code.split(".")[0],
-            "score": 0,
-            "base_score": 0,
+            "score": round(mastery * 100, 1),
+            "base_score": round(mastery, 3),
             "mastery_formula": "题目练习、正确率、学习资源和讨论参与综合计算",
-            "components": {"exercise": 0, "accuracy": 0, "volume": 0, "video": 0, "resource": 0, "discussion": 0},
-            "status": flow_status(0)
+            "components": {
+                "exercise": detail.get("exercise_score", 0),
+                "accuracy": detail.get("accuracy", 0),
+                "volume": answered_questions / max(total_questions, 1) if total_questions > 0 else 0,
+                "video": 0,
+                "resource": detail.get("behavior_score", 0),
+                "discussion": 0
+            },
+            "status": status,
+            "total_questions": total_questions,
+            "answered_questions": answered_questions,
+            "correct_questions": correct_questions,
+            "stats_display": stats_display
         }
         points.append(item)
-    if not points:
-        for code in ["1.1.1 基本概念", "1.1.2 计算机系统的视图", "2.1.1 进程的概念", "3.4.1 死锁的概念"]:
-            item = {
-                "kp_id": code, "name": display_kp_name(code), "full_name": code,
-                "chapter": flow_kp_code(code).split(".")[0], "score": 0, "base_score": 0,
-                "mastery_formula": "题目练习、正确率、学习资源和讨论参与综合计算",
-                "components": {"exercise": 0, "accuracy": 0, "volume": 0, "video": 0, "resource": 0, "discussion": 0},
-                "status": flow_status(0)
-            }
-            points.append(item)
+    
     points.sort(key=lambda p: natural_sort_key(p["kp_id"]))
-    return {"points": points, "chapters": build_mastery_chapters(points), "stats": {"total": len(points), "mastered": 0, "weak": 0, "severe": len(points)}, "offline": True}
+    
+    mastered_count = sum(1 for p in points if p["score"] >= 85)
+    weak_count = sum(1 for p in points if p["score"] < 60 and p["score"] > 0)
+    severe_count = sum(1 for p in points if p["score"] == 0)
+    
+    return {
+        "points": points,
+        "chapters": build_mastery_chapters(points),
+        "stats": {
+            "total": len(points),
+            "mastered": mastered_count,
+            "weak": weak_count,
+            "severe": severe_count
+        },
+        "offline": False
+    }
 
 def get_flow_mastery_data(user_id):
     if neo4j_temporarily_offline():
@@ -6022,18 +6005,18 @@ STUDENT_FLOW_HTML = r"""
 <!doctype html><html lang="zh-CN"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
 <title>{{ page_title }} - 操作系统</title><script src="https://cdn.jsdelivr.net/npm/vis-network@9.1.2/standalone/umd/vis-network.min.js"></script>
 <style>
-*{box-sizing:border-box}body{margin:0;background:#f3f5f8;color:#111827;font-family:"Microsoft YaHei",Arial,sans-serif}.layout{display:grid;grid-template-columns:216px 1fr;min-height:100vh}.side{background:#fff;border-right:1px solid #e5e7eb;padding:22px 0;position:sticky;top:0;height:100vh}.brand{padding:0 24px 24px;font-size:20px;font-weight:800}.nav a{display:block;padding:13px 28px;color:#4b5563;text-decoration:none;border-left:3px solid transparent}.nav a.active,.nav a:hover{background:#eef4ff;color:#2563eb;border-left-color:#60a5fa}.logout{position:absolute;left:20px;right:20px;bottom:20px}.logout a{display:block;text-align:center;padding:10px;border-radius:6px;background:#eef4ff;color:#2563eb;text-decoration:none;font-weight:700}.top{height:64px;background:#fff;border-bottom:1px solid #e5e7eb;display:flex;align-items:center;justify-content:space-between;padding:0 34px}.top h1{margin:0;font-size:22px}.content{padding:28px 36px;max-width:1500px}.card{background:#fff;border:1px solid #e5e7eb;border-radius:8px;padding:20px;margin-bottom:16px}.grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(230px,1fr));gap:14px}.stat,.res,.res-card{background:#fff;border:1px solid #e5e7eb;border-radius:8px;padding:14px}.stat b{display:block;font-size:30px;margin-top:8px}.muted{color:#64748b;font-size:14px;line-height:1.7}.btn{border:0;background:#2563eb;color:#fff;border-radius:6px;padding:8px 13px;text-decoration:none;cursor:pointer;display:inline-block}.btn.light{background:#eef4ff;color:#2563eb;border:1px solid #dbeafe}.btn.green{background:#16a34a}.tag{font-size:12px;border-radius:999px;background:#eef2ff;color:#3730a3;padding:4px 8px;margin:3px;display:inline-block}.tag.ok{background:#ecfdf5;color:#166534}.tag.warn{background:#fff7ed;color:#9a3412}.tag.bad{background:#fee2e2;color:#991b1b}.progress{height:10px;background:#e5e7eb;border-radius:99px;overflow:hidden;width:320px}.bar{height:100%;background:#22c55e}.bar.warn{background:#f59e0b}.bar.bad{background:#ef4444}.path-step{display:grid;grid-template-columns:38px 1fr;gap:14px;border-top:1px solid #eef2f7;padding:18px 0}.no{width:30px;height:30px;border-radius:50%;background:#2563eb;color:#fff;display:grid;place-items:center;font-weight:800}.res-list,.res-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(230px,1fr));gap:10px}.row{display:flex;justify-content:space-between;gap:12px;align-items:center;border-top:1px solid #eef2f7;padding:12px 0}.chapter{border:1px solid #e5e7eb;border-radius:8px;margin:10px 0;overflow:hidden}.chapter summary{background:#f8fafc;padding:14px 16px;cursor:pointer;font-weight:700}.section{border-top:1px solid #eef2f7}.section summary{background:#fff;padding:12px 20px;color:#475569}.kp-row{display:grid;grid-template-columns:minmax(220px,1fr) 88px 340px;gap:14px;align-items:center;border-top:1px solid #eef2f7;padding:12px 22px}.empty{padding:34px;text-align:center;color:#94a3b8;border:1px dashed #cbd5e1;border-radius:8px}.search,input,select,textarea{border:1px solid #cbd5e1;border-radius:6px;background:#fff;padding:9px 11px}.search{min-width:280px}.toolbar{display:flex;gap:10px;flex-wrap:wrap;margin:12px 0}.post{border-top:1px solid #eef2f7;padding:14px 0;cursor:pointer}.post-head{display:flex;justify-content:space-between;gap:12px}.comment{border-top:1px solid #eef2f7;padding:10px 0}.record-timeline{display:grid;gap:10px}.record-card{display:grid;grid-template-columns:80px minmax(0,1fr) 140px;gap:12px;align-items:center;border-top:1px solid #eef2f7;padding:12px 0}.graph-detail{min-width:0}.graph-detail .progress{width:100%;min-width:0}@media(max-width:900px){.layout{grid-template-columns:1fr}.side{height:auto;position:relative}.logout{position:relative}.content{padding:18px}.kp-row,.path-step,.record-card{grid-template-columns:1fr}.progress{width:100%}}
-</style></head><body><div class="layout"><aside class="side"><div class="brand">操作系统</div><nav class="nav"><a href="/student/dashboard" class="{% if active_page=='dashboard' %}active{% endif %}">首页</a><a href="/student/path" class="{% if active_page=='path' %}active{% endif %}">智能学习路径</a><a href="/student/resources" class="{% if active_page=='resources' %}active{% endif %}">学习资源库</a><a href="/student/mastery" class="{% if active_page=='mastery' %}active{% endif %}">知识点掌握度</a><a href="/student/graph" class="{% if active_page=='graph' %}active{% endif %}">知识图谱</a><a href="/student/discuss" class="{% if active_page=='discuss' %}active{% endif %}">问题讨论</a><a href="/student/records" class="{% if active_page=='records' %}active{% endif %}">学习记录</a></nav><div class="logout"><a href="/logout">退出登录</a></div></aside><main><header class="top"><h1>{{ page_title }}</h1><div>{{ student_name }}</div></header><section class="content" id="app"></section></main></div>
+*{box-sizing:border-box}body{margin:0;background:#f3f5f8;color:#111827;font-family:"Microsoft YaHei",Arial,sans-serif}.layout{display:grid;grid-template-columns:216px 1fr;min-height:100vh}.side{background:#1e293b;border-right:1px solid #334155;padding:0;position:sticky;top:0;height:100vh;display:flex;flex-direction:column}.brand{padding:20px 16px 8px;font-size:14px;font-weight:600;color:#f1f5f9;border-bottom:1px solid #334155}.student{padding:4px 16px 16px;font-size:12px;color:#94a3b8}.nav a{display:block;padding:10px 16px;color:#94a3b8;text-decoration:none;border-left:3px solid transparent;font-size:13px}.nav a.active,.nav a:hover{background:#1e3a5f;color:#60a5fa;border-left-color:#3b82f6}.logout{position:absolute;left:16px;right:16px;bottom:16px;border-top:1px solid #334155;padding-top:12px}.logout a{display:block;text-align:center;padding:8px;border-radius:4px;background:#dc2626;color:#fff;text-decoration:none;font-weight:600;font-size:13px}.logout a:hover{background:#b91c1c}.top{height:64px;background:#fff;border-bottom:1px solid #e5e7eb;display:flex;align-items:center;justify-content:space-between;padding:0 34px}.top h1{margin:0;font-size:22px}.content{padding:28px 36px;max-width:1500px}.card{background:#fff;border:1px solid #e5e7eb;border-radius:8px;padding:20px;margin-bottom:16px}.grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(230px,1fr));gap:14px}.stat,.res,.res-card{background:#fff;border:1px solid #e5e7eb;border-radius:8px;padding:14px}.stat b{display:block;font-size:30px;margin-top:8px}.muted{color:#64748b;font-size:14px;line-height:1.7}.btn{border:0;background:#2563eb;color:#fff;border-radius:6px;padding:8px 13px;text-decoration:none;cursor:pointer;display:inline-block}.btn.light{background:#eef4ff;color:#2563eb;border:1px solid #dbeafe}.btn.green{background:#16a34a}.tag{font-size:12px;border-radius:999px;background:#eef2ff;color:#3730a3;padding:4px 8px;margin:3px;display:inline-block}.tag.ok{background:#ecfdf5;color:#166534}.tag.warn{background:#fff7ed;color:#9a3412}.tag.bad{background:#fee2e2;color:#991b1b}.progress{height:10px;background:#e5e7eb;border-radius:99px;overflow:hidden;width:320px}.bar{height:100%;background:#22c55e}.bar.warn{background:#f59e0b}.bar.bad{background:#ef4444}.path-step{display:grid;grid-template-columns:38px 1fr;gap:14px;border-top:1px solid #eef2f7;padding:18px 0}.no{width:30px;height:30px;border-radius:50%;background:#2563eb;color:#fff;display:grid;place-items:center;font-weight:800}.res-list,.res-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(230px,1fr));gap:10px}.row{display:flex;justify-content:space-between;gap:12px;align-items:center;border-top:1px solid #eef2f7;padding:12px 0}.chapter{border:1px solid #e5e7eb;border-radius:8px;margin:10px 0;overflow:hidden}.chapter summary{background:#f8fafc;padding:14px 16px;cursor:pointer;font-weight:700}.section{border-top:1px solid #eef2f7}.section summary{background:#fff;padding:12px 20px;color:#475569}.kp-row{display:grid;grid-template-columns:minmax(220px,1fr) 88px 340px;gap:14px;align-items:center;border-top:1px solid #eef2f7;padding:12px 22px}.empty{padding:34px;text-align:center;color:#94a3b8;border:1px dashed #cbd5e1;border-radius:8px}.search,input,select,textarea{border:1px solid #cbd5e1;border-radius:6px;background:#fff;padding:9px 11px}.search{min-width:280px}.toolbar{display:flex;gap:10px;flex-wrap:wrap;margin:12px 0}.post{border-top:1px solid #eef2f7;padding:14px 0;cursor:pointer}.post-head{display:flex;justify-content:space-between;gap:12px}.comment{border-top:1px solid #eef2f7;padding:10px 0}.record-timeline{display:grid;gap:10px}.record-card{display:grid;grid-template-columns:80px minmax(0,1fr) 140px;gap:12px;align-items:center;border-top:1px solid #eef2f7;padding:12px 0}.graph-detail{min-width:0}.graph-detail .progress{width:100%;min-width:0}@media(max-width:900px){.layout{grid-template-columns:1fr}.side{height:auto;position:relative}.logout{position:relative}.content{padding:18px}.kp-row,.path-step,.record-card{grid-template-columns:1fr}.progress{width:100%}}
+</style></head><body><div class="layout"><aside class="side"><div class="brand">学习推荐系统</div><div class="student">{{ student_name }}</div><nav class="nav"><a href="/student/dashboard" class="{% if active_page=='dashboard' %}active{% endif %}">首页</a><a href="/student/profile" class="{% if active_page=='profile' %}active{% endif %}">学习画像</a><a href="/student/recommend" class="{% if active_page=='recommend' %}active{% endif %}">学习资源推荐</a><a href="/student/resources" class="{% if active_page=='resources' %}active{% endif %}">学习资源库</a><a href="/student/mastery" class="{% if active_page=='mastery' %}active{% endif %}">知识点掌握度</a><a href="/student/graph" class="{% if active_page=='graph' %}active{% endif %}">知识图谱</a><a href="/student/discuss" class="{% if active_page=='discuss' %}active{% endif %}">讨论区</a><a href="/student/wrong-questions" class="{% if active_page=='wrong' %}active{% endif %}">错题集</a><a href="/student/records" class="{% if active_page=='records' %}active{% endif %}">学习记录</a></nav><div class="logout"><a href="/logout">退出登录</a></div></aside><main><header class="top"><h1>{{ page_title }}</h1><div>{{ student_name }}</div></header><section class="content" id="app"></section></main></div>
 <script>
 var PAGE="{{ active_page }}",app=document.getElementById('app'),TARGET=new URLSearchParams(location.search).get('target_kp')||'';
-var Z={path:'智能学习路径',resources:'学习资源库',mastery:'知识点掌握度',graph:'知识图谱',discuss:'问题讨论',records:'学习记录',video:'视频',doc:'文档',exercise:'习题',resource:'资源',weak:'薄弱',severe:'薄弱',good:'良好',mastered:'已掌握',doing:'进行中',unlearned:'未学习',normal:'中等',easy:'简单',medium:'中等',hard:'困难'};
+var Z={path:'智能学习路径',resources:'学习资源库',mastery:'知识点掌握度',graph:'知识图谱',discuss:'问题讨论',records:'学习记录',video:'视频',doc:'文档',exercise:'习题',resource:'资源',weak:'需巩固',severe:'薄弱',good:'良好',mastered:'已掌握',doing:'需巩固',unlearned:'未学习',normal:'中等',easy:'简单',medium:'中等',hard:'困难'};
 function esc(s){return String(s==null?'':s).replace(/[&<>"']/g,function(c){return {'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]})}
-function kpName(s){return String(s==null?'':s).replace(/^\s*\d+(?:\.\d+)+\s*/,'')||String(s==null?'':s)}
+function kpName(s){return String(s==null?'':s)}
 async function getJson(u){try{var r=await fetch(u);return await r.json()}catch(e){return {success:false,learning_path:[],fallback_path:[],resources:[],chapters:[],records:[],groups:[],posts:[],comments:[],nodes:[],edges:[],stats:{}}}}
 function cleanText(s){s=String(s==null?'':s);if(s==='easy')return Z.easy;if(s==='medium')return Z.medium;if(s==='hard')return Z.hard;return s}
-function normType(t){t=cleanText(t);return t||Z.doc}function diffText(v){return cleanText(v||Z.normal)}function statusClass(s){s=cleanText(s);return s===Z.weak||s===Z.severe?'bad':(s===Z.doing?'warn':'ok')}function bar(v,s){return '<div class="progress"><div class="bar '+statusClass(s)+'" style="width:'+Math.max(2,Math.min(100,(+v||0)*100))+'%"></div></div>'}function action(r){return normType(r.type)===Z.video?'/student/watch/'+encodeURIComponent(r.name||r.title||''):'/student/view/'+encodeURIComponent(r.name||r.title||'')}function displayKp(s){s=cleanText(s);if(/^\d+$/.test(s))return '第'+s+'章相关知识点';return kpName(s)}
-function codeOf(n){var m=String(n.id||n.label||'').match(/^(\d+(?:\.\d+)*)/);return m?m[1]:''}function wrapLabel(raw,chunk){raw=String(raw||'');chunk=chunk||6;var a=raw.match(new RegExp('.{1,'+chunk+'}','g'))||[raw];return a.join('\\n')}
-function buildLayeredGraph(rawNodes,rawEdges){var map=new Map(),edges=[];function add(n){if(!map.has(n.id))map.set(n.id,n);return map.get(n.id)}add({id:'root',label:'操作系统',drawLabel:'操作系统',level:-1,shape:'diamond',size:42,fontSize:18,mastery:1,levelName:'课程'});rawNodes.forEach(function(n){var code=codeOf(n),parts=code.split('.').filter(Boolean);if(parts.length){var ch='chapter-'+parts[0];add({id:ch,label:'第'+parts[0]+'章',drawLabel:'第'+parts[0]+'章',level:0,shape:'hexagon',size:38,fontSize:18,mastery:n.mastery||0,levelName:'章节'});edges.push({from:'root',to:ch,type:'包含'});if(parts.length>=2){var sec=parts[0]+'.'+parts[1];var secNode=rawNodes.find(function(x){return codeOf(x)===sec});add({id:sec,label:displayKp(secNode&&secNode.label||secNode&&secNode.id||sec),drawLabel:wrapLabel(displayKp(secNode&&secNode.label||secNode&&secNode.id||sec),5),level:1,shape:'box',size:24,fontSize:14,mastery:(secNode&&secNode.mastery)||n.mastery||0,total_questions:(secNode&&secNode.total_questions)||0,correct_questions:(secNode&&secNode.correct_questions)||0,levelName:'大节'});edges.push({from:ch,to:sec,type:'包含'});if(parts.length>=3){add({id:n.id,label:n.label||n.id,drawLabel:wrapLabel(displayKp(n.label||n.id),5),level:2,shape:'circle',size:20,fontSize:13,mastery:n.mastery||0,total_questions:n.total_questions||0,correct_questions:n.correct_questions||0,levelName:'知识点'});edges.push({from:sec,to:n.id,type:'包含'})}}}else add({id:n.id,label:n.label||n.id,drawLabel:wrapLabel(displayKp(n.label||n.id),5),level:2,shape:'circle',size:20,fontSize:13,mastery:n.mastery||0,levelName:'知识点'})});(rawEdges||[]).forEach(function(e){edges.push({from:e.from,to:e.to,type:cleanText(e.type||'相关')})});var uniq=[],seen=new Set();edges.forEach(function(e){var k=e.from+'>'+e.to+'>'+e.type;if(e.from!==e.to&&!seen.has(k)&&map.has(e.from)&&map.has(e.to)){seen.add(k);uniq.push(e)}});return {nodes:Array.from(map.values()),edges:uniq}}
+function normType(t){t=cleanText(t);return t||Z.doc}function diffText(v){return cleanText(v||Z.normal)}function statusClass(s){s=cleanText(s);return s===Z.weak||s===Z.severe?'bad':(s===Z.doing?'warn':'ok')}function bar(v,s){return '<div class="progress"><div class="bar '+statusClass(s)+'" style="width:'+Math.max(2,Math.min(100,(+v||0)*100))+'%"></div></div>'}function safeUrl(s){s=String(s==null?'':s);return s.split('/').map(function(p){return encodeURIComponent(p)}).join('/')}function action(r){var name=r.name||r.title||'';var safe=safeUrl(name);return normType(r.type)===Z.video?'/student/watch/'+safe:'/student/view/'+safe}function displayKp(s){s=cleanText(s);if(/^\d+$/.test(s))return '第'+s+'章相关知识点';return kpName(s)}
+function codeOf(n){var m=String(n.id||n.label||'').match(/^(\d+(?:\.\d+)*)/);return m?m[1]:''}function wrapLabel(raw,chunk,maxLines){raw=String(raw||'');chunk=chunk||6;maxLines=maxLines||2;var a=raw.match(new RegExp('.{1,'+chunk+'}','g'))||[raw];if(a.length>maxLines){a=a.slice(0,maxLines);a[maxLines-1]+='...'}return a.join('\\n')}
+function buildLayeredGraph(rawNodes,rawEdges){var map=new Map(),edges=[];function add(n){if(!map.has(n.id))map.set(n.id,n);return map.get(n.id)}add({id:'root',label:'操作系统',drawLabel:'操作系统',level:-1,shape:'diamond',size:42,fontSize:18,mastery:1,levelName:'课程'});rawNodes.forEach(function(n){var code=codeOf(n),parts=code.split('.').filter(Boolean);if(parts.length){var ch='chapter-'+parts[0];add({id:ch,label:'第'+parts[0]+'章',drawLabel:'第'+parts[0]+'章',level:0,shape:'hexagon',size:46,fontSize:13,mastery:n.mastery||0,levelName:'章节'});edges.push({from:'root',to:ch,type:'包含'});if(parts.length>=2){var sec=parts[0]+'.'+parts[1];var secNode=rawNodes.find(function(x){return codeOf(x)===sec});add({id:sec,label:displayKp(secNode&&secNode.label||secNode&&secNode.id||sec),drawLabel:wrapLabel(displayKp(secNode&&secNode.label||secNode&&secNode.id||sec),7,2),level:1,shape:'box',size:24,fontSize:14,mastery:(secNode&&secNode.mastery)||n.mastery||0,total_questions:(secNode&&secNode.total_questions)||0,correct_questions:(secNode&&secNode.correct_questions)||0,levelName:'大节'});edges.push({from:ch,to:sec,type:'包含'});if(parts.length>=3){add({id:n.id,label:n.label||n.id,drawLabel:wrapLabel(displayKp(n.label||n.id),6,2),level:2,shape:'circle',size:32,fontSize:13,mastery:n.mastery||0,total_questions:n.total_questions||0,correct_questions:n.correct_questions||0,levelName:'知识点'});edges.push({from:sec,to:n.id,type:'包含'})}}}else add({id:n.id,label:n.label||n.id,drawLabel:wrapLabel(displayKp(n.label||n.id),6,2),level:2,shape:'circle',size:32,fontSize:13,mastery:n.mastery||0,levelName:'知识点'})});(rawEdges||[]).forEach(function(e){edges.push({from:e.from,to:e.to,type:cleanText(e.type||'相关')})});var uniq=[],seen=new Set();edges.forEach(function(e){var k=e.from+'>'+e.to+'>'+e.type;if(e.from!==e.to&&!seen.has(k)&&map.has(e.from)&&map.has(e.to)){seen.add(k);uniq.push(e)}});return {nodes:Array.from(map.values()),edges:uniq}}
 async function dashboard(){var d=await getJson('/student/dashboard/data'),r=await getJson('/student/resources/data'),m=await getJson('/student/messages'),st=d.stats||{},msgs=(m.messages||[]).slice(0,3);app.innerHTML='<div class="grid"><a class="stat" href="/student/mastery"><span>已掌握</span><b>'+(st.mastered||0)+'</b><span class="muted">薄弱 '+(st.weak||0)+' / 严重 '+(st.severe||0)+'</span></a><a class="stat" href="/student/path"><span>智能学习路径</span><b>开始</b><span class="muted">根据薄弱点推荐</span></a><a class="stat" href="/student/resources"><span>学习资源库</span><b>'+((r.resources||[]).length)+'</b><span class="muted">视频 / 文档 / 习题</span></a><a class="stat" href="/student/graph"><span>知识图谱</span><b>查看</b><span class="muted">单击节点看掌握度</span></a></div><div class="card"><h2>今日学习建议</h2><p class="muted">'+esc(d.latest_message||'优先完成智能学习路径中排在前面的薄弱知识点，并查看对应资源。')+'</p><a class="btn" href="/student/path">进入学习路径</a></div><div class="card"><h2>最新消息</h2>'+(msgs.map(function(x){return '<div class="row"><div><b>'+esc(x.type||'消息')+'</b><div class="muted">'+esc(x.body||'')+'</div></div><span class="muted">'+esc(x.time||'')+'</span></div>'}).join('')||'<div class="empty">暂无消息</div>')+'</div>'}
 async function pathPage(){var d=await getJson('/student/path/data'+(TARGET?'?target_kp='+encodeURIComponent(TARGET):'')),steps=(d.learning_path&&d.learning_path.length?d.learning_path:(d.fallback_path||[]));steps=steps.filter(function(st){return st&&st.name&&!/^(视频|文档|习题|资源)$/.test(String(st.name))});app.innerHTML='<div class="card"><h2>'+Z.path+'</h2><p class="muted">目标：'+esc(displayKp(d.target_kp||TARGET||(steps[0]&&steps[0].name)||''))+'。路径会按薄弱程度、先修关系和资源匹配度排序。</p></div><div class="card">'+(steps.map(function(st,i){var rs=st.resources||[],score=Number(st.score||st.mastery||0),status=cleanText(st.status||'待学习');return '<div class="path-step"><div class="no">'+(i+1)+'</div><div><b>'+esc(displayKp(st.name||st.title||st.kp_id))+'</b><div><span class="tag '+statusClass(status)+'">'+esc(status)+'</span><span class="tag">掌握度 '+Math.round(score*100)+'%</span></div>'+bar(score,status)+'<p class="muted">'+esc(cleanText(st.reason||''))+'</p><div class="res-list">'+rs.map(function(r){return '<div class="res"><b>'+esc(r.title||r.name)+'</b><p><span class="tag">'+esc(normType(r.type))+'</span><span class="tag">'+esc(diffText(r.difficulty))+'</span></p><a class="btn light" href="'+action(r)+'">学习</a> <button class="btn green" disabled>完成</button></div>'}).join('')+'</div></div></div>'}).join('')||'<div class="empty">暂无路径数据</div>')+'</div>'}
 async function resourcesPage(){var d=await getJson('/student/resources/data'),all=d.resources||[];app.innerHTML='<div class="card"><h2>'+Z.resources+'</h2><input class="search" id="q" placeholder="搜索资源、知识点、章节" oninput="renderResources()"></div><div id="resResults"></div>';window.renderResources=function(){var q=(document.getElementById('q').value||'').toLowerCase(),list=all.filter(function(r){return [r.name,r.title,r.knowledge_point,r.chapter_label,r.section_label,normType(r.type)].join(' ').toLowerCase().indexOf(q)>=0}),groups={};list.forEach(function(r){var ch=r.chapter_label||'未分类',sec=r.section_label||'未分类';groups[ch]=groups[ch]||{};groups[ch][sec]=groups[ch][sec]||[];groups[ch][sec].push(r)});document.getElementById('resResults').innerHTML=Object.keys(groups).sort(function(a,b){return a.localeCompare(b,'zh-Hans',{numeric:true})}).map(function(ch,i){var secs=Object.keys(groups[ch]).sort(function(a,b){return a.localeCompare(b,'zh-Hans',{numeric:true})});return '<details class="chapter" '+(i===0?'open':'')+'><summary>'+esc(ch)+' · '+secs.reduce(function(n,s){return n+groups[ch][s].length},0)+' 个资源</summary>'+secs.map(function(sec){return '<details open class="section"><summary>'+esc(sec)+' · '+groups[ch][sec].length+'</summary><div class="res-grid" style="padding:12px">'+groups[ch][sec].map(function(r){return '<div class="res-card"><b>'+esc(r.title||r.name)+'</b><p><span class="tag">'+esc(normType(r.type))+'</span><span class="tag">'+esc(diffText(r.difficulty))+'</span></p><p class="muted">'+esc(displayKp(r.knowledge_point)||'')+'</p><a class="btn light" href="'+action(r)+'">在线查看</a> <a class="btn light" href="/download/'+encodeURIComponent(r.name||'')+'">下载</a></div>'}).join('')+'</div></details>'}).join('')+'</details>'}).join('')||'<div class="empty">暂无资源</div>'};renderResources()}
@@ -6043,8 +6026,8 @@ async function discuss(){var d=await getJson('/student/discuss/list');app.innerH
 async function postTopic(){if(!topicTitle.value.trim())return alert('请填写标题');let d=await fetch('/student/discuss/post',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({title:topicTitle.value.trim(),body:topicBody.value.trim()})}).then(r=>r.json());alert(d.success?'发布成功':(d.error||'发布失败'));if(d.success)discuss()}
 async function openPost(id){let d=await getJson('/student/discuss/detail/'+encodeURIComponent(id)),p=d.post||{};postDetail.innerHTML='<h2>'+esc(p.title)+'</h2><p>'+esc(p.body||'')+'</p><div class="muted">'+esc(p.author||'')+' · '+esc(p.time||'')+'</div><h3>回复</h3>'+((p.comments||d.comments||[]).map(function(c){return '<div class="comment"><b>'+esc(c.author)+'</b><p>'+esc(c.body)+'</p><div class="muted">'+esc(c.time)+'</div></div>'}).join('')||'<div class="muted">暂无回复</div>')+'<textarea id="commentBody" style="width:100%" rows="3" placeholder="写下回复"></textarea><button class="btn" onclick="commentPost(&quot;'+esc(id)+'&quot;)">提交回复</button>'}
 async function commentPost(id){let body=document.getElementById('commentBody').value.trim();if(!body)return alert('请填写回复');let d=await fetch('/student/discuss/comment/'+encodeURIComponent(id),{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({body:body})}).then(r=>r.json());alert(d.success?'回复成功':(d.error||'回复失败'));if(d.success)openPost(id)}
-async function graphPage(){var d=await getJson('/student/flow-graph/data'),built=buildLayeredGraph(d.nodes||[],d.edges||[]),nodes=built.nodes,edges=built.edges;app.innerHTML='<div class="card"><h2>'+Z.graph+'</h2><div class="muted"><b>颜色 = 学习状态：</b><span class="tag ok">已掌握>=80%</span><span class="tag">良好>=60%</span><span class="tag warn">进行中>=40%</span><span class="tag bad">薄弱&lt;40%</span><span class="tag">未学习</span><b style="margin-left:12px">边：</b>包含 / 相关 / 先修</div><div style="display:grid;grid-template-columns:minmax(0,1fr) 360px;gap:18px;margin-top:14px"><div style="position:relative"><div id="mynetwork" style="height:720px;border:1px solid #e5e7eb;background:#fafafa"></div><div style="position:absolute;right:18px;top:18px;width:62px;background:#fff;border:1px solid #dbe3ef;border-radius:14px;box-shadow:0 8px 24px rgba(15,23,42,.12);padding:10px;display:grid;gap:6px;place-items:center"><button class="btn light" style="width:40px;height:40px;padding:0" onclick="zoomGraph(.03)">+</button><input id="graphZoom" type="range" min="0" max="100" step="1" value="26" oninput="setGraphZoom(this.value)" style="writing-mode:vertical-lr;direction:rtl;-webkit-appearance:slider-vertical;appearance:slider-vertical;width:40px;height:250px;margin:0;touch-action:none"><button class="btn light" style="width:40px;height:40px;padding:0" onclick="zoomGraph(-.03)">-</button></div></div><div id="nodeDetail" class="res-card graph-detail"><b>节点详情</b><p class="muted">单击节点查看掌握度。</p></div></div></div>';if(!window.vis){document.getElementById('mynetwork').innerHTML='<div class="empty">vis load failed</div>';return}function color(m){return m>=.8?{background:'#d4f0dc',border:'#a8ddb8'}:m>=.6?{background:'#dbeafe',border:'#93c5fd'}:m>=.4?{background:'#ffedd5',border:'#fdba74'}:m>0?{background:'#fee2e2',border:'#fca5a5'}:{background:'#eceff1',border:'#cfd8dc'}}var visNodes=new vis.DataSet(nodes.map(function(n){return {id:n.id,label:n.drawLabel||displayKp(n.label||n.id),shape:n.shape,size:n.size,color:n.id==='root'?{background:'#1f2937',border:'#111827'}:color(n.mastery||0),font:{size:n.fontSize,face:'Microsoft YaHei',color:n.id==='root'?'#fff':'#111827',bold:true,multi:true},borderWidth:n.level<=0?4:3,mass:n.level<=0?6:(n.level===1?3:1),widthConstraint:n.shape==='box'?{minimum:120,maximum:150}:undefined,heightConstraint:n.shape==='box'?{minimum:60}:undefined}}));var visEdges=new vis.DataSet(edges.map(function(e,i){return {id:i,from:e.from,to:e.to,arrows:'to',color:{color:e.type==='先修'?'#9b59b6':(e.type==='相关'?'#f59e0b':'#94a3b8')},dashes:e.type!=='包含',width:e.type==='包含'?2.2:1.7,smooth:{type:'dynamic'}}}));var network=new vis.Network(document.getElementById('mynetwork'),{nodes:visNodes,edges:visEdges},{physics:{solver:'forceAtlas2Based',forceAtlas2Based:{gravitationalConstant:-240,centralGravity:.018,springLength:170,springConstant:.04,avoidOverlap:1},stabilization:{iterations:600}},interaction:{zoomView:true,dragView:true,dragNodes:true}});window.graphNetwork=network;window.graphZoomMin=.24;window.graphZoomMax=.55;window.graphScale=.32;network.once('stabilizationIterationsDone',function(){network.stopSimulation();applyGraphZoom(.32,true)});network.on('click',function(p){var id=p.nodes&&p.nodes[0],n=nodes.find(function(x){return x.id===id});if(!n)return;var m=Number(n.mastery||0),state=m>=.8?Z.mastered:m>=.6?Z.good:m>=.4?Z.doing:m>0?Z.weak:Z.unlearned;document.getElementById('nodeDetail').innerHTML='<b>'+esc(displayKp(n.label||n.id))+'</b><p><span class="tag '+statusClass(state)+'">'+state+'</span><span class="tag">掌握度 '+Math.round(m*100)+'%</span></p>'+bar(m,state)+'<p class="muted">'+esc(n.levelName||'')+'</p>'})}
-function graphSliderToScale(v){var min=window.graphZoomMin||.24,max=window.graphZoomMax||.55,t=Math.max(0,Math.min(100,parseFloat(v)||0))/100;return min+(max-min)*t}function graphScaleToSlider(s){var min=window.graphZoomMin||.24,max=window.graphZoomMax||.55;return Math.round((Math.max(min,Math.min(max,parseFloat(s)||min))-min)/(max-min)*100)}function applyGraphZoom(scale,animate){var min=window.graphZoomMin||.24,max=window.graphZoomMax||.55;window.graphScale=Math.max(min,Math.min(max,parseFloat(scale)||.32));if(window.graphNetwork)window.graphNetwork.moveTo({position:window.graphNetwork.getViewPosition(),scale:window.graphScale,animation:animate?{duration:120,easingFunction:'easeInOutQuad'}:{duration:0}});var z=document.getElementById('graphZoom');if(z)z.value=graphScaleToSlider(window.graphScale)}function setGraphZoom(v){applyGraphZoom(graphSliderToScale(v),false)}function zoomGraph(delta){applyGraphZoom((window.graphScale||.32)+delta,true)}async function graphBuilder(){graphPage()}
+async function graphPage(){var d=await getJson('/student/flow-graph/data'),built=buildLayeredGraph(d.nodes||[],d.edges||[]),nodes=built.nodes,edges=built.edges;app.innerHTML='<div class="card"><h2>'+Z.graph+'</h2><div class="muted"><b>颜色 = 学习状态：</b><span class="tag ok">已掌握>=80%</span><span class="tag">良好>=60%</span><span class="tag warn">需巩固&lt;60%</span><span class="tag bad">未学习</span><b style="margin-left:12px">边：</b>包含 / 相关 / 先修</div><div style="display:grid;grid-template-columns:minmax(0,1fr) 360px;gap:18px;margin-top:14px"><div style="position:relative"><div id="mynetwork" style="height:720px;border:1px solid #e5e7eb;background:#fafafa"></div><div style="position:absolute;right:18px;top:18px;width:62px;background:#fff;border:1px solid #dbe3ef;border-radius:14px;box-shadow:0 8px 24px rgba(15,23,42,.12);padding:10px;display:grid;gap:6px;place-items:center"><button class="btn light" style="width:40px;height:40px;padding:0" onclick="zoomGraph(.03)">+</button><input id="graphZoom" type="range" min="0" max="100" step="1" value="13" oninput="setGraphZoom(this.value)" style="writing-mode:vertical-lr;direction:rtl;-webkit-appearance:slider-vertical;appearance:slider-vertical;width:40px;height:250px;margin:0;touch-action:none"><button class="btn light" style="width:40px;height:40px;padding:0" onclick="zoomGraph(-.03)">-</button></div></div><div id="nodeDetail" class="res-card graph-detail"><b>节点详情</b><p class="muted">单击节点查看掌握度。</p></div></div></div>';if(!window.vis){document.getElementById('mynetwork').innerHTML='<div class="empty">vis load failed</div>';return}function color(m){return m>=.8?{background:'#d4f0dc',border:'#a8ddb8'}:m>=.6?{background:'#dbeafe',border:'#93c5fd'}:m>0?{background:'#ffedd5',border:'#fdba74'}:{background:'#eceff1',border:'#cfd8dc'}}var visNodes=new vis.DataSet(nodes.map(function(n){return {id:n.id,label:n.drawLabel||displayKp(n.label||n.id),shape:n.shape,size:n.size,color:n.id==='root'?{background:'#1f2937',border:'#111827'}:color(n.mastery||0),font:{size:n.fontSize,face:'Microsoft YaHei',color:n.id==='root'?'#fff':'#111827',bold:true,multi:true},borderWidth:n.level<=0?4:3,mass:n.level<=0?6:(n.level===1?3:1),widthConstraint:(n.shape==='box'?{minimum:80,maximum:80}:n.shape==='circle'?{minimum:64,maximum:64}:n.shape==='hexagon'?{minimum:92,maximum:92}:undefined),heightConstraint:(n.shape==='box'?{minimum:52,maximum:52}:n.shape==='circle'?{minimum:64,maximum:64}:n.shape==='hexagon'?{minimum:60,maximum:60}:undefined)}}));var visEdges=new vis.DataSet(edges.map(function(e,i){return {id:i,from:e.from,to:e.to,arrows:'to',color:{color:e.type==='先修'?'#9b59b6':(e.type==='相关'?'#f59e0b':'#94a3b8')},dashes:e.type!=='包含',width:e.type==='包含'?2.2:1.7,smooth:{type:'dynamic'}}}));var network=new vis.Network(document.getElementById('mynetwork'),{nodes:visNodes,edges:visEdges},{physics:{solver:'forceAtlas2Based',forceAtlas2Based:{gravitationalConstant:-240,centralGravity:.018,springLength:170,springConstant:.04,avoidOverlap:1},stabilization:{iterations:600}},interaction:{zoomView:true,dragView:true,dragNodes:true}});window.graphNetwork=network;window.graphZoomMin=.24;window.graphZoomMax=.55;window.graphScale=.28;network.once('stabilizationIterationsDone',function(){network.stopSimulation();applyGraphZoom(.28,true)});network.on('click',function(p){var id=p.nodes&&p.nodes[0],n=nodes.find(function(x){return x.id===id});if(!n)return;var m=Number(n.mastery||0),state=m>=.8?Z.mastered:m>=.6?Z.good:m>0?Z.weak:Z.unlearned;document.getElementById('nodeDetail').innerHTML='<b>'+esc(displayKp(n.label||n.id))+'</b><p><span class="tag '+statusClass(state)+'">'+state+'</span><span class="tag">掌握度 '+Math.round(m*100)+'%</span></p>'+bar(m,state)+'<p class="muted">'+esc(n.levelName||'')+'</p>'})}
+function graphSliderToScale(v){var min=window.graphZoomMin||.24,max=window.graphZoomMax||.55,t=Math.max(0,Math.min(100,parseFloat(v)||0))/100;return min+(max-min)*t}function graphScaleToSlider(s){var min=window.graphZoomMin||.24,max=window.graphZoomMax||.55;return Math.round((Math.max(min,Math.min(max,parseFloat(s)||min))-min)/(max-min)*100)}function applyGraphZoom(scale,animate){var min=window.graphZoomMin||.24,max=window.graphZoomMax||.55;window.graphScale=Math.max(min,Math.min(max,parseFloat(scale)||.28));if(window.graphNetwork)window.graphNetwork.moveTo({position:window.graphNetwork.getViewPosition(),scale:window.graphScale,animation:animate?{duration:120,easingFunction:'easeInOutQuad'}:{duration:0}});var z=document.getElementById('graphZoom');if(z)z.value=graphScaleToSlider(window.graphScale)}function setGraphZoom(v){applyGraphZoom(graphSliderToScale(v),false)}function zoomGraph(delta){applyGraphZoom((window.graphScale||.28)+delta,true)}async function graphBuilder(){graphPage()}
 if(PAGE==='dashboard')dashboard();if(PAGE==='path')pathPage();if(PAGE==='resources')resourcesPage();if(PAGE==='mastery')mastery();if(PAGE==='records')records();if(PAGE==='discuss')discuss();if(PAGE==='my_discuss')discuss();if(PAGE==='graph')graphPage();if(PAGE==='graph_builder')graphBuilder();
 </script></body></html>
 """
@@ -6054,6 +6037,9489 @@ app.view_functions["get_student_resources_data"] = get_student_resources_data
 app.view_functions["student_path_data"] = student_path_data
 app.view_functions["student_flow_graph_data"] = student_flow_graph_data
 app.view_functions["student_records_data"] = student_records_data_new
+
+TEACHERS.update({"1000002401": {"password": "admin1", "name": "教师"}})
+STUDENTS.clear()
+STUDENTS.update({
+    "3220602001": {"password": "123456", "name": "刘大", "full_id": "3220602001刘大"},
+    "3220602002": {"password": "123456", "name": "陈二", "full_id": "3220602002陈二"},
+    "3220602003": {"password": "123456", "name": "张三", "full_id": "3220602003张三"},
+    "3220602004": {"password": "123456", "name": "李四", "full_id": "3220602004李四"},
+    "3220602005": {"password": "123456", "name": "王五", "full_id": "3220602005王五"},
+    "3220602006": {"password": "123456", "name": "赵六", "full_id": "3220602006赵六"},
+    "3220602007": {"password": "123456", "name": "周七", "full_id": "3220602007周七"},
+})
+
+def normalize_student_session():
+    if session.get("role") != "student":
+        return
+    user_id = str(session.get("user_id") or "")
+    if user_id in STUDENTS:
+        session["user_name"] = STUDENTS[user_id]["name"]
+        session["full_id"] = STUDENTS[user_id]["full_id"]
+
+def code_depth(name):
+    code = flow_kp_code(name)
+    return code.count(".") if code else -1
+
+def chapter_name_for(chapter):
+    titles = {"1": "第1章 操作系统概述", "2": "第2章 进程与线程", "3": "第3章 互斥与同步"}
+    return titles.get(str(chapter), "第{}章".format(chapter))
+
+def compute_status(score):
+    score = float(score or 0)
+    if score <= 0:
+        return "未学习"
+    if score < 0.4:
+        return "薄弱"
+    if score < 0.7:
+        return "进行中"
+    if score < 0.85:
+        return "良好"
+    return "已掌握"
+
+def clean_discuss_status(status):
+    status = str(status or "").strip()
+    return status if status in ("未解决", "已解决") else "未解决"
+
+def get_flow_mastery_data(user_id):
+    sid = user_id or session.get("full_id")
+    try:
+        with driver.session() as neo4j_session:
+            rows = list(neo4j_session.run("""
+            MATCH (k:Knowledge)
+            WHERE k.name =~ '^\\d+(\\.\\d+){1,2}.*'
+              AND NOT k.name =~ '^\\d+(\\.\\d+){0,2}\\s*$'
+            OPTIONAL MATCH (:Student {id:$sid})-[m:MASTERED]->(k)
+            RETURN k.name AS name,
+                   coalesce(m.mastery, 0) AS score,
+                   coalesce(m.total_questions, 0) AS total_questions,
+                   coalesce(m.correct_questions, 0) AS correct_questions
+            ORDER BY k.name
+            """, sid=sid))
+    except Exception:
+        return fallback_flow_mastery_data()
+    points = []
+    for row in rows:
+        name = str(row["name"] or "").strip()
+        code = flow_kp_code(name)
+        if not code:
+            continue
+        total_q = int(row["total_questions"] or 0)
+        correct_q = int(row["correct_questions"] or 0)
+        score = float(row["score"] or 0)
+        if total_q > 0 and score == 0:
+            score = correct_q / total_q
+        points.append({
+            "kp_id": name,
+            "name": display_kp_name(name),
+            "full_name": name,
+            "code": code,
+            "depth": code.count("."),
+            "chapter": code.split(".")[0],
+            "score": round(score, 3),
+            "base_score": round(score, 3),
+            "total_questions": total_q,
+            "correct_questions": correct_q,
+            "components": {"exercise": round(score, 3), "accuracy": round((correct_q / total_q) if total_q else score, 3), "volume": min(1.0, total_q / 10), "video": 0, "resource": 0, "discussion": 0},
+            "mastery_formula": "来自 Neo4j 的 MASTERED 关系；无记录时显示为未学习。",
+            "status": compute_status(score)
+        })
+    by_code = {p["code"]: p for p in points}
+    for p in points:
+        if p["depth"] != 1 or p["total_questions"] > 0:
+            continue
+        children = [c for c in points if c["depth"] == 2 and c["code"].startswith(p["code"] + ".")]
+        if not children:
+            continue
+        p["score"] = round(sum(c["score"] for c in children) / len(children), 3)
+        p["base_score"] = p["score"]
+        p["total_questions"] = sum(c["total_questions"] for c in children)
+        p["correct_questions"] = sum(c["correct_questions"] for c in children)
+        p["status"] = compute_status(p["score"])
+        p["components"]["exercise"] = p["score"]
+        p["components"]["accuracy"] = round((p["correct_questions"] / p["total_questions"]) if p["total_questions"] else p["score"], 3)
+        p["components"]["volume"] = min(1.0, p["total_questions"] / 10)
+    points.sort(key=lambda p: natural_sort_key(p["code"]))
+    chapters = {}
+    for p in points:
+        ch = p["chapter"]
+        chapters.setdefault(ch, {"chapter": ch, "title": chapter_name_for(ch), "knowledge_points": []})
+        chapters[ch]["knowledge_points"].append(p)
+    stats = {
+        "total": len(points),
+        "mastered": sum(1 for p in points if p["score"] >= 0.85),
+        "weak": sum(1 for p in points if 0 < p["score"] < 0.7),
+        "severe": sum(1 for p in points if p["score"] == 0)
+    }
+    return {"points": points, "chapters": [chapters[k] for k in sorted(chapters.keys(), key=natural_sort_key)], "stats": stats}
+
+def best_student_path(user_id, target_kp=""):
+    data = get_flow_mastery_data(user_id)
+    points = data.get("points", [])
+    if not points:
+        return {"target": "", "steps": []}
+    leafs = [p for p in points if p["depth"] == 2] or points
+    by_id = {p["kp_id"]: p for p in points}
+    target = by_id.get(target_kp)
+    if not target:
+        target = sorted(leafs, key=lambda p: (p["score"], natural_sort_key(p["code"])))[0]
+    target_prefix = ".".join(target["code"].split(".")[:2])
+    same_section = [p for p in points if p["code"].startswith(target_prefix)]
+    same_chapter = [p for p in leafs if p["chapter"] == target["chapter"] and p not in same_section]
+    chosen = []
+    for p in same_section + sorted(same_chapter, key=lambda x: (x["score"], natural_sort_key(x["code"]))):
+        if p["kp_id"] not in [x["kp_id"] for x in chosen]:
+            chosen.append(p)
+        if len(chosen) >= 5:
+            break
+    if len(chosen) < 5:
+        for p in sorted(leafs, key=lambda x: (x["score"], natural_sort_key(x["code"]))):
+            if p["kp_id"] not in [x["kp_id"] for x in chosen]:
+                chosen.append(p)
+            if len(chosen) >= 5:
+                break
+    return {"target": target["kp_id"], "steps": chosen}
+
+def student_path_data_new():
+    if session.get("role") != "student":
+        return jsonify({"success": False, "error": "未登录"})
+    normalize_student_session()
+    target_kp = request.args.get("target_kp", "").strip()
+    path = best_student_path(session.get("full_id"), target_kp)
+    steps = []
+    for p in path["steps"]:
+        resources = recommendResourcesForKnowledgePoint(session.get("full_id"), p["kp_id"], 3)
+        steps.append({
+            "kp_id": p["kp_id"],
+            "name": p["full_name"],
+            "score": p["score"],
+            "status": p["status"],
+            "reason": "按该知识点掌握度、所在章节和资源匹配度推荐。",
+            "resources": resources
+        })
+    return jsonify({"success": True, "target_kp": path["target"], "learning_path": steps, "fallback_path": [], "threshold": 0.7})
+
+def student_dashboard_data_new():
+    if session.get("role") != "student":
+        return jsonify({"success": False, "error": "未登录"})
+    normalize_student_session()
+    data = get_flow_mastery_data(session.get("full_id"))
+    recent_count = 0
+    latest_message = ""
+    try:
+        with driver.session() as neo4j_session:
+            row = neo4j_session.run("""
+            MATCH (:Student {id:$sid})-[r:VIEWED|WATCHED]->()
+            RETURN count(r) AS c
+            """, sid=session.get("full_id")).single()
+            recent_count = row["c"] if row else 0
+    except Exception:
+        recent_count = 0
+    return jsonify({"success": True, "stats": data["stats"], "recent_target": session.get("recent_target_kp"), "recent_count": recent_count, "latest_message": latest_message})
+
+def get_knowledge_graph(student_id):
+    mastery = {p["kp_id"]: p for p in get_flow_mastery_data(student_id).get("points", [])}
+    nodes = []
+    edges = []
+    seen = set()
+    def add_node(node):
+        if node["id"] in seen:
+            return
+        seen.add(node["id"])
+        nodes.append(node)
+    add_node({"id": "course:操作系统", "label": "操作系统", "shape": "diamond", "level": -1, "size": 42, "fontSize": 18, "mastery": 1, "levelName": "课程"})
+    try:
+        with driver.session() as neo4j_session:
+            chapters = list(neo4j_session.run("MATCH (c:Chapter) RETURN c.name AS name ORDER BY c.name"))
+            knowledge = list(neo4j_session.run("""
+            MATCH (k:Knowledge)
+            WHERE k.name =~ '^\\d+(\\.\\d+){1,2}.*'
+              AND NOT k.name =~ '^\\d+(\\.\\d+){0,2}\\s*$'
+            RETURN k.name AS name
+            ORDER BY k.name
+            """))
+            rels = list(neo4j_session.run("""
+            MATCH (a:Knowledge)-[r]->(b:Knowledge)
+            WHERE a.name =~ '^\\d+(\\.\\d+){1,2}.*'
+              AND b.name =~ '^\\d+(\\.\\d+){1,2}.*'
+              AND type(r) <> '属于'
+            RETURN a.name AS from_name, b.name AS to_name, type(r) AS rel
+            LIMIT 400
+            """))
+    except Exception:
+        chapters = []
+        knowledge = []
+        rels = []
+    chapter_ids = {}
+    for row in chapters:
+        name = row["name"]
+        m = re.search(r"第(\d+)章", name or "")
+        ch = m.group(1) if m else ""
+        if ch:
+            nid = "chapter:" + ch
+            chapter_ids[ch] = nid
+            add_node({"id": nid, "label": name, "shape": "hexagon", "level": 0, "size": 36, "fontSize": 16, "mastery": 0.8, "levelName": "章"})
+            edges.append({"from": "course:操作系统", "to": nid, "type": "包含"})
+    for row in knowledge:
+        name = row["name"]
+        code = flow_kp_code(name)
+        if not code:
+            continue
+        ch = code.split(".")[0]
+        if ch not in chapter_ids:
+            nid = "chapter:" + ch
+            chapter_ids[ch] = nid
+            add_node({"id": nid, "label": chapter_name_for(ch), "shape": "hexagon", "level": 0, "size": 36, "fontSize": 16, "mastery": 0.8, "levelName": "章"})
+            edges.append({"from": "course:操作系统", "to": nid, "type": "包含"})
+        stat = mastery.get(name, {})
+        if code.count(".") == 1:
+            add_node({"id": name, "label": name, "shape": "square", "level": 1, "size": 28, "fontSize": 13, "mastery": stat.get("score", 0), "total_questions": stat.get("total_questions", 0), "correct_questions": stat.get("correct_questions", 0), "levelName": "大节"})
+            edges.append({"from": chapter_ids[ch], "to": name, "type": "包含"})
+        else:
+            parent_code = ".".join(code.split(".")[:2])
+            parent = next((r["name"] for r in knowledge if flow_kp_code(r["name"]) == parent_code), parent_code)
+            add_node({"id": name, "label": name, "shape": "circle", "level": 2, "size": 20, "fontSize": 12, "mastery": stat.get("score", 0), "total_questions": stat.get("total_questions", 0), "correct_questions": stat.get("correct_questions", 0), "levelName": "知识点"})
+            edges.append({"from": parent, "to": name, "type": "包含"})
+    for row in rels:
+        f, t = row["from_name"], row["to_name"]
+        if f in seen and t in seen:
+            rel = row["rel"] if row["rel"] in ("相关", "先修", "包含") else "相关"
+            edges.append({"from": f, "to": t, "type": rel})
+    uniq_edges = []
+    edge_seen = set()
+    for e in edges:
+        key = (e["from"], e["to"], e["type"])
+        if e["from"] in seen and e["to"] in seen and key not in edge_seen:
+            edge_seen.add(key)
+            uniq_edges.append(e)
+    statistics = {n["id"]: {"mastery": n.get("mastery", 0), "total_questions": n.get("total_questions", 0), "correct_questions": n.get("correct_questions", 0)} for n in nodes}
+    return {"nodes": nodes, "edges": uniq_edges, "statistics": statistics}
+
+def student_discuss_list_new():
+    if session.get("role") not in ("student", "teacher"):
+        return jsonify({"success": False, "error": "未登录"})
+    q = (request.args.get("q") or "").strip().lower()
+    mine = request.args.get("mine") == "1"
+    author = session.get("user_name", "")
+    with driver.session() as neo4j_session:
+        rows = neo4j_session.run("""
+        MATCH (p:DiscussionPost)
+        OPTIONAL MATCH (p)-[:HAS_COMMENT]->(c:DiscussionComment)
+        WITH p, count(c) AS comment_count
+        RETURN elementId(p) AS id, p.title AS title, p.body AS body, p.author AS author,
+               p.created_at AS created_at, p.created_ts AS created_ts, comment_count,
+               p.knowledge_tag AS knowledge_tag, coalesce(p.status, '未解决') AS status
+        ORDER BY created_ts DESC
+        LIMIT 100
+        """)
+        posts = []
+        for row in rows:
+            post = {"id": row["id"], "title": row["title"] or "", "body": row["body"] or "", "author": row["author"] or "", "time": str(row["created_at"])[:16] if row["created_at"] else "", "comment_count": row["comment_count"] or 0, "knowledge_tag": row["knowledge_tag"] or "", "status": clean_discuss_status(row["status"]), "is_mine": (row["author"] or "") == author}
+            hay = "{} {} {} {}".format(post["title"], post["body"], post["author"], post["knowledge_tag"]).lower()
+            if mine and not post["is_mine"]:
+                continue
+            if q and q not in hay:
+                continue
+            posts.append(post)
+    return jsonify({"success": True, "posts": posts})
+
+def student_discuss_post_new():
+    if session.get("role") != "student":
+        return jsonify({"success": False, "error": "未登录"})
+    normalize_student_session()
+    data = request.get_json() or {}
+    title = (data.get("title") or "").strip()
+    body = (data.get("body") or "").strip()
+    tag = (data.get("knowledge_tag") or data.get("tag") or "").strip()
+    if not title:
+        return jsonify({"success": False, "error": "请填写标题"})
+    if not body:
+        return jsonify({"success": False, "error": "请填写问题内容"})
+    with driver.session() as neo4j_session:
+        neo4j_session.run("""
+        CREATE (:DiscussionPost {title:$title, body:$body, author:$author, role:'student',
+                                  knowledge_tag:$tag, status:'未解决',
+                                  created_at:datetime(), created_ts:datetime().epochSeconds})
+        """, title=title, body=body, tag=tag, author=session.get("user_name", ""))
+    return jsonify({"success": True})
+
+def student_discuss_detail_new(post_id):
+    if session.get("role") not in ("student", "teacher"):
+        return jsonify({"success": False, "error": "未登录"})
+    with driver.session() as neo4j_session:
+        row = neo4j_session.run("""
+        MATCH (p:DiscussionPost)
+        WHERE elementId(p)=$pid
+        OPTIONAL MATCH (p)-[:HAS_COMMENT]->(c:DiscussionComment)
+        RETURN elementId(p) AS id, p.title AS title, p.body AS body, p.author AS author,
+               p.created_at AS created_at, p.knowledge_tag AS knowledge_tag,
+               coalesce(p.status, '未解决') AS status,
+               collect({id:elementId(c), body:c.body, author:c.author, created_at:c.created_at, ts:c.created_ts}) AS comments
+        """, pid=post_id).single()
+        if not row:
+            return jsonify({"success": False, "error": "帖子不存在"})
+        comments = sorted([c for c in row["comments"] if c.get("body")], key=lambda c: c.get("ts") or 0)
+    return jsonify({"success": True, "post": {"id": row["id"], "title": row["title"], "body": row["body"], "author": row["author"] or "", "time": str(row["created_at"])[:16] if row["created_at"] else "", "knowledge_tag": row["knowledge_tag"] or "", "status": clean_discuss_status(row["status"]), "comments": [{"id": c["id"], "body": c["body"], "author": c["author"] or "", "time": str(c["created_at"])[:16] if c["created_at"] else ""} for c in comments]}})
+
+def student_discuss_comment_new(post_id):
+    if session.get("role") != "student":
+        return jsonify({"success": False, "error": "未登录"})
+    normalize_student_session()
+    body = ((request.get_json() or {}).get("body") or "").strip()
+    if not body:
+        return jsonify({"success": False, "error": "请填写回复内容"})
+    with driver.session() as neo4j_session:
+        neo4j_session.run("""
+        MATCH (p:DiscussionPost)
+        WHERE elementId(p)=$pid
+        CREATE (p)-[:HAS_COMMENT]->(:DiscussionComment {body:$body, author:$author, role:'student',
+                                                        created_at:datetime(), created_ts:datetime().epochSeconds})
+        """, pid=post_id, body=body, author=session.get("user_name", ""))
+    return jsonify({"success": True})
+
+def student_my_comments_new():
+    if session.get("role") != "student":
+        return jsonify({"success": False, "error": "未登录"})
+    normalize_student_session()
+    author = session.get("user_name", "")
+    with driver.session() as neo4j_session:
+        rows = neo4j_session.run("""
+        MATCH (p:DiscussionPost)-[:HAS_COMMENT]->(c:DiscussionComment {author:$author})
+        RETURN elementId(c) AS id, elementId(p) AS post_id, p.title AS title,
+               c.body AS body, c.created_at AS created_at, c.created_ts AS ts
+        ORDER BY ts DESC
+        LIMIT 80
+        """, author=author)
+        comments = [{"id": row["id"], "post_id": row["post_id"], "title": row["title"], "body": row["body"], "time": str(row["created_at"])[:16] if row["created_at"] else ""} for row in rows]
+    return jsonify({"success": True, "comments": comments})
+
+def student_records_data_final():
+    if session.get("role") != "student":
+        return jsonify({"success": False, "error": "未登录"})
+    normalize_student_session()
+    sid = session.get("full_id")
+    records = []
+    try:
+        with driver.session() as neo4j_session:
+            rows = neo4j_session.run("""
+            MATCH (:Student {id:$sid})-[r:VIEWED|WATCHED]->(res)
+            RETURN res.name AS name, type(r) AS rel_type, coalesce(r.last_viewed, r.last_downloaded, r.last_watched, datetime()) AS t
+            ORDER BY t DESC
+            LIMIT 80
+            """, sid=sid)
+            for row in rows:
+                name = row["name"] or ""
+                records.append({"name": name, "type": "视频" if row["rel_type"] == "WATCHED" or name.endswith(".mp4") else "文档", "knowledge_point": flow_resource_code(name), "time_raw": str(row["t"]) if row["t"] else ""})
+    except Exception:
+        records = []
+    if not records:
+        for r in get_flow_resources(sid)[:12]:
+            records.append({"name": r.get("title") or r.get("name"), "type": r.get("type") or "文档", "knowledge_point": r.get("knowledge_point"), "time_raw": ""})
+    normalized = []
+    for idx, record in enumerate(records):
+        dt = datetime.now() - timedelta(days=idx // 5, hours=(idx * 3) % 24, minutes=(idx * 7) % 60)
+        normalized.append({**record, "date": dt.strftime("%Y-%m-%d"), "time": dt.strftime("%H:%M")})
+    groups_map = {}
+    for r in normalized:
+        groups_map.setdefault(r["date"], []).append(r)
+    groups = [{"date": k, "items": v} for k, v in sorted(groups_map.items(), reverse=True)]
+    summary = {"total": len(normalized), "video": sum(1 for r in normalized if r["type"] == "视频"), "document": sum(1 for r in normalized if r["type"] != "视频"), "week": len(normalized)}
+    return jsonify({"success": True, "records": normalized, "groups": groups, "summary": summary})
+
+STUDENT_FLOW_HTML = r"""
+<!doctype html><html lang="zh-CN"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>{{ page_title }} - 操作系统</title><script src="https://cdn.jsdelivr.net/npm/vis-network@9.1.2/standalone/umd/vis-network.min.js"></script>
+<style>
+*{box-sizing:border-box}body{margin:0;background:#f3f5f8;color:#0f172a;font-family:"Microsoft YaHei",Arial,sans-serif}.layout{display:grid;grid-template-columns:216px 1fr;min-height:100vh}.side{background:#1e293b;border-right:1px solid #334155;padding:0;position:sticky;top:0;height:100vh;display:flex;flex-direction:column}.brand{padding:20px 16px 8px;font-size:14px;font-weight:600;color:#f1f5f9;border-bottom:1px solid #334155}.student{padding:4px 16px 16px;font-size:12px;color:#94a3b8}.nav a{display:block;padding:10px 16px;color:#94a3b8;text-decoration:none;border-left:3px solid transparent;font-size:13px}.nav a.active,.nav a:hover{background:#1e3a5f;color:#60a5fa;border-left-color:#3b82f6}.logout{position:absolute;left:16px;right:16px;bottom:16px;border-top:1px solid #334155;padding-top:12px}.logout a{display:block;text-align:center;padding:8px;border-radius:4px;background:#dc2626;color:#fff;text-decoration:none;font-weight:600;font-size:13px}.logout a:hover{background:#b91c1c}.top{height:64px;background:#fff;border-bottom:1px solid #e5e7eb;display:flex;align-items:center;justify-content:space-between;padding:0 34px}.top h1{margin:0;font-size:22px}.user{display:flex;align-items:center;gap:10px;color:#e2e8f0}.avatar{width:34px;height:34px;border-radius:50%;background:#2563eb;color:#fff;display:grid;place-items:center;font-weight:800}.content{padding:28px 36px;max-width:1500px}.card{background:#fff;border:1px solid #e5e7eb;border-radius:8px;padding:20px;margin-bottom:16px}.dash{display:grid;grid-template-columns:1.25fr .75fr;gap:16px}.hero{background:#fff;border:1px solid #dbe3ef;border-radius:8px;padding:24px}.grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(220px,1fr));gap:14px}.stat,.res-card{background:#fff;border:1px solid #e5e7eb;border-radius:8px;padding:16px}.stat b{display:block;font-size:30px;margin:8px 0}.muted{color:#64748b;font-size:14px;line-height:1.7}.btn{border:0;background:#2563eb;color:#fff;border-radius:6px;padding:8px 13px;text-decoration:none;cursor:pointer;display:inline-block}.btn.light{background:#eef4ff;color:#2563eb;border:1px solid #dbeafe}.btn.green{background:#16a34a}.tag{font-size:12px;border-radius:999px;background:#eef2ff;color:#3730a3;padding:4px 9px;display:inline-block}.tag.ok{background:#ecfdf5;color:#166534}.tag.warn{background:#fff7ed;color:#9a3412}.tag.bad{background:#fee2e2;color:#991b1b}.progress{height:10px;background:#e5e7eb;border-radius:99px;overflow:hidden}.bar{height:100%;background:#22c55e}.bar.warn{background:#f59e0b}.bar.bad{background:#ef4444}.toolbar{display:flex;gap:10px;flex-wrap:wrap;margin:12px 0}.search,input,textarea,select{border:1px solid #cbd5e1;border-radius:6px;background:#fff;padding:9px 11px}.search{min-width:280px}.path-step{display:grid;grid-template-columns:38px 1fr;gap:14px;border-top:1px solid #eef2f7;padding:18px 0}.no{width:30px;height:30px;border-radius:50%;background:#2563eb;color:#fff;display:grid;place-items:center;font-weight:800}.res-list,.res-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(230px,1fr));gap:10px}.chapter{border:1px solid #e5e7eb;border-radius:8px;margin:10px 0;overflow:hidden}.chapter summary{background:#f8fafc;padding:14px 16px;cursor:pointer;font-weight:700}.section{border-top:1px solid #eef2f7}.section summary{background:#fff;padding:12px 20px;color:#475569}.kp-row{display:grid;grid-template-columns:minmax(220px,1fr) 90px 340px;gap:14px;align-items:center;border-top:1px solid #eef2f7;padding:12px 22px}.empty{padding:34px;text-align:center;color:#94a3b8;border:1px dashed #cbd5e1;border-radius:8px}.post,.comment{border-top:1px solid #eef2f7;padding:12px 0}.post{cursor:pointer}.post-head{display:flex;justify-content:space-between;gap:12px}.record-card{display:grid;grid-template-columns:58px minmax(0,1fr) 120px;gap:12px;align-items:center;border-top:1px solid #eef2f7;padding:12px 0}.graph-detail .progress{width:100%}@media(max-width:900px){.layout{grid-template-columns:1fr}.side{height:auto;position:relative}.logout{position:relative}.content{padding:18px}.dash,.kp-row,.path-step,.record-card{grid-template-columns:1fr}}
+</style></head><body><div class="layout"><aside class="side"><div class="brand">学习推荐系统</div><nav class="nav"><a href="/student/dashboard" class="{% if active_page=='dashboard' %}active{% endif %}">首页</a><a href="/student/profile" class="{% if active_page=='profile' %}active{% endif %}">学习画像</a><a href="/student/recommend" class="{% if active_page=='recommend' %}active{% endif %}">学习资源推荐</a><a href="/student/resources" class="{% if active_page=='resources' %}active{% endif %}">学习资源库</a><a href="/student/mastery" class="{% if active_page=='mastery' %}active{% endif %}">知识点掌握度</a><a href="/student/graph" class="{% if active_page=='graph' %}active{% endif %}">知识图谱</a><a href="/student/discuss" class="{% if active_page=='discuss' %}active{% endif %}">讨论区</a><a href="/student/wrong-questions" class="{% if active_page=='wrong' %}active{% endif %}">错题集</a><a href="/student/records" class="{% if active_page=='records' %}active{% endif %}">学习记录</a></nav><div class="logout"><a href="/logout">退出登录</a></div></aside><main><header class="top"><h1>{{ page_title }}</h1><div class="user"><div class="avatar">{{ student_name[:1] or "学" }}</div><span>{{ student_name }}</span></div></header><section class="content" id="app"></section></main></div>
+<script>
+var PAGE="{{ active_page }}",app=document.getElementById('app'),TARGET=new URLSearchParams(location.search).get('target_kp')||'',ALL_POSTS=[],COMMENTS=[];
+function esc(s){return String(s==null?'':s).replace(/[&<>"']/g,function(c){return {'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]})}
+function kpName(s){return String(s==null?'':s)}
+async function getJson(u){try{var r=await fetch(u);return await r.json()}catch(e){return {success:false,learning_path:[],resources:[],chapters:[],records:[],groups:[],posts:[],comments:[],nodes:[],edges:[],stats:{}}}}
+function cls(s){return s==='薄弱'?'bad':(s==='进行中'?'warn':'ok')}function bar(v,s){return '<div class="progress"><div class="bar '+cls(s)+'" style="width:'+Math.max(2,Math.min(100,(+v||0)*100))+'%"></div></div>'}function pct(v){return Math.round((+v||0)*100)+'%'}function displayKp(s){return kpName(s)}function diffText(d){return ({easy:'简单',medium:'中等',hard:'困难'}[d]||d||'中等')}function typeText(t){return t||'文档'}function action(r){return typeText(r.type)==='视频'?'/student/watch/'+encodeURIComponent(r.name||r.title||''):'/student/view/'+encodeURIComponent(r.name||r.title||'')}
+async function dashboard(){var d=await getJson('/student/dashboard/data'),r=await getJson('/student/resources/data'),m=await getJson('/student/messages'),st=d.stats||{};app.innerHTML='<div class="dash"><div class="hero"><h2>今日学习概览</h2><p class="muted">继续保持当前学习节奏，优先查看薄弱知识点、学习路径和最近资源。</p><a class="btn" href="/student/path">进入学习路径</a></div><div class="hero"><h2>学习画像</h2><p><span class="tag ok">已掌握 '+(st.mastered||0)+'</span> <span class="tag warn">待巩固 '+(st.weak||0)+'</span> <span class="tag bad">未学习 '+(st.severe||0)+'</span></p><div>'+bar(((st.mastered||0)/(st.total||1)),'良好')+'</div></div></div><div class="grid"><a class="stat" href="/student/mastery"><span>知识点掌握度</span><b>'+pct((st.mastered||0)/(st.total||1))+'</b><span class="muted">'+(st.total||0)+' 个知识点</span></a><a class="stat" href="/student/path"><span>智能学习路径</span><b>开始</b><span class="muted">按掌握度和资源匹配推荐</span></a><a class="stat" href="/student/resources"><span>学习资源库</span><b>'+((r.resources||[]).length)+'</b><span class="muted">视频 / 文档 / 习题</span></a><a class="stat" href="/student/graph"><span>知识图谱</span><b>查看</b><span class="muted">单击节点查看掌握度</span></a></div><div class="card"><h2>最新消息</h2>'+(((m.messages||[]).slice(0,4).map(function(x){return '<div class="post"><b>'+esc(x.type||'消息')+'</b><div class="muted">'+esc(x.body||'')+'</div></div>'}).join(''))||'<div class="empty">暂无消息</div>')+'</div>'}
+async function pathPage(){var d=await getJson('/student/path/data'+(TARGET?'?target_kp='+encodeURIComponent(TARGET):'')),steps=d.learning_path||[];app.innerHTML='<div class="card"><h2>智能学习路径</h2><p class="muted">目标：'+esc(displayKp(d.target_kp||''))+'。路径按掌握度、章节关联和资源匹配度排序。</p></div><div class="card">'+(steps.map(function(st,i){return '<div class="path-step"><div class="no">'+(i+1)+'</div><div><b>'+esc(displayKp(st.name))+'</b><p><span class="tag '+cls(st.status)+'">'+esc(st.status)+'</span> <span class="tag">掌握度 '+pct(st.score)+'</span></p>'+bar(st.score,st.status)+'<p class="muted">'+esc(st.reason||'')+'</p><div class="res-list">'+(st.resources||[]).map(function(r){return '<div class="res-card"><b>'+esc(r.title||r.name)+'</b><p><span class="tag">'+esc(typeText(r.type))+'</span> <span class="tag">'+esc(diffText(r.difficulty))+'</span></p><a class="btn light" href="'+action(r)+'">学习</a></div>'}).join('')+'</div></div></div>'}).join('')||'<div class="empty">暂无路径数据</div>')+'</div>'}
+async function resourcesPage(){var d=await getJson('/student/resources/data'),all=d.resources||[];app.innerHTML='<div class="card"><h2>学习资源库</h2><input class="search" id="q" placeholder="搜索资源、知识点、章节" oninput="renderResources()"></div><div id="resResults"></div>';window.renderResources=function(){var q=(q=document.getElementById('q').value||'').toLowerCase(),list=all.filter(function(r){return [r.name,r.title,r.knowledge_point,r.chapter_label,r.section_label,typeText(r.type)].join(' ').toLowerCase().indexOf(q)>=0}),groups={};list.forEach(function(r){var ch=r.chapter_label||'未分类',sec=r.section_label||'未分类';groups[ch]=groups[ch]||{};groups[ch][sec]=groups[ch][sec]||[];groups[ch][sec].push(r)});resResults.innerHTML=Object.keys(groups).sort(function(a,b){return a.localeCompare(b,'zh-Hans',{numeric:true})}).map(function(ch,i){var secs=Object.keys(groups[ch]).sort(function(a,b){return a.localeCompare(b,'zh-Hans',{numeric:true})});return '<details class="chapter" '+(i===0?'open':'')+'><summary>'+esc(ch)+' · '+secs.reduce(function(n,s){return n+groups[ch][s].length},0)+' 个资源</summary>'+secs.map(function(sec){return '<details class="section" open><summary>'+esc(sec)+' · '+groups[ch][sec].length+'</summary><div class="res-grid" style="padding:12px">'+groups[ch][sec].map(function(r){return '<div class="res-card"><b>'+esc(r.title||r.name)+'</b><p><span class="tag">'+esc(typeText(r.type))+'</span> <span class="tag">'+esc(diffText(r.difficulty))+'</span></p><p class="muted">'+esc(displayKp(r.knowledge_point)||'')+'</p><a class="btn light" href="'+action(r)+'">在线查看</a></div>'}).join('')+'</div></details>'}).join('')+'</details>'}).join('')||'<div class="empty">暂无资源</div>'};renderResources()}
+async function mastery(){var d=await getJson('/student/mastery/data'),chs=d.chapters||[];app.innerHTML='<div class="card"><h2>知识点掌握度</h2>'+(chs.map(function(ch){var points=ch.knowledge_points||[],secs={};points.forEach(function(k){var m=String(k.code||k.kp_id||'').match(/^(\d+\.\d+)/),sec=m?m[1]:'未分节';secs[sec]=secs[sec]||[];secs[sec].push(k)});return '<details class="chapter" open><summary>'+esc(ch.title)+' · '+points.length+' 个知识点</summary>'+Object.keys(secs).sort(function(a,b){return a.localeCompare(b,'zh-Hans',{numeric:true})}).map(function(sec){return '<details class="section" open><summary>'+esc(sec)+' · '+secs[sec].length+'</summary>'+secs[sec].map(function(k){return '<div class="kp-row"><div><b>'+esc(displayKp(k.full_name||k.name))+'</b><div class="muted">'+esc(k.status)+' · '+(k.correct_questions||0)+'/'+(k.total_questions||0)+' 题</div></div><b>'+pct(k.score)+'</b>'+bar(k.score,k.status)+'</div>'}).join('')+'</details>'}).join('')+'</details>'}).join('')||'<div class="empty">暂无掌握度数据</div>')+'</div>'}
+async function graphPage(){var d=await getJson('/student/flow-graph/data'),nodes=d.nodes||[],edges=d.edges||[];app.innerHTML='<div class="card"><h2>知识图谱</h2><div class="muted"><b>形状：</b>菱形课程 > 六边形章 > 正方形大节 > 圆形知识点　<b>颜色：</b><span class="tag ok">已掌握</span><span class="tag">良好</span><span class="tag warn">需巩固</span><span class="tag bad">未学习</span><b style="margin-left:12px">边：</b>包含（实线）/ 相关（虚线）/ 先修（虚线）</div><div style="display:grid;grid-template-columns:minmax(0,1fr) 360px;gap:18px;margin-top:14px"><div style="position:relative"><div id="mynetwork" style="height:720px;border:1px solid #e5e7eb;background:#fafafa"></div><div style="position:absolute;right:18px;top:18px;width:62px;background:#fff;border:1px solid #dbe3ef;border-radius:14px;box-shadow:0 8px 24px rgba(15,23,42,.12);padding:10px;display:grid;gap:6px;place-items:center"><button class="btn light" style="width:40px;height:40px;padding:0" onclick="zoomGraph(.04)">+</button><input id="graphZoom" type="range" min="0" max="100" value="22" oninput="setGraphZoom(this.value)" style="writing-mode:vertical-lr;direction:rtl;-webkit-appearance:slider-vertical;width:40px;height:250px"><button class="btn light" style="width:40px;height:40px;padding:0" onclick="zoomGraph(-.04)">-</button></div></div><div id="nodeDetail" class="res-card graph-detail"><b>节点详情</b><p class="muted">单击节点查看掌握度。</p></div></div></div>';if(!window.vis){mynetwork.innerHTML='<div class="empty">vis 加载失败</div>';return}function color(m){return m>=.8?{background:'#d4f0dc',border:'#8fd3a6'}:m>=.6?{background:'#dbeafe',border:'#93c5fd'}:m>0?{background:'#ffedd5',border:'#fdba74'}:{background:'#eceff1',border:'#cfd8dc'}}function label(s){s=String(s||'');return s.length>16?s.match(/.{1,8}/g).join('\\n'):s}var visNodes=new vis.DataSet(nodes.map(function(n){return {id:n.id,label:label(displayKp(n.label)),shape:n.shape||'circle',size:n.size||20,color:n.shape==='diamond'?{background:'#1f2937',border:'#111827'}:color(n.mastery||0),font:{size:n.fontSize||12,face:'Microsoft YaHei',color:n.shape==='diamond'?'#fff':'#111827',bold:true,multi:true},borderWidth:n.level<=0?4:3,mass:n.level<=0?6:(n.level===1?3:1),widthConstraint:(n.shape==='box'?{minimum:80,maximum:80}:n.shape==='circle'?{minimum:64,maximum:64}:n.shape==='hexagon'?{minimum:92,maximum:92}:undefined),heightConstraint:(n.shape==='box'?{minimum:52,maximum:52}:n.shape==='circle'?{minimum:64,maximum:64}:n.shape==='hexagon'?{minimum:60,maximum:60}:undefined)}}));var visEdges=new vis.DataSet(edges.map(function(e,i){return {id:i,from:e.from,to:e.to,arrows:'to',color:{color:e.type==='先修'?'#9b59b6':(e.type==='相关'?'#f59e0b':'#94a3b8')},dashes:e.type!=='包含',width:e.type==='包含'?2.2:1.6,smooth:{type:'dynamic'}}}));var network=new vis.Network(mynetwork,{nodes:visNodes,edges:visEdges},{physics:{solver:'forceAtlas2Based',forceAtlas2Based:{gravitationalConstant:-260,centralGravity:.018,springLength:150,springConstant:.04,avoidOverlap:1},stabilization:{iterations:700}},interaction:{zoomView:true,dragView:true,dragNodes:true}});window.graphNetwork=network;window.graphScale=.30;network.once('stabilizationIterationsDone',function(){network.stopSimulation();applyGraphZoom(.30,true)});network.on('click',function(p){var id=p.nodes&&p.nodes[0],n=nodes.find(function(x){return x.id===id});if(!n)return;var s=(n.mastery||0)>=.8?'已掌握':((n.mastery||0)>=.6?'良好':((n.mastery||0)>0?'需巩固':'未学习'));nodeDetail.innerHTML='<b>'+esc(displayKp(n.label))+'</b><p><span class="tag '+cls(s)+'">'+s+'</span> <span class="tag">掌握度 '+pct(n.mastery||0)+'</span></p>'+bar(n.mastery||0,s)+'<p class="muted">'+esc(n.levelName||'')+' · '+(n.correct_questions||0)+'/'+(n.total_questions||0)+' 题</p>'})}
+function graphSliderToScale(v){return .18+(Math.max(0,Math.min(100,parseFloat(v)||0))/100)*.55}function applyGraphZoom(s,a){window.graphScale=Math.max(.18,Math.min(.73,parseFloat(s)||.30));if(window.graphNetwork)window.graphNetwork.moveTo({position:window.graphNetwork.getViewPosition(),scale:window.graphScale,animation:a?{duration:120,easingFunction:'easeInOutQuad'}:{duration:0}});if(graphZoom)graphZoom.value=Math.round((window.graphScale-.18)/.55*100)}function setGraphZoom(v){applyGraphZoom(graphSliderToScale(v),false)}function zoomGraph(d){applyGraphZoom((window.graphScale||.30)+d,true)}
+async function discuss(){var d=await getJson('/student/discuss/list');ALL_POSTS=d.posts||[];var c=await getJson('/student/discuss/my-comments');COMMENTS=c.comments||[];app.innerHTML='<div class="card"><h2>问题讨论</h2><div class="toolbar"><input id="topicTitle" class="search" placeholder="问题标题"><button class="btn" onclick="postTopic()">发布</button><input id="discussQ" class="search" placeholder="搜索标题、内容、作者、知识点" oninput="renderDiscuss()"><button class="btn light" onclick="setDiscussMode(&quot;all&quot;)">全部问题</button><button class="btn light" onclick="setDiscussMode(&quot;mine&quot;)">我的问题</button><button class="btn light" onclick="setDiscussMode(&quot;comments&quot;)">我的评论</button></div><textarea id="topicBody" style="width:100%" rows="3" placeholder="描述你的问题、卡点或学习经验"></textarea></div><div class="card" id="discussList"></div><div class="card" id="postDetail"><div class="muted">点击讨论查看详情和回复。</div></div>';window.DISC_MODE='all';renderDiscuss()}
+function setDiscussMode(mode){window.DISC_MODE=mode;renderDiscuss()}
+function renderDiscuss(){var q=(discussQ&&discussQ.value||'').toLowerCase();if(window.DISC_MODE==='comments'){discussList.innerHTML=COMMENTS.filter(function(c){return !q||[c.title,c.body].join(' ').toLowerCase().indexOf(q)>=0}).map(function(c){return '<div class="post" onclick="openPost(&quot;'+esc(c.post_id)+'&quot;)"><b>'+esc(c.title)+'</b><p>'+esc(c.body)+'</p><div class="muted">'+esc(c.time)+'</div></div>'}).join('')||'<div class="empty">暂无评论</div>';return}var list=ALL_POSTS.filter(function(p){var ok=window.DISC_MODE!=='mine'||p.is_mine,hit=!q||[p.title,p.body,p.author,p.knowledge_tag,String(p.display_id||p.no)].join(' ').toLowerCase().indexOf(q)>=0;return ok&&hit});discussList.innerHTML=list.map(function(p){return '<div class="post" onclick="openPost(&quot;'+esc(p.id)+'&quot;)"><div class="post-head"><b>#'+esc(p.display_id||p.no)+' '+esc(p.title)+'</b><span class="tag">'+esc(p.status)+'</span></div><div class="muted">'+esc(p.author)+' · '+esc(p.time)+' · '+(p.comment_count||0)+' 条回复</div><p>'+esc(p.body||'')+'</p></div>'}).join('')||'<div class="empty">暂无讨论</div>'}
+async function postTopic(){if(!topicTitle.value.trim())return alert('请填写标题');if(!topicBody.value.trim())return alert('请填写问题内容');let d=await fetch('/student/discuss/post',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({title:topicTitle.value.trim(),body:topicBody.value.trim()})}).then(r=>r.json());alert(d.success?'发布成功':(d.error||'发布失败'));if(d.success)discuss()}
+async function openPost(id){let d=await getJson('/student/discuss/detail/'+encodeURIComponent(id)),p=d.post||{};postDetail.innerHTML='<h2>#'+esc(p.display_id||p.no)+' '+esc(p.title)+'</h2><p>'+esc(p.body||'')+'</p><div class="muted">'+esc(p.author||'')+' · '+esc(p.time||'')+' · '+esc(p.status||'')+'</div><h3>回复</h3>'+((p.comments||[]).map(function(c){return '<div class="comment"><b>'+esc(c.author)+'</b><p>'+esc(c.body)+'</p><div class="muted">'+esc(c.time)+'</div></div>'}).join('')||'<div class="muted">暂无回复</div>')+'<textarea id="commentBody" style="width:100%" rows="3" placeholder="写下回复"></textarea><button class="btn" onclick="commentPost(&quot;'+esc(id)+'&quot;)">提交回复</button>'}
+async function commentPost(id){let body=commentBody.value.trim();if(!body)return alert('请填写回复');let d=await fetch('/student/discuss/comment/'+encodeURIComponent(id),{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({body:body})}).then(r=>r.json());alert(d.success?'回复成功':(d.error||'回复失败'));if(d.success){await openPost(id);await discuss()}}
+async function records(){var d=await getJson('/student/records/data'),s=d.summary||{},groups=d.groups||[];app.innerHTML='<div class="grid"><div class="stat"><span>视频学习</span><b>'+(s.video||0)+'</b></div><div class="stat"><span>文档学习</span><b>'+(s.document||0)+'</b></div><div class="stat"><span>本周记录</span><b>'+(s.week||0)+'</b></div><div class="stat"><span>总记录</span><b>'+(s.total||0)+'</b></div></div><div class="card"><h2>学习记录</h2><div class="record-timeline">'+(groups.map(function(g){return '<details class="chapter" open><summary>'+esc(g.date)+' · '+g.items.length+' 条</summary>'+g.items.map(function(r){return '<div class="record-card"><span class="tag">'+esc(typeText(r.type))+'</span><div><b>'+esc(r.name)+'</b><div class="muted">'+esc(displayKp(r.knowledge_point)||'未绑定知识点')+'</div></div><div class="muted">'+esc(r.time||'')+'</div></div>'}).join('')+'</details>'}).join('')||'<div class="empty">暂无学习记录</div>')+'</div></div>'}
+async function profilePage(){var d=await getJson('/student/profile/data'),p=d.profile||{},m=d.mastery||{},st=m.status||{},weak=(d.weak_points||[]).slice(0,5),ss=m.suggestions||'',basics=(m.basics||p.basics||{}),lvl=p.level||'',weakTitle='薄弱知识点';if(lvl==='优秀'||lvl==='良好')weakTitle='可进一步提升知识点';else if(lvl==='需巩固')weakTitle='重点巩固知识点';else if(lvl==='基础薄弱')weakTitle='急需掌握知识点';app.innerHTML='<div class="grid"><div class="stat"><span>综合掌握度</span><b>'+pct(p.avg_mastery||0)+'</b><span class="muted">'+esc(p.level||'')+'</span></div><div class="stat"><span>最近正确率</span><b>'+pct(p.accuracy||0)+'</b></div><div class="stat"><span>资源完成数</span><b>'+(p.completed_resources||0)+'</b></div><div class="stat"><span>错题数</span><b>'+(p.wrong_count||0)+'</b></div><div class="stat"><span>学生等级</span><b>'+esc(p.level||'')+'</b></div></div><div class="card"><h2>基本信息</h2><div class="grid"><div class="stat"><span>学号</span><b>'+esc(p.student_id||'')+'</b></div><div class="stat"><span>姓名</span><b>'+esc(p.student_name||'')+'</b></div><div class="stat"><span>班级</span><b>'+esc(basics.class_name||p.class_name||'')+'</b></div><div class="stat"><span>性别</span><b>'+esc(basics.gender||p.gender||'')+'</b></div><div class="stat"><span>学习记录数</span><b>'+(p.record_count||0)+'</b></div><div class="stat"><span>做题数</span><b>'+(p.total_questions||0)+'</b></div></div></div><div class="card"><h2>'+esc(weakTitle)+'</h2>'+(weak.length?weak.map(function(w){return '<div class="row" style="display:grid;grid-template-columns:1fr 200px;gap:12px;align-items:center;padding:10px 0;border-top:1px solid #eef2f7"><div><b>'+esc(displayKp(w.name||w.kp_id||''))+'</b><div class="muted">'+esc(w.kp_id||'')+' · '+esc(w.status||'')+'</div></div><div>'+bar(w.mastery||w.score||0,w.status||'')+'<span class="muted" style="margin-left:8px">'+pct(w.mastery||w.score||0)+'</span></div></div>'}).join(''):'<div class="empty">'+(lvl==='优秀'?'当前表现优秀，继续保持！':'暂无相关知识点数据')+'</div>')+'</div><div class="card"><h2>学习建议</h2><p class="muted">'+esc(ss||'保持学习节奏，继续完成学习任务。')+'</p></div><div class="card"><h2>状态统计</h2><div class="grid"><div class="stat"><span>已掌握</span><b>'+(st.mastered||0)+'</b></div><div class="stat"><span>良好</span><b>'+(st.good||0)+'</b></div><div class="stat"><span>需巩固</span><b>'+(st.weak||0)+'</b></div><div class="stat"><span>未学习</span><b>'+(st.unlearned||0)+'</b></div></div></div>'}
+async function wrongPage(){var d=await getJson('/student/wrong-questions/data'),questions=d.questions||[],stats=d.stats||{};app.innerHTML='<div class="grid"><div class="stat"><span>错题总数</span><b>'+(stats.total||questions.length)+'</b></div><div class="stat"><span>已订正</span><b>'+(stats.corrected||0)+'</b></div><div class="stat"><span>未订正</span><b>'+(stats.uncorrected||0)+'</b></div><div class="stat"><span>正确率</span><b>'+pct(stats.accuracy||0)+'</b></div></div><div class="card"><h2>错题列表</h2>'+(questions.map(function(q,i){return '<div class="row" style="padding:12px 0"><div><b>'+(i+1)+'. '+esc(q.stem||q.title||'')+'</b><div class="muted">'+esc(q.knowledge_point||'')+' · '+esc(q.type||'')+'</div></div><span class="tag bad">错误</span></div>'}).join('')||'<div class="empty">暂无错题记录</div>')+'</div>'}
+if(PAGE==='dashboard')dashboard();if(PAGE==='profile')profilePage();if(PAGE==='recommend')recommendPage();if(PAGE==='path')pathPage();if(PAGE==='resources')resourcesPage();if(PAGE==='mastery')mastery();if(PAGE==='graph')graphPage();if(PAGE==='discuss')discuss();if(PAGE==='wrong')wrongPage();if(PAGE==='records')records();
+</script></body></html>
+"""
+
+def render_flow_page(title, active):
+    normalize_student_session()
+    title_map = {"dashboard": "首页", "path": "智能学习路径", "resources": "学习资源库", "mastery": "知识点掌握度", "graph": "知识图谱", "discuss": "问题讨论", "my_discuss": "我的讨论", "records": "学习记录"}
+    return make_response(render_template_string(STUDENT_FLOW_HTML, page_title=title_map.get(active, title), active_page=active, student_name=session.get("user_name", ""), student_id=session.get("user_id", "")))
+
+app.view_functions["student_path_data"] = student_path_data_new
+app.view_functions["student_dashboard_data"] = student_dashboard_data_new
+app.view_functions["student_flow_graph_data"] = student_flow_graph_data
+app.view_functions["student_discuss_list_v2"] = student_discuss_list_new
+app.view_functions["student_discuss_post"] = student_discuss_post_new
+app.view_functions["student_discuss_detail_v2"] = student_discuss_detail_new
+app.view_functions["student_discuss_comment_v2"] = student_discuss_comment_new
+app.view_functions["student_my_comments"] = student_my_comments_new
+app.view_functions["student_records_data"] = student_records_data_final
+
+# =========================
+# Final clean runtime overrides
+# =========================
+
+LOGIN_HTML = r"""
+<!doctype html><html lang="zh-CN"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>登录 - 操作系统课程管理</title>
+<style>
+*{box-sizing:border-box}body{margin:0;min-height:100vh;display:grid;place-items:center;background:linear-gradient(180deg,#eaf2ff 0,#f3f5f8 42%,#f3f5f8 100%);font-family:"Microsoft YaHei",Arial,sans-serif;color:#0f172a}.card{width:420px;max-width:calc(100vw - 32px);background:#fff;border:1px solid #e5e7eb;border-radius:10px;padding:34px 36px;box-shadow:0 18px 45px rgba(15,23,42,.12)}h1{margin:0;text-align:center;font-size:24px}.sub{text-align:center;color:#64748b;margin:10px 0 26px}.switch{display:grid;grid-template-columns:1fr 1fr;gap:4px;background:#f8fafc;border:1px solid #e5e7eb;border-radius:8px;padding:5px;margin-bottom:22px}.role{padding:11px;text-align:center;border-radius:6px;cursor:pointer;color:#64748b;font-weight:700}.role.active{background:#2563eb;color:#fff;box-shadow:0 8px 18px rgba(37,99,235,.2)}label{display:block;margin:14px 0 7px;color:#334155;font-weight:700;font-size:14px}input{width:100%;padding:12px;border:1px solid #cbd5e1;border-radius:6px;background:#f8fafc;font-size:15px}input:focus{outline:none;border-color:#2563eb;background:#fff;box-shadow:0 0 0 3px rgba(37,99,235,.12)}button{width:100%;margin-top:20px;padding:12px;border:0;border-radius:6px;background:#2563eb;color:#fff;font-size:16px;font-weight:800;cursor:pointer}.error{margin-top:14px;text-align:center;color:#b91c1c;background:#fee2e2;border-radius:6px;padding:10px}
+</style></head><body><div class="card"><h1>操作系统课程管理</h1><div class="sub">请选择身份后登录学习平台</div><div class="switch"><div id="studentBtn" class="role active" onclick="switchRole('student')">学生</div><div id="teacherBtn" class="role" onclick="switchRole('teacher')">教师</div></div><form method="POST"><input type="hidden" name="role" id="roleInput" value="student"><label id="idLabel">学号</label><input name="user_id" id="userIdInput" placeholder="例如：3220602001" required><label>密码</label><input type="password" name="password" placeholder="请输入密码" required><button type="submit">登录</button></form>{% if error %}<div class="error">{{ error }}</div>{% endif %}</div><script>
+function switchRole(role){roleInput.value=role;studentBtn.classList.toggle('active',role==='student');teacherBtn.classList.toggle('active',role==='teacher');idLabel.textContent=role==='student'?'学号':'教师工号';userIdInput.placeholder=role==='student'?'例如：3220602001':'例如：1000002401'}
+</script></body></html>
+"""
+
+def _clean_student_discuss_status(status):
+    return "已解决" if str(status or "").strip() in ("已解决", "resolved", "done") else "未解决"
+
+def _discussion_author():
+    normalize_student_session()
+    return session.get("user_name", "")
+
+def _next_discussion_no(tx):
+    row = tx.run("MATCH (p:DiscussionPost) RETURN max(coalesce(p.no,0)) AS no").single()
+    return int(row["no"] or 0) + 1
+
+def student_discuss_list_final():
+    if session.get("role") not in ("student", "teacher"):
+        return jsonify({"success": False, "error": "未登录"})
+    q = (request.args.get("q") or "").strip().lower()
+    mine = request.args.get("mine") == "1"
+    author = _discussion_author()
+    posts = []
+    with driver.session() as neo4j_session:
+        rows = neo4j_session.run("""
+        MATCH (p:DiscussionPost)
+        OPTIONAL MATCH (p)-[:HAS_COMMENT]->(c:DiscussionComment)
+        WITH p, count(c) AS comment_count
+        RETURN elementId(p) AS id, coalesce(p.no,0) AS no, p.title AS title, p.body AS body,
+               p.author AS author, p.created_at AS created_at, p.created_ts AS created_ts,
+               p.knowledge_tag AS knowledge_tag, coalesce(p.status,'未解决') AS status, comment_count
+        ORDER BY created_ts DESC
+        LIMIT 150
+        """)
+        for row in rows:
+            post = {
+                "id": row["id"], "no": row["no"] or 0, "title": row["title"] or "",
+                "body": row["body"] or "", "author": row["author"] or "",
+                "time": str(row["created_at"])[:16] if row["created_at"] else "",
+                "knowledge_tag": row["knowledge_tag"] or "", "status": _clean_student_discuss_status(row["status"]),
+                "comment_count": row["comment_count"] or 0, "is_mine": (row["author"] or "") == author,
+            }
+            hay = "{} {} {} {} {}".format(post["no"], post["title"], post["body"], post["author"], post["knowledge_tag"]).lower()
+            if mine and not post["is_mine"]:
+                continue
+            if q and q not in hay:
+                continue
+            posts.append(post)
+    return jsonify({"success": True, "posts": posts})
+
+def student_discuss_post_final():
+    if session.get("role") != "student":
+        return jsonify({"success": False, "error": "未登录"})
+    data = request.get_json() or {}
+    title = (data.get("title") or "").strip()
+    body = (data.get("body") or "").strip()
+    tag = (data.get("knowledge_tag") or data.get("tag") or "").strip()
+    if not title or not body or not tag:
+        return jsonify({"success": False, "error": "请填写标题、内容并选择知识点标签"})
+    with driver.session() as neo4j_session:
+        no = neo4j_session.execute_write(_next_discussion_no)
+        neo4j_session.run("""
+        CREATE (:DiscussionPost {no:$no, title:$title, body:$body, author:$author, role:'student',
+                                  knowledge_tag:$tag, status:'未解决',
+                                  created_at:datetime(), created_ts:datetime().epochSeconds})
+        """, no=no, title=title, body=body, tag=tag, author=_discussion_author())
+    return jsonify({"success": True, "no": no})
+
+def student_discuss_detail_final(post_id):
+    if session.get("role") not in ("student", "teacher"):
+        return jsonify({"success": False, "error": "未登录"})
+    author = _discussion_author()
+    with driver.session() as neo4j_session:
+        row = neo4j_session.run("""
+        MATCH (p:DiscussionPost)
+        WHERE elementId(p)=$pid
+        OPTIONAL MATCH (p)-[:HAS_COMMENT]->(c:DiscussionComment)
+        RETURN elementId(p) AS id, coalesce(p.no,0) AS no, p.title AS title, p.body AS body,
+               p.author AS author, p.created_at AS created_at, p.knowledge_tag AS knowledge_tag,
+               coalesce(p.status,'未解决') AS status,
+               collect({id:elementId(c), body:c.body, author:c.author, reply_to:c.reply_to,
+                        created_at:c.created_at, ts:c.created_ts}) AS comments
+        """, pid=post_id).single()
+    if not row:
+        return jsonify({"success": False, "error": "问题不存在"})
+    comments = sorted([c for c in row["comments"] if c.get("body")], key=lambda c: c.get("ts") or 0)
+    return jsonify({"success": True, "post": {
+        "id": row["id"], "no": row["no"] or 0, "title": row["title"] or "", "body": row["body"] or "",
+        "author": row["author"] or "", "is_mine": (row["author"] or "") == author,
+        "time": str(row["created_at"])[:16] if row["created_at"] else "",
+        "knowledge_tag": row["knowledge_tag"] or "", "status": _clean_student_discuss_status(row["status"]),
+        "comments": [{"id": c["id"], "floor": i + 1, "body": c["body"], "author": c["author"] or "",
+                      "reply_to": c.get("reply_to") or "", "time": str(c["created_at"])[:16] if c["created_at"] else ""}
+                     for i, c in enumerate(comments)]
+    }})
+
+def student_discuss_comment_final(post_id):
+    if session.get("role") != "student":
+        return jsonify({"success": False, "error": "未登录"})
+    data = request.get_json() or {}
+    body = (data.get("body") or "").strip()
+    reply_to = (data.get("reply_to") or "").strip()
+    if not body:
+        return jsonify({"success": False, "error": "请填写回复内容"})
+    if reply_to and not body.startswith("回复{}：".format(reply_to)):
+        body = "回复{}：{}".format(reply_to, body)
+    with driver.session() as neo4j_session:
+        neo4j_session.run("""
+        MATCH (p:DiscussionPost)
+        WHERE elementId(p)=$pid
+        CREATE (p)-[:HAS_COMMENT]->(:DiscussionComment {body:$body, author:$author, role:'student',
+                                                        reply_to:$reply_to, created_at:datetime(),
+                                                        created_ts:datetime().epochSeconds})
+        """, pid=post_id, body=body, reply_to=reply_to, author=_discussion_author())
+    return jsonify({"success": True})
+
+def student_discuss_status_final(post_id):
+    if session.get("role") != "student":
+        return jsonify({"success": False, "error": "未登录"})
+    status = _clean_student_discuss_status((request.get_json() or {}).get("status"))
+    with driver.session() as neo4j_session:
+        row = neo4j_session.run("""
+        MATCH (p:DiscussionPost {author:$author})
+        WHERE elementId(p)=$pid
+        SET p.status=$status, p.updated_at=datetime()
+        RETURN elementId(p) AS id
+        """, pid=post_id, author=_discussion_author(), status=status).single()
+    return jsonify({"success": bool(row), "status": status})
+
+def student_my_comments_final():
+    if session.get("role") != "student":
+        return jsonify({"success": False, "error": "未登录"})
+    author = _discussion_author()
+    with driver.session() as neo4j_session:
+        rows = neo4j_session.run("""
+        MATCH (p:DiscussionPost)-[:HAS_COMMENT]->(c:DiscussionComment {author:$author})
+        RETURN elementId(c) AS id, elementId(p) AS post_id, coalesce(p.no,0) AS no,
+               p.title AS title, c.body AS body, c.created_at AS created_at, c.created_ts AS ts
+        ORDER BY ts DESC
+        LIMIT 80
+        """, author=author)
+        comments = [{"id": r["id"], "post_id": r["post_id"], "no": r["no"] or 0, "title": r["title"] or "",
+                     "body": r["body"] or "", "time": str(r["created_at"])[:16] if r["created_at"] else ""} for r in rows]
+    return jsonify({"success": True, "comments": comments})
+
+def get_knowledge_graph(student_id):
+    flow = get_flow_mastery_data(student_id)
+    stats = {p.get("full_name") or p.get("name") or p.get("kp_id"): p for p in flow.get("points", [])}
+    nodes, edges, seen = [], [], set()
+    def add(n):
+        if n["id"] not in seen:
+            seen.add(n["id"])
+            nodes.append(n)
+    add({"id": "course:操作系统", "label": "操作系统", "shape": "diamond", "level": -1, "size": 78, "fontSize": 22, "mastery": 1, "levelName": "课程"})
+    knowledge_names = []
+    rel_rows = []
+    with driver.session() as neo4j_session:
+        for row in neo4j_session.run("MATCH (k:Knowledge) RETURN k.name AS name ORDER BY k.name"):
+            name = row["name"] or ""
+            if re.match(r"^\d+(?:\.\d+){1,2}\s+\S", name):
+                knowledge_names.append(name)
+        for row in neo4j_session.run("""
+        MATCH (a:Knowledge)-[r]->(b:Knowledge)
+        RETURN a.name AS a, b.name AS b, type(r) AS rel, coalesce(r.rel,'') AS rel_name
+        """):
+            rel_rows.append(row)
+    chapters = {}
+    for name in knowledge_names:
+        code = _kp_code(name)
+        if not code:
+            continue
+        parts = code.split(".")
+        ch = parts[0]
+        chapters.setdefault(ch, [])
+    for ch in sorted(chapters, key=lambda x: int(x) if x.isdigit() else 99):
+        cid = "chapter:{}".format(ch)
+        add({"id": cid, "label": "第{}章".format(ch), "shape": "hexagon", "level": 0, "size": 62, "fontSize": 19, "mastery": 0.8, "levelName": "章"})
+        edges.append({"from": "course:操作系统", "to": cid, "type": "包含"})
+    for name in knowledge_names:
+        code = _kp_code(name)
+        parts = code.split(".")
+        stat = stats.get(name, {})
+        if len(parts) == 2:
+            add({"id": name, "label": name, "shape": "square", "level": 1, "size": 50, "fontSize": 16, "mastery": stat.get("score", 0),
+                 "total_questions": stat.get("total_questions", 0), "correct_questions": stat.get("correct_questions", 0), "levelName": "大节"})
+            edges.append({"from": "chapter:{}".format(parts[0]), "to": name, "type": "包含"})
+        elif len(parts) == 3:
+            parent = next((x for x in knowledge_names if _kp_code(x) == "{}.{}".format(parts[0], parts[1])), "{}.{}".format(parts[0], parts[1]))
+            add({"id": name, "label": name, "shape": "circle", "level": 2, "size": 40, "fontSize": 14, "mastery": stat.get("score", 0),
+                 "total_questions": stat.get("total_questions", 0), "correct_questions": stat.get("correct_questions", 0), "levelName": "知识点"})
+            edges.append({"from": parent, "to": name, "type": "包含"})
+    valid = {n["id"] for n in nodes}
+    for row in rel_rows:
+        a, b = row["a"], row["b"]
+        if a in valid and b in valid:
+            rel = row["rel_name"] or row["rel"]
+            if rel not in ("包含", "先修", "相关"):
+                rel = "相关"
+            edges.append({"from": a, "to": b, "type": rel})
+    uniq, edge_seen = [], set()
+    for e in edges:
+        key = (e["from"], e["to"], e["type"])
+        if e["from"] in valid and e["to"] in valid and e["from"] != e["to"] and key not in edge_seen:
+            edge_seen.add(key)
+            uniq.append(e)
+    return {"nodes": nodes, "edges": uniq, "statistics": {n["id"]: n for n in nodes}}
+
+STUDENT_FLOW_HTML = r"""
+<!doctype html><html lang="zh-CN"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>{{ page_title }} - 操作系统</title><script src="https://cdn.jsdelivr.net/npm/vis-network@9.1.2/standalone/umd/vis-network.min.js"></script>
+<style>
+*{box-sizing:border-box}body{margin:0;background:#f3f5f8;color:#0f172a;font-family:"Microsoft YaHei",Arial,sans-serif}.layout{display:grid;grid-template-columns:216px 1fr;min-height:100vh}.side{background:#1e293b;border-right:1px solid #334155;padding:0;position:sticky;top:0;height:100vh;display:flex;flex-direction:column}.brand{padding:20px 16px 8px;font-size:14px;font-weight:600;color:#f1f5f9;border-bottom:1px solid #334155}.student{padding:4px 16px 16px;font-size:12px;color:#94a3b8}.nav{margin-top:4px}.nav a{display:block;padding:10px 16px;color:#94a3b8;text-decoration:none;border-left:3px solid transparent;font-size:13px}.nav a.active,.nav a:hover{background:#1e3a5f;color:#60a5fa;border-left-color:#3b82f6}.logout{position:absolute;left:16px;right:16px;bottom:16px;border-top:1px solid #334155;padding-top:12px}.logout a{display:block;text-align:center;padding:8px;border-radius:4px;background:#dc2626;color:#fff;text-decoration:none;font-weight:600;font-size:13px}.top{height:64px;background:#1e293b;border-bottom:1px solid #334155;color:#f1f5f9;display:flex;align-items:center;justify-content:space-between;padding:0 34px}.top h1{margin:0;font-size:22px}.user{display:flex;align-items:center;gap:10px;color:#475569}.avatar{width:34px;height:34px;border-radius:50%;background:#2563eb;color:#fff;display:grid;place-items:center;font-weight:800}.content{padding:28px 36px;max-width:1500px}.card{background:#fff;border:1px solid #e5e7eb;border-radius:8px;padding:20px;margin-bottom:16px}.dash{display:grid;grid-template-columns:1.2fr .8fr;gap:16px}.hero{background:#fff;border:1px solid #dbe3ef;border-radius:8px;padding:24px}.grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(220px,1fr));gap:14px}.stat,.res-card{background:#fff;border:1px solid #e5e7eb;border-radius:8px;padding:16px}.stat b{display:block;font-size:30px;margin:8px 0}.muted{color:#64748b;font-size:14px;line-height:1.7}.btn{border:0;background:#2563eb;color:#fff;border-radius:6px;padding:8px 13px;text-decoration:none;cursor:pointer;display:inline-block}.btn.light{background:#eef4ff;color:#2563eb;border:1px solid #dbeafe}.btn.green{background:#16a34a}.tag{font-size:12px;border-radius:999px;background:#eef2ff;color:#3730a3;padding:4px 9px;display:inline-block}.tag.ok{background:#ecfdf5;color:#166534}.tag.warn{background:#fff7ed;color:#9a3412}.tag.bad{background:#fee2e2;color:#991b1b}.progress{height:10px;background:#e5e7eb;border-radius:99px;overflow:hidden}.bar{height:100%;background:#22c55e}.bar.warn{background:#f59e0b}.bar.bad{background:#ef4444}.toolbar{display:flex;gap:10px;flex-wrap:wrap;margin:12px 0}.search,input,textarea,select{border:1px solid #cbd5e1;border-radius:6px;background:#fff;padding:9px 11px}.search{min-width:280px}.path-step{display:grid;grid-template-columns:38px 1fr;gap:14px;border-top:1px solid #eef2f7;padding:18px 0}.no{width:30px;height:30px;border-radius:50%;background:#2563eb;color:#fff;display:grid;place-items:center;font-weight:800}.res-list,.res-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(230px,1fr));gap:10px}.chapter{border:1px solid #e5e7eb;border-radius:8px;margin:10px 0;overflow:hidden}.chapter summary{background:#f8fafc;padding:14px 16px;cursor:pointer;font-weight:700}.section{border-top:1px solid #eef2f7}.section summary{background:#fff;padding:12px 20px;color:#475569}.kp-row{display:grid;grid-template-columns:minmax(220px,1fr) 90px 340px;gap:14px;align-items:center;border-top:1px solid #eef2f7;padding:12px 22px}.empty{padding:34px;text-align:center;color:#94a3b8;border:1px dashed #cbd5e1;border-radius:8px}.post,.comment{border-top:1px solid #eef2f7;padding:12px 0}.post{cursor:pointer}.post-head{display:flex;justify-content:space-between;gap:12px}.forum{display:grid;grid-template-columns:380px minmax(0,1fr);gap:16px}.forum-list{max-height:620px;overflow:auto}.comment-tools{display:flex;gap:8px;align-items:center}.record-card{display:grid;grid-template-columns:48px minmax(0,1fr) 120px;gap:12px;align-items:center;border-top:1px solid #eef2f7;padding:12px 0}.record-card .tag{min-width:0;text-align:center}.graph-detail .progress{width:100%}@media(max-width:900px){.layout{grid-template-columns:1fr}.side{height:auto;position:relative}.logout{position:relative}.content{padding:18px}.dash,.forum,.kp-row,.path-step,.record-card{grid-template-columns:1fr}}
+</style></head><body><div class="layout"><aside class="side"><div class="brand">学习推荐系统</div><div class="student">{{ student_name }}</div><nav class="nav"><a href="/student/dashboard" class="{% if active_page=='dashboard' %}active{% endif %}">首页</a><a href="/student/profile" class="{% if active_page=='profile' %}active{% endif %}">学习画像</a><a href="/student/recommend" class="{% if active_page=='recommend' %}active{% endif %}">学习资源推荐</a><a href="/student/resources" class="{% if active_page=='resources' %}active{% endif %}">学习资源库</a><a href="/student/mastery" class="{% if active_page=='mastery' %}active{% endif %}">知识点掌握度</a><a href="/student/graph" class="{% if active_page=='graph' %}active{% endif %}">知识图谱</a><a href="/student/discuss" class="{% if active_page=='discuss' %}active{% endif %}">讨论区</a><a href="/student/wrong-questions" class="{% if active_page=='wrong' %}active{% endif %}">错题集</a><a href="/student/records" class="{% if active_page=='records' %}active{% endif %}">学习记录</a></nav><div class="logout"><a href="/logout">退出登录</a></div></aside><main><header class="top"><h1>{{ page_title }}</h1><div class="user"><div class="avatar">{{ student_name[:1] or "学" }}</div><span>{{ student_name }}</span><span class="muted">{{ student_id }}</span></div></header><section class="content" id="app"></section></main></div>
+<script>
+var PAGE="{{ active_page }}",app=document.getElementById('app'),TARGET=new URLSearchParams(location.search).get('target_kp')||'',ALL_POSTS=[],COMMENTS=[],KP_OPTIONS=[];
+function esc(s){return String(s==null?'':s).replace(/[&<>"']/g,function(c){return {'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]})}
+function codeOf(s){var m=String(s||'').match(/\d+(?:\.\d+){0,2}/);return m?m[0]:''}
+function kpName(s){return String(s==null?'':s)}
+function displayKp(s){return kpName(s)}
+function pct(v){return Math.round((+v||0)*100)+'%'}
+function statusClass(s){return s==='未学习'||s==='薄弱'||s==='严重薄弱'?'bad':(s==='需巩固'||s==='进行中'?'warn':'ok')}
+function bar(v,s){return '<div class="progress"><div class="bar '+statusClass(s)+'" style="width:'+Math.max(2,Math.min(100,(+v||0)*100))+'%"></div></div>'}
+function typeText(t){return t==='视频'||String(t||'').toLowerCase()==='video'?'视频':'文档'}
+function action(r){return typeText(r.type)==='视频'?'/student/watch/'+encodeURIComponent(r.name||r.title||''):'/student/view/'+encodeURIComponent(r.name||r.title||'')}
+async function getJson(u){try{var r=await fetch(u);return await r.json()}catch(e){return {success:false,learning_path:[],resources:[],chapters:[],records:[],groups:[],posts:[],comments:[],nodes:[],edges:[],stats:{}}}}
+async function loadKps(){if(KP_OPTIONS.length)return KP_OPTIONS;var d=await getJson('/student/mastery/data');(d.points||[]).forEach(function(p){var n=p.full_name||p.name||p.kp_id;if(n)KP_OPTIONS.push(n)});return KP_OPTIONS}
+async function dashboard(){var d=await getJson('/student/dashboard/data'),st=d.stats||{},total=(st.mastered||0)+(st.good||0)+(st.weak||0)+(st.unlearned||0),p=d.profile||{},avgMastery=p.avg_mastery||0,rg=d.recent_groups||[],rm=d.recommendations||[],w3=(d.weak_points||[]).slice(0,3),today=d.today_count||0;app.innerHTML='<div class="dash"><div class="hero hero-overview"><h2>今日学习概览</h2><div class="grid" style="margin-top:12px"><div class="stat"><span>综合掌握度</span><b>'+pct(avgMastery)+'</b><span class="muted">'+esc(p.level||'')+'</span></div><div class="stat"><span>今日学习</span><b>'+today+'</b><span class="muted">条学习记录</span></div><div class="stat"><span>做题总数</span><b>'+(p.total_questions||0)+'</b><span class="muted">正确率 '+pct(p.accuracy||0)+'</span></div><div class="stat"><span>错题待练</span><b>'+(p.wrong_count||0)+'</b><span class="muted">去错题集复练</span></div></div></div><div class="hero light hero-profile"><h2>学习画像</h2><div class="pill-row" style="margin-top:4px"><span class="tag ok">已掌握 '+(st.mastered||0)+'</span><span class="tag">良好 '+(st.good||0)+'</span><span class="tag warn">需巩固 '+(st.weak||0)+'</span><span class="tag bad">未学习 '+(st.unlearned||0)+'</span></div>'+bar(avgMastery,p.level||'')+'<p class="muted" style="margin-top:8px">知识点总数 '+total+'，已掌握+'+(st.mastered||0)+'+良好+'+(st.good||0)+'+需巩固+'+(st.weak||0)+'+未学习+'+(st.unlearned||0)+'='+total+'</p><a class="btn" href="/student/profile" style="margin-top:12px">查看完整学习画像</a></div></div><div class="split" style="display:grid;grid-template-columns:1.2fr .8fr;gap:16px"><div><div class="card"><h2>最近学习记录</h2>'+(rg.length?rg.map(function(g){return '<details class="chapter" open><summary>'+esc(g.date)+' · '+g.items.length+' 条</summary>'+g.items.map(function(r){return '<div class="record-card"><span class="tag">'+esc(typeText(r.type))+'</span><div><b>'+esc(r.name)+'</b><div class="muted">'+esc(r.knowledge_point||'')+'</div></div><div class="muted">'+esc(r.time||'')+'</div></div>'}).join('')+'</details>'}).join(''):'<div class="empty">暂无学习记录</div>')+'</div><div class="card"><h2>学习建议</h2>'+((p.suggestions||[]).map(function(x){return '<div class="hint">'+esc(x)+'</div>'}).join('')||'<div class="empty">暂无建议</div>')+'</div></div><div><div class="card"><h2>今日推荐摘要</h2>'+(rm.slice(0,3).map(function(r){return '<div class="res-card"><b>'+esc(r.title||r.name)+'</b><p><span class="tag">'+esc(typeText(r.type))+'</span><span class="tag">'+esc(r.difficulty||'中等')+'</span></p><p class="muted">'+esc(r.knowledge_point||'')+'</p><a class="btn light" href="'+action(r)+'">查看</a></div>'}).join('')||'<div class="empty">暂无推荐</div>')+'</div><div class="card"><h2>薄弱知识点 Top3</h2>'+(w3.length?w3.map(function(x){return '<div class="row"><div><b>'+esc(x.name)+'</b></div><div><b>'+pct(x.score)+'</b></div></div>'}).join(''):'<div class="empty">暂无薄弱知识点</div>')+'</div><div class="card"><h2>最近学习摘要</h2>'+(rg.slice(0,3).map(function(g){return '<div class="record-card"><span class="tag">'+esc(g.date)+'</span><div><b>'+esc(((g.items||[])[0]||{}).name||'无')+'</b><div class="muted">共 '+g.items.length+' 条</div></div></div>'}).join('')||'<div class="empty">暂无</div>')+'</div></div></div>'}
+async function pathPage(){var d=await getJson('/student/path/data'+(TARGET?'?target_kp='+encodeURIComponent(TARGET):'')),steps=d.learning_path||[];app.innerHTML='<div class="card"><h2>学习资源推荐</h2><p class="muted">目标：'+esc(displayKp(d.target_kp||''))+'。路径按掌握度、章节关联和资源匹配度排序。</p></div><div class="card">'+(steps.map(function(st,i){return '<div class="path-step"><div class="no">'+(i+1)+'</div><div><b>'+esc(displayKp(st.name))+'</b><p><span class="tag '+statusClass(st.status)+'">'+esc(st.status)+'</span> <span class="tag">掌握度 '+pct(st.score)+'</span></p>'+bar(st.score,st.status)+'<p class="muted">'+esc(st.reason||'建议优先巩固该知识点')+'</p><div class="res-list">'+(st.resources||[]).map(function(r){return '<div class="res-card"><b>'+esc(r.title||r.name)+'</b><p><span class="tag">'+esc(typeText(r.type))+'</span> <span class="tag">'+esc(r.difficulty||'中等')+'</span></p><a class="btn light" href="'+action(r)+'">学习</a></div>'}).join('')+'</div></div></div>'}).join('')||'<div class="empty">暂无路径数据</div>')+'</div>'}
+async function resourcesPage(){var d=await getJson('/student/resources/data'),all=d.resources||[];app.innerHTML='<div class="card"><h2>学习资源库</h2><input class="search" id="resQ" placeholder="搜索资源、知识点、章节" oninput="renderResources()"></div><div id="resResults"></div>';window.renderResources=function(){var q=(resQ.value||'').toLowerCase(),list=all.filter(function(r){return [r.name,r.title,r.knowledge_point,r.chapter_label,r.section_label,typeText(r.type)].join(' ').toLowerCase().indexOf(q)>=0}),groups={};list.forEach(function(r){var ch=r.chapter_label||'未分类',sec=r.section_label||'未分类';groups[ch]=groups[ch]||{};groups[ch][sec]=groups[ch][sec]||[];groups[ch][sec].push(r)});resResults.innerHTML=Object.keys(groups).sort((a,b)=>a.localeCompare(b,'zh-Hans',{numeric:true})).map(function(ch,i){var secs=Object.keys(groups[ch]).sort((a,b)=>a.localeCompare(b,'zh-Hans',{numeric:true}));return '<details class="chapter" '+(i===0?'open':'')+'><summary>'+esc(ch)+' · '+secs.reduce((n,s)=>n+groups[ch][s].length,0)+' 个资源</summary>'+secs.map(function(sec){return '<details class="section" open><summary>'+esc(sec)+' · '+groups[ch][sec].length+'</summary><div class="res-grid" style="padding:12px">'+groups[ch][sec].map(function(r){return '<div class="res-card"><b>'+esc(r.title||r.name)+'</b><p><span class="tag">'+esc(typeText(r.type))+'</span> <span class="tag">'+esc(r.difficulty||'中等')+'</span></p><p class="muted">'+esc(displayKp(r.knowledge_point)||'未绑定知识点')+'</p><a class="btn light" href="'+action(r)+'">在线查看</a></div>'}).join('')+'</div></details>'}).join('')+'</details>'}).join('')||'<div class="empty">暂无资源</div>'};renderResources()}
+async function mastery(){var d=await getJson('/student/mastery/data'),chs=d.chapters||[];app.innerHTML='<div class="card"><h2>知识点掌握度</h2>'+(chs.map(function(ch){var points=ch.knowledge_points||[],secs={};points.forEach(function(k){var code=codeOf(k.code||k.kp_id||k.name),sec=code.split('.').slice(0,2).join('.')||'未分节';secs[sec]=secs[sec]||[];secs[sec].push(k)});return '<details class="chapter" open><summary>'+esc(ch.title)+' · '+points.length+' 个知识点</summary>'+Object.keys(secs).sort((a,b)=>a.localeCompare(b,'zh-Hans',{numeric:true})).map(function(sec){return '<details class="section" open><summary>'+esc(sec)+' · '+secs[sec].length+'</summary>'+secs[sec].map(function(k){return '<div class="kp-row"><div><b>'+esc(displayKp(k.full_name||k.name))+'</b><div class="muted">'+esc(k.status)+' · '+(k.correct_questions||0)+'/'+(k.total_questions||0)+' 题</div></div><b>'+pct(k.score)+'</b>'+bar(k.score,k.status)+'</div>'}).join('')+'</details>'}).join('')+'</details>'}).join('')||'<div class="empty">暂无掌握度数据</div>')+'</div>'}
+function wrapLabel(text,max){text=String(text||'');var code=codeOf(text),name=displayKp(text),chars=name.split(''),lines=[],line='';chars.forEach(function(c){line+=c;if(line.length>=max){lines.push(line);line=''}});if(line)lines.push(line);return (code?code+'\\n':'')+lines.join('\\n')}
+function graphPosition(nodes){
+  var groups={root:[],chapter:[],section:[],leaf:[]};
+  nodes.forEach(function(n){
+    if(n.level<0)groups.root.push(n);
+    else if(n.level===0)groups.chapter.push(n);
+    else if(n.level===1)groups.section.push(n);
+    else groups.leaf.push(n)
+  });
+
+  function placeCircular(arr,radius,startAngle,spread){
+    if(!arr.length)return;
+    arr.sort((a,b)=>String(a.label).localeCompare(String(b.label),'zh-Hans',{numeric:true}));
+    var len=arr.length;
+    if(len<=1){
+      arr[0].x=0;arr[0].y=-radius;
+    }else{
+      arr.forEach(function(n,i){
+        var angle=startAngle+spread*(i/(len-1)-0.5);
+        n.x=Math.cos(angle)*radius;
+        n.y=Math.sin(angle)*radius
+      })
+    }
+  }
+
+  function placeByParent(children,parentX,parentY,baseRadius,angleSpread){
+    if(!children.length)return;
+    children.sort((a,b)=>String(a.label).localeCompare(String(b.label),'zh-Hans',{numeric:true}));
+    var len=children.length;
+    children.forEach(function(n,i){
+      var parentAngle=Math.atan2(parentY,parentX);
+      var baseAngle=(parentAngle>0?parentAngle:(parentAngle+2*Math.PI));
+      var spreadAngle=len===1?0:angleSpread*(i/(len-1)-0.5);
+      var finalAngle=baseAngle+spreadAngle;
+      n.x=parentX+Math.cos(finalAngle)*baseRadius;
+      n.y=parentY+Math.sin(finalAngle)*baseRadius
+    })
+  }
+
+  groups.root.forEach(n=>{n.x=0;n.y=0;n.fixed=true});
+  placeCircular(groups.chapter,220,-Math.PI/2,Math.PI*1.4);
+
+  var chapterGroups={};
+  groups.chapter.forEach(ch=>{
+    chapterGroups[ch.id]=[];
+    ch._children=[]
+  });
+  groups.section.forEach(sec=>{
+    var parentId=sec.parentChapter||'chapter-1';
+    if(chapterGroups[parentId]){
+      chapterGroups[parentId].push(sec);
+      sec._parent=parentId
+    }else{
+      chapterGroups['chapter-1']=chapterGroups['chapter-1']||[];
+      chapterGroups['chapter-1'].push(sec)
+    }
+  });
+  Object.keys(chapterGroups).forEach(chId=>{
+    var chNode=groups.chapter.find(c=>c.id===chId);
+    var chX=chNode?chNode.x:0,chY=chNode?chNode.y:-220;
+    var secs=chapterGroups[chId];
+    if(secs.length>0){
+      placeCircular(secs,420,-Math.PI/2,Math.PI*1.3);
+      secs.forEach(s=>{
+        s.x+=chX*0.35;
+        s.y+=(chY+220)*0.35
+      })
+    }
+  });
+
+  var sectionGroups={};
+  groups.section.forEach(sec=>{
+    sectionGroups[sec.id]=[]
+  });
+  groups.leaf.forEach(leaf=>{
+    var parentSecId=leaf.parentSection||(groups.section[0]&&groups.section[0].id);
+    if(sectionGroups[parentSecId]){
+      sectionGroups[parentSecId].push(leaf)
+    }
+  });
+  Object.keys(sectionGroups).forEach(secId=>{
+    var secNode=groups.section.find(s=>s.id===secId);
+    var secX=secNode?secNode.x:0,secY=secNode?secNode.y:-420;
+    var leaves=sectionGroups[secId];
+    if(leaves.length>0){
+      placeCircular(leaves,680,-Math.PI/2,Math.PI*1.2);
+      leaves.forEach(l=>{
+        l.x+=secX*0.25;
+        l.y+=(secY+420)*0.25
+      })
+    }
+  })
+}
+async function graphPage(){var d=await getJson('/student/flow-graph/data'),nodes=d.nodes||[],edges=d.edges||[];graphPosition(nodes);app.innerHTML='<div class="card"><h2>知识图谱</h2><div class="muted"><b>形状：</b>菱形课程 > 六边形章 > 正方形大节 > 圆形知识点　<b>颜色：</b><span class="tag ok">已掌握</span><span class="tag">良好</span><span class="tag warn">需巩固</span><span class="tag bad">未学习</span><b style="margin-left:12px">边：</b>包含（实线）/ 相关（虚线）/ 先修（虚线）</div><div style="display:grid;grid-template-columns:minmax(0,1fr) 360px;gap:18px;margin-top:14px"><div style="position:relative"><div id="mynetwork" style="height:760px;border:1px solid #e5e7eb;background:#fafafa"></div><div style="position:absolute;right:18px;top:18px;width:62px;background:#fff;border:1px solid #dbe3ef;border-radius:14px;box-shadow:0 8px 24px rgba(15,23,42,.12);padding:10px;display:grid;gap:6px;place-items:center"><button class="btn light" style="width:40px;height:40px;padding:0" onclick="zoomGraph(.06)">+</button><input id="graphZoom" type="range" min="0" max="100" value="28" oninput="setGraphZoom(this.value)" style="writing-mode:vertical-lr;direction:rtl;-webkit-appearance:slider-vertical;width:40px;height:250px"><button class="btn light" style="width:40px;height:40px;padding:0" onclick="zoomGraph(-.06)">-</button></div></div><div id="nodeDetail" class="res-card graph-detail"><b>节点详情</b><p class="muted">单击节点查看掌握度。</p></div></div></div>';if(!window.vis){mynetwork.innerHTML='<div class="empty">vis 加载失败</div>';return}function color(m){return m>=.8?{background:'#dcfce7',border:'#86efac',highlight:{background:'#bbf7d0',border:'#4ade80'}}:m>=.6?{background:'#dbeafe',border:'#93c5fd',highlight:{background:'#bfdbfe',border:'#60a5fa'}}:m>0?{background:'#ffedd5',border:'#fdba74',highlight:{background:'#fed7aa',border:'#fb923c'}}:{background:'#f1f5f9',border:'#cbd5e1',highlight:{background:'#e2e8f0',border:'#94a3b8'}}}var visNodes=new vis.DataSet(nodes.map(function(n){var isRoot=n.shape==='diamond',isChapter=n.shape==='hexagon',isSection=n.shape==='square'||n.shape==='box';return {id:n.id,label:wrapLabel(n.label,isRoot?4:(isChapter?4:(isSection?6:5))),shape:n.shape||'circle',size:isRoot?55:(isChapter?42:(isSection?32:24)),x:n.x,y:n.y,fixed:isRoot?{x:true,y:true}:false,color:isRoot?{background:'#0f172a',border:'#1e293b',highlight:{background:'#1e293b',border:'#334155'}}:color(n.mastery||0),font:{size:isRoot?18:(isChapter?16:(isSection?14:12)),face:'Microsoft YaHei',color:isRoot?'#f8fafc':'#0f172a',bold:true,multi:true,align:'center',vadjust:isRoot?-3:0},borderWidth:isRoot?5:(isChapter?4:(isSection?3:2.5)),shadow:isRoot?{enabled:true,color:'rgba(0,0,0,0.25)',size:15,x:3,y:3}:false,mass:isRoot?10:(isChapter?6:(isSection?3:1.5))}}));var visEdges=new vis.DataSet(edges.map(function(e,i){return {id:i,from:e.from,to:e.to,arrows:'to',color:{color:e.type==='先修'?'#9b59b6':(e.type==='相关'?'#d97706':'#94a3b8'),opacity:0.7,highlight:'#2563eb'},dashes:e.type!=='包含'?[8,6]:false,width:e.type==='包含'?2.5:(e.type==='相关'?1.8:1.5),smooth:{type:e.type==='包含'?'continuous':'curvedCW',roundness:e.type==='包含'?0.7:0.5}}}));var network=new vis.Network(mynetwork,{nodes:visNodes,edges:visEdges},{physics:false,interaction:{zoomView:true,dragView:true,dragNodes:true,hover:true,multiselect:false},layout:{improvedLayout:false,hierarchical:false}});window.graphNetwork=network;window.graphScale=.38;setTimeout(function(){network.fit({animation:{duration:200,easingFunction:'easeInOutCubic'}});applyGraphZoom(.38,true)},100);network.on('click',function(p){var id=p.nodes&&p.nodes[0],n=nodes.find(x=>x.id===id);if(!n)return;var s=(n.mastery||0)>=.8?'已掌握':((n.mastery||0)>=.6?'良好':((n.mastery||0)>0?'需巩固':'未学习'));nodeDetail.innerHTML='<b>'+esc(displayKp(n.label))+'</b><p><span class="tag '+statusClass(s)+'">'+s+'</span> <span class="tag">掌握度 '+pct(n.mastery||0)+'</span></p>'+bar(n.mastery||0,s)+'<p class="muted">'+esc(n.levelName||'')+' · '+(n.correct_questions||0)+'/'+(n.total_questions||0)+' 题</p>'})}
+function graphSliderToScale(v){return .38+(Math.max(0,Math.min(100,parseFloat(v)||0))/100)*.9}function applyGraphZoom(s,a){window.graphScale=Math.max(.38,Math.min(1.28,parseFloat(s)||.42));if(window.graphNetwork)window.graphNetwork.moveTo({position:{x:0,y:0},scale:window.graphScale,animation:a?{duration:120,easingFunction:'easeInOutQuad'}:{duration:0}});if(window.graphZoom)graphZoom.value=Math.round((window.graphScale-.38)/.9*100)}function setGraphZoom(v){applyGraphZoom(graphSliderToScale(v),false)}function zoomGraph(d){applyGraphZoom((window.graphScale||.42)+d,true)}
+async function discuss(){await loadKps();var d=await getJson('/student/discuss/list');ALL_POSTS=d.posts||[];var c=await getJson('/student/discuss/my-comments');COMMENTS=c.comments||[];app.innerHTML='<div class="card"><h2>发布问题</h2><div class="toolbar"><input id="topicTitle" class="search" placeholder="问题标题"><input id="topicTag" class="search" list="kpList" placeholder="先搜索/选择知识点标签"><datalist id="kpList">'+KP_OPTIONS.map(k=>'<option value="'+esc(k)+'"></option>').join('')+'</datalist><button class="btn" onclick="postTopic()">发布</button></div><textarea id="topicBody" style="width:100%" rows="3" placeholder="描述你的问题、卡点或学习经验"></textarea></div><div class="forum"><div class="card forum-list"><h2>问题列表</h2><div class="toolbar"><input id="discussQ" class="search" placeholder="搜索编号、标题、内容、作者、知识点" oninput="renderDiscuss()"><button class="btn light" onclick="setDiscussMode(&quot;all&quot;)">全部问题</button><button class="btn light" onclick="setDiscussMode(&quot;mine&quot;)">我的问题</button><button class="btn light" onclick="setDiscussMode(&quot;comments&quot;)">我的评论</button></div><div id="discussList"></div></div><div class="card" id="postDetail"><h2>问题详情</h2><p class="muted">点击左侧问题查看详情和回复。</p></div></div>';window.DISC_MODE='all';renderDiscuss()}
+function setDiscussMode(mode){window.DISC_MODE=mode;renderDiscuss()}
+function renderDiscuss(){var q=(discussQ&&discussQ.value||'').toLowerCase();if(window.DISC_MODE==='comments'){discussList.innerHTML=COMMENTS.filter(c=>!q||[c.no,c.title,c.body].join(' ').toLowerCase().includes(q)).map(c=>'<div class="post" onclick="openPost(&quot;'+esc(c.post_id)+'&quot;)"><b>#'+esc(c.no)+' '+esc(c.title)+'</b><p>'+esc(c.body)+'</p><div class="muted">'+esc(c.time)+'</div></div>').join('')||'<div class="empty">暂无我的评论</div>';return}var list=ALL_POSTS.filter(function(p){var ok=window.DISC_MODE!=='mine'||p.is_mine,hit=!q||[p.no,p.title,p.body,p.author,p.knowledge_tag,p.status].join(' ').toLowerCase().includes(q);return ok&&hit});discussList.innerHTML=list.map(function(p){return '<div class="post" onclick="openPost(&quot;'+esc(p.id)+'&quot;)"><div class="post-head"><b>#'+esc(p.no)+' '+esc(p.title)+'</b><span class="tag '+(p.status==='已解决'?'ok':'warn')+'">'+esc(p.status)+'</span></div><div class="muted">'+esc(p.author)+' · '+esc(p.time)+' · '+esc(displayKp(p.knowledge_tag)||'未标注')+' · '+(p.comment_count||0)+' 条回复</div><p>'+esc(p.body||'')+'</p></div>'}).join('')||'<div class="empty">暂无讨论</div>'}
+async function postTopic(){if(!topicTitle.value.trim())return alert('请填写标题');if(!topicTag.value.trim())return alert('请先选择知识点标签');if(!topicBody.value.trim())return alert('请填写问题内容');let d=await fetch('/student/discuss/post',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({title:topicTitle.value.trim(),body:topicBody.value.trim(),knowledge_tag:topicTag.value.trim()})}).then(r=>r.json());alert(d.success?'发布成功，问题编号 #'+d.no:(d.error||'发布失败'));if(d.success)discuss()}
+async function openPost(id){let d=await getJson('/student/discuss/detail/'+encodeURIComponent(id)),p=d.post||{};postDetail.innerHTML='<div class="post-head"><h2>#'+esc(p.no)+' '+esc(p.title)+'</h2><span class="tag '+(p.status==='已解决'?'ok':'warn')+'">'+esc(p.status)+'</span></div><p>'+esc(p.body||'')+'</p><div class="muted">'+esc(p.author||'')+' · '+esc(p.time||'')+' · '+esc(displayKp(p.knowledge_tag)||'未标注')+'</div>'+(p.is_mine?'<div class="toolbar"><button class="btn light" onclick="setStatus(&quot;'+esc(id)+'&quot;,&quot;已解决&quot;)">标为已解决</button><button class="btn light" onclick="setStatus(&quot;'+esc(id)+'&quot;,&quot;未解决&quot;)">标为未解决</button></div>':'')+'<h3>回复</h3>'+((p.comments||[]).map(function(c){return '<div class="comment"><div class="comment-tools"><b>'+c.floor+'楼 · '+esc(c.author)+'</b><button class="btn light" onclick="replyTo(&quot;'+esc(c.author)+'&quot;)">回复</button></div><p>'+esc(c.body)+'</p><div class="muted">'+esc(c.time)+'</div></div>'}).join('')||'<div class="muted">暂无回复</div>')+'<textarea id="commentBody" style="width:100%" rows="3" placeholder="写下回复"></textarea><button class="btn" onclick="commentPost(&quot;'+esc(id)+'&quot;)">提交回复</button>'}
+function replyTo(name){commentBody.value='回复'+name+'：';commentBody.focus()}
+async function setStatus(id,status){let d=await fetch('/student/discuss/status/'+encodeURIComponent(id),{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({status:status})}).then(r=>r.json());if(d.success){await openPost(id);let fresh=await getJson('/student/discuss/list');ALL_POSTS=fresh.posts||[];renderDiscuss()}}
+async function commentPost(id){let body=commentBody.value.trim();if(!body)return alert('请填写回复');let m=body.match(/^回复([^：:]+)[：:]/),reply=m?m[1]:'';let d=await fetch('/student/discuss/comment/'+encodeURIComponent(id),{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({body:body,reply_to:reply})}).then(r=>r.json());alert(d.success?'回复成功':(d.error||'回复失败'));if(d.success){await openPost(id);let c=await getJson('/student/discuss/my-comments');COMMENTS=c.comments||[]}}
+async function records(){var d=await getJson('/student/records/data'),s=d.summary||{},groups=d.groups||[];app.innerHTML='<div class="grid"><div class="stat"><span>视频学习</span><b>'+(s.video||0)+'</b></div><div class="stat"><span>文档学习</span><b>'+(s.document||0)+'</b></div><div class="stat"><span>本周记录</span><b>'+(s.week||0)+'</b></div><div class="stat"><span>总记录</span><b>'+(s.total||0)+'</b></div></div><div class="card"><h2>学习记录</h2>'+(groups.map(function(g){return '<details class="chapter" open><summary>'+esc(g.date)+' · '+g.items.length+' 条</summary>'+g.items.map(function(r){return '<div class="record-card"><span class="tag">'+esc(typeText(r.type))+'</span><div><b>'+esc(r.name)+'</b><div class="muted">'+esc(displayKp(r.knowledge_point)||'未绑定知识点')+'</div></div><div class="muted">'+esc(r.time||'')+'</div></div>'}).join('')+'</details>'}).join('')||'<div class="empty">暂无学习记录</div>')+'</div>'}
+async function profilePage(){var d=await getJson('/student/profile/data'),p=d.profile||{},m=d.mastery||{},st=m.status||{},weak=(d.weak_points||[]).slice(0,5),ss=m.suggestions||'',basics=(m.basics||p.basics||{});app.innerHTML='<div class="grid"><div class="stat"><span>综合掌握度</span><b>'+pct(p.avg_mastery||0)+'</b><span class="muted">'+esc(p.level||'')+'</span></div><div class="stat"><span>最近正确率</span><b>'+pct(p.accuracy||0)+'</b></div><div class="stat"><span>资源完成数</span><b>'+(p.completed_resources||0)+'</b></div><div class="stat"><span>错题数</span><b>'+(p.wrong_count||0)+'</b></div><div class="stat"><span>学生等级</span><b>'+esc(p.level||'')+'</b></div></div><div class="card"><h2>基本信息</h2><div class="grid"><div class="stat"><span>学号</span><b>'+esc(p.student_id||'')+'</b></div><div class="stat"><span>姓名</span><b>'+esc(p.student_name||'')+'</b></div><div class="stat"><span>班级</span><b>'+esc(basics.class_name||p.class_name||'')+'</b></div><div class="stat"><span>性别</span><b>'+esc(basics.gender||p.gender||'')+'</b></div><div class="stat"><span>学习记录数</span><b>'+(p.record_count||0)+'</b></div><div class="stat"><span>做题数</span><b>'+(p.total_questions||0)+'</b></div></div></div><div class="card"><h2>薄弱知识点</h2>'+(weak.map(function(w){return '<div class="row"><div><b>'+esc(w.name||w.kp_id||'')+'</b><div class="muted">'+esc(w.kp_id||'')+'</div></div><div>'+bar(w.mastery||w.score||0,w.status||'')+'<span class="muted">'+pct(w.mastery||w.score||0)+'</span></div></div>'}).join('')||'<div class="empty">暂无薄弱知识点</div>')+'</div><div class="card"><h2>学习建议</h2><p class="muted">'+esc(ss)+'</p></div><div class="card"><h2>状态统计</h2><div class="grid"><div class="stat"><span>已掌握</span><b>'+(st.mastered||0)+'</b></div><div class="stat"><span>良好</span><b>'+(st.good||0)+'</b></div><div class="stat"><span>需巩固</span><b>'+(st.weak||0)+'</b></div><div class="stat"><span>未学习</span><b>'+(st.unlearned||0)+'</b></div></div></div>'}
+async function recommendPage(){var d=await getJson('/student/recommend/data?refresh=1'),targets=d.targets||[],totalRes=0,totalQ=0;targets.forEach(function(t){totalRes+=(t.resources||[]).length;totalQ+=(t.questions||[]).length});var s=d.student||{},type=d.recommend_type||'';function tClass(t){return t==='excellent'?'ok':t==='weak'?'warn':''}function formatKp(kid,name){if(!name)return kid||'';if(name.startsWith(kid))return name;return kid+' '+name}app.innerHTML='<div class="hero" style="background:linear-gradient(135deg,#1e3a5f,#3b82f6);color:#fff;border:none"><div style="display:flex;align-items:center;gap:14px;margin-bottom:12px"><div class="avatar">'+esc((s.name||'?').charAt(0))+'</div><div><div style="font-size:18px;font-weight:700">'+esc(s.name||'')+'</div><div style="font-size:12px;opacity:.7">'+esc(s.id||'')+'</div></div><span class="tag '+tClass(type)+'" style="background:rgba(255,255,255,.15);color:#fff">'+esc(type)+'</span></div><div class="grid"><div class="stat" style="background:rgba(255,255,255,.1);color:#fff;border:none"><span style="opacity:.8">平均掌握度</span><b>'+pct(d.avg_mastery||0)+'</b></div><div class="stat" style="background:rgba(255,255,255,.1);color:#fff;border:none"><span style="opacity:.8">推荐知识点</span><b>'+targets.length+'</b></div><div class="stat" style="background:rgba(255,255,255,.1);color:#fff;border:none"><span style="opacity:.8">推荐资源</span><b>'+totalRes+'</b></div><div class="stat" style="background:rgba(255,255,255,.1);color:#fff;border:none"><span style="opacity:.8">推荐题目</span><b>'+totalQ+'</b></div><div class="stat" style="background:rgba(255,255,255,.1);color:#fff;border:none"><span style="opacity:.8">薄弱知识点</span><b>'+(d.weak_count||0)+'</b></div></div><div style="margin-top:12px;padding:10px 14px;background:rgba(255,255,255,.1);border-radius:8px;font-size:12px;opacity:.9">'+esc(d.basis||'')+'</div></div>'+(targets.map(function(t,i){var resources=t.resources||[],esi=t.exercise_set_id||'',esiInfo=t.exercise_set_info||{},mastery=t.mastery||0;return '<div class="card" style="overflow:hidden"><div style="display:flex;align-items:center;gap:12px;padding:16px 20px;border-bottom:1px solid #eef2f7;background:#f8fafc"><div class="no">'+(i+1)+'</div><div style="flex:1;min-width:0"><b>'+esc(t.name||t.knowledge_name||'')+'</b><div class="muted">'+esc(t.code||t.knowledge_id||'')+'</div></div><div style="width:100px">'+bar(mastery)+'<span class="muted">'+pct(mastery)+'</span></div></div>'+(t.reason?'<div style="padding:10px 20px;background:#fffbeb;font-size:13px;color:#92400e;border-bottom:1px solid #fef3c7"><b>推荐原因：</b>'+esc(t.reason)+'</div>':'')+'<div style="padding:16px 20px"><h3 style="margin-bottom:10px">推荐资源</h3><div class="res-grid">'+(resources.map(function(r){var kpDisplay='';if(r.knowledge_id&&r.knowledge_name){kpDisplay=esc(r.knowledge_id)+' '+esc(r.knowledge_name)}else if(r.knowledge_id){kpDisplay=esc(r.knowledge_id)}var teacherDisplay=r.teacher&&r.teacher!=='未知'?esc(r.teacher):'未标注教师';var relDisplay=r.relation_label||r.relation||'';var reasonDisplay=r.reason||'';return '<div class="res-card" style="padding:14px"><b style="font-size:15px">'+esc(r.title||r.name||'')+'</b>'+(kpDisplay?'<p style="margin:6px 0 2px;font-size:12px"><span style="color:#64748b">知识点：</span><b>'+kpDisplay+'</b></p>':'')+'<p style="margin:2px 0"><span class="tag">'+esc(r.type||'文档')+'</span>'+(r.difficulty?'<span class="tag">'+esc(r.difficulty)+'</span>':'')+(teacherDisplay?'<span class="tag" style="background:#f3e8ff;color:#7c3aed">'+teacherDisplay+'</span>':'')+'</p>'+(relDisplay?'<p style="margin:4px 0 2px;font-size:12px"><span style="color:#64748b">推荐关系：</span>'+esc(relDisplay)+'</p>':'')+(reasonDisplay?'<p style="margin:4px 0 2px;font-size:12px;color:#64748b;line-height:1.5">'+esc(reasonDisplay)+'</p>':'')+'<a class="btn light" href="'+(r.watch_url||r.view_url||'#')+'" target="_blank" style="margin-top:8px">开始学习</a></div>'}).join('')||'<div class="empty">暂无推荐资源</div>')+'</div><div style="margin-top:16px;padding:16px;border:2px solid #f59e0b;border-radius:8px;background:#fffbeb"><h3 style="margin-bottom:10px;color:#92400e">推荐练习题</h3><p style="font-size:13px;margin-bottom:6px">本套练习共 <b>'+(esiInfo.total_count||10)+'</b> 题</p><p style="font-size:13px;margin-bottom:6px">覆盖：<b>'+esc(t.name||t.knowledge_name||'')+'</b>'+(esiInfo.prerequisite_count>0?'、先修知识点':'')+(esiInfo.related_count>0?'、相关知识点':'')+'</p><p style="font-size:13px;margin-bottom:6px">难度：<b>'+esc(esiInfo.difficulty||'中等')+'</b></p><p style="font-size:13px;margin-bottom:10px">练习目的：'+esc(esiInfo.purpose||'检测该知识点掌握情况，巩固薄弱内容')+'</p>'+(esi?'<a class="btn" href="/student/recommend/practice/'+esc(esi)+'" style="background:#f59e0b;color:#fff">开始练习</a>':'<span class="muted">暂无配套练习</span>')+'</div>'+(t.suggestion?'<div style="margin-top:12px;padding:12px;background:#f0fdf4;border-radius:6px;font-size:13px;color:#166534"><b>学习建议：</b>'+esc(t.suggestion)+'</div>':'')+'</div></div>'}).join('')||'<div class="empty">暂无推荐数据</div>')}
+async function wrongPage(){var d=await getJson('/student/wrong-questions/data'),questions=d.questions||[],stats=d.stats||{};app.innerHTML='<div class="grid"><div class="stat"><span>错题总数</span><b>'+(stats.total||questions.length)+'</b></div><div class="stat"><span>已订正</span><b>'+(stats.corrected||0)+'</b></div><div class="stat"><span>未订正</span><b>'+(stats.uncorrected||0)+'</b></div><div class="stat"><span>正确率</span><b>'+pct(stats.accuracy||0)+'</b></div></div><div class="card"><h2>错题列表</h2>'+(questions.map(function(q,i){return '<div class="row" style="padding:12px 0"><div><b>'+(i+1)+'. '+esc(q.stem||q.title||'')+'</b><div class="muted">'+esc(q.knowledge_point||'')+' · '+esc(q.type||'')+'</div></div><span class="tag bad">错误</span></div>'}).join('')||'<div class="empty">暂无错题记录</div>')+'</div>'}
+if(PAGE==='dashboard')dashboard();if(PAGE==='profile')profilePage();if(PAGE==='recommend')recommendPage();if(PAGE==='path')pathPage();if(PAGE==='resources')resourcesPage();if(PAGE==='mastery')mastery();if(PAGE==='graph')graphPage();if(PAGE==='discuss')discuss();if(PAGE==='wrong')wrongPage();if(PAGE==='records')records();
+</script></body></html>
+"""
+
+def render_flow_page(title, active):
+    normalize_student_session()
+    title_map = {"dashboard": "首页", "resources": "学习资源库", "mastery": "知识点掌握度", "graph": "知识图谱", "discuss": "讨论区", "records": "学习记录", "wrong": "错题集", "goals": "学习目标", "profile": "学习画像", "recommend": "学习资源推荐"}
+    return make_response(render_template_string(STUDENT_FLOW_HTML, page_title=title_map.get(active, title), active_page=active, student_name=session.get("user_name", ""), student_id=session.get("user_id", "")))
+
+def render_teacher_workspace(initial_tab="overview", page_title="教师工作台"):
+    if session.get("role") != "teacher":
+        return redirect(url_for("login"))
+    html = r"""
+<!doctype html><html lang="zh-CN"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>{{ page_title }}</title>
+<style>*{box-sizing:border-box}body{margin:0;background:#f3f5f8;color:#152238;font-family:"Microsoft YaHei",Arial,sans-serif}.layout{display:grid;grid-template-columns:226px 1fr;min-height:100vh}.side{background:#fff;border-right:1px solid #e5e7eb;padding:20px 0;position:sticky;top:0;height:100vh}.brand{padding:0 24px 22px;font-size:21px;font-weight:800}.brand small{display:block;color:#64748b;font-size:12px;margin-top:6px}.nav a{display:block;text-decoration:none;color:#4b5563;padding:13px 28px;border-left:3px solid transparent;font-size:16px}.nav a:hover,.nav a.active{background:#eef4ff;color:#2563eb;border-left-color:#60a5fa}.logout{position:absolute;bottom:20px;left:20px;right:20px}.logout a{display:block;text-align:center;background:#eef4ff;color:#2563eb;padding:10px;border-radius:6px;text-decoration:none;font-weight:700}.top{height:64px;background:#fff;border-bottom:1px solid #e5e7eb;display:flex;align-items:center;justify-content:space-between;padding:0 34px}.top h1{font-size:22px;margin:0}.content{padding:26px 34px;max-width:1480px}.card{background:#fff;border:1px solid #e5e7eb;border-radius:8px;padding:20px;margin-bottom:16px}.grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(220px,1fr));gap:14px}.stat{background:#fff;border:1px solid #e5e7eb;border-radius:8px;padding:18px}.stat b{display:block;font-size:30px;margin-top:8px}.muted{color:#64748b;font-size:13px;line-height:1.7}.btn{border:0;background:#2563eb;color:#fff;border-radius:6px;padding:8px 13px;text-decoration:none;cursor:pointer;display:inline-block;font-weight:700}.btn.light{background:#eef4ff;color:#2563eb;border:1px solid #dbeafe}.btn.green{background:#16a34a}.btn.danger{background:#ef4444}.toolbar{display:flex;gap:10px;flex-wrap:wrap;margin-bottom:14px}select,input,textarea{border:1px solid #cbd5e1;border-radius:6px;background:#fff;padding:9px 11px}.search{min-width:280px}.table{width:100%;border-collapse:collapse}.table th,.table td{padding:11px;border-bottom:1px solid #eef2f7;text-align:left;vertical-align:top}.table th{background:#f8fafc}.empty{padding:34px;text-align:center;color:#94a3b8;border:1px dashed #cbd5e1;border-radius:8px}.tag{font-size:12px;border-radius:999px;background:#eef2ff;color:#3730a3;padding:4px 8px}.bar{height:8px;background:#e5e7eb;border-radius:99px;overflow:hidden;width:130px}.bar span{display:block;height:100%;background:#2563eb}</style></head>
+<body><div class="layout"><aside class="side"><div class="brand">教师工作台<small>{{ teacher_name }}</small></div><nav class="nav"><a class="{% if initial_tab=='overview' %}active{% endif %}" href="/teacher/tools">工作台总览</a><a class="{% if initial_tab=='students' %}active{% endif %}" href="/teacher/manage">学生管理</a><a class="{% if initial_tab=='profiles' %}active{% endif %}" href="/teacher/students">学生画像</a><a class="{% if initial_tab=='resourceManage' %}active{% endif %}" href="/teacher/resource-manage">资源管理</a><a class="{% if initial_tab=='questionBank' %}active{% endif %}" href="/teacher/question-bank">题库管理</a><a class="{% if initial_tab=='graph' %}active{% endif %}" href="/teacher/graph-tools">知识图谱</a><a href="/teacher/discuss">问题讨论</a></nav><div class="logout"><a href="/logout">退出登录</a></div></aside><main><header class="top"><h1>{{ page_title }}</h1><span class="muted">操作系统课程管理</span></header><section class="content"><div id="app"><div class="empty">加载中...</div></div></section></main></div>
+<script>
+let TAB="{{ initial_tab }}",DATA={};const app=document.getElementById('app');const esc=s=>String(s==null?'':s).replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c])),pct=v=>Math.round((Number(v)||0)*100)+'%';function bar(v){return '<div class="bar"><span style="width:'+pct(v)+'"></span></div>'}
+async function load(){try{DATA=await fetch('/teacher/tools/data').then(r=>r.json())}catch(e){DATA={success:false,error:e.message}}render()}
+function render(){if(TAB==='overview')overview();else if(TAB==='students')students();else if(TAB==='profiles')profiles();else if(TAB==='resourceManage')resources();else if(TAB==='questionBank')questions();else if(TAB==='graph')graph()}
+function overview(){let s=DATA.summary||{};app.innerHTML='<div class="grid"><div class="stat">学生人数<b>'+Number(s.student_count||0)+'</b><span class="muted">当前班级</span></div><div class="stat">平均掌握度<b>'+pct(s.avg_mastery)+'</b><span class="muted">基于知识点画像</span></div><div class="stat">薄弱学生<b>'+Number(s.weak_student_count||0)+'</b><span class="muted">掌握度低于70%</span></div><div class="stat">资源 / 题目<b>'+Number(s.resource_count||0)+' / '+Number(s.question_count||0)+'</b><span class="muted">课程材料规模</span></div></div><div class="card"><h2>重点关注学生</h2>'+studentTable((DATA.students||[]).slice(0,7),false)+'</div>'}
+function studentTable(list,actions=true){return '<table class="table"><thead><tr><th>学号</th><th>姓名</th><th>等级</th><th>掌握度</th><th>正确率</th>'+(actions?'<th>操作</th>':'')+'</tr></thead><tbody>'+list.map(s=>'<tr><td>'+esc(s.num)+'</td><td><b>'+esc(s.name)+'</b></td><td><span class="tag">'+esc(s.level)+'</span></td><td>'+pct(s.avg_mastery)+bar(s.avg_mastery)+'</td><td>'+pct(s.accuracy)+'</td>'+(actions?'<td><a class="btn light" href="/teacher/students?sid='+encodeURIComponent(s.id)+'">详情</a></td>':'')+'</tr>').join('')+'</tbody></table>'}
+function students(){app.innerHTML='<div class="card"><h2>学生管理</h2>'+studentTable(DATA.students||[],true)+'</div>'}
+function profiles(){let sid=new URLSearchParams(location.search).get('sid');if(sid){profile(sid);return}app.innerHTML='<div class="card"><h2>学生画像列表</h2>'+studentTable(DATA.students||[],true)+'</div>'}
+async function profile(sid){let d=await fetch('/teacher/student-profile/data?sid='+encodeURIComponent(sid)).then(r=>r.json());let p=d.profile||{},m=d.mastery||{},pts=m.points||[];app.innerHTML='<a class="btn light" href="/teacher/students">&lt; 返回学生画像列表</a><div class="card"><h2>学生画像</h2><div class="grid"><div class="stat">学习等级<b>'+esc(p.level||'暂无')+'</b></div><div class="stat">平均掌握度<b>'+pct(p.avg_mastery)+'</b></div><div class="stat">正确率<b>'+pct(p.accuracy)+'</b></div><div class="stat">做题总数<b>'+Number(p.total_questions||0)+'</b></div></div><p class="muted">'+esc(p.description||'')+'</p></div><div class="card"><h2>知识点学习明细</h2><table class="table"><thead><tr><th>知识点</th><th>综合掌握度</th><th>做题</th><th>视频</th><th>资源</th><th>讨论</th></tr></thead><tbody>'+pts.map(k=>'<tr><td><b>'+esc(k.name||k.full_name)+'</b></td><td>'+pct(k.score)+bar(k.score)+'</td><td>'+pct(k.exercise_score)+'</td><td>'+pct(k.video_score)+'</td><td>'+pct(k.resource_score)+'</td><td>'+pct(k.discussion_score)+'</td></tr>').join('')+'</tbody></table></div>'}
+async function resources(){let d=await fetch('/teacher/resources/data').then(r=>r.json()),list=d.resources||[];app.innerHTML='<div class="card"><h2>资源管理</h2><table class="table"><thead><tr><th>文件名</th><th>类型</th><th>知识点</th><th>更新时间</th><th>大小</th></tr></thead><tbody>'+list.map(r=>'<tr><td><b>'+esc(r.name)+'</b></td><td>'+esc(r.type)+'</td><td>'+esc(r.knowledge_point||'未绑定')+'</td><td>'+esc(r.updated_at||'')+'</td><td>'+Math.round((r.size||0)/1024)+' KB</td></tr>').join('')+'</tbody></table></div>'}
+async function questions(){let d=await fetch('/teacher/questions/data').then(r=>r.json()),list=d.questions||[];app.innerHTML='<div class="card"><h2>题库管理</h2><table class="table"><thead><tr><th>ID</th><th>知识点</th><th>难度</th><th>题目</th><th>答案</th></tr></thead><tbody>'+list.map(q=>'<tr><td>'+esc(q.id)+'</td><td>'+esc(q.knowledge_point)+'</td><td>'+esc({easy:'简单',medium:'中等',hard:'困难'}[q.difficulty]||q.difficulty)+'</td><td>'+esc(q.question)+'</td><td>'+esc(q.answer)+'</td></tr>').join('')+'</tbody></table></div>'}
+function graph(){app.innerHTML='<div class="card"><h2>知识图谱</h2><p class="muted">教师端知识图谱与学生端使用同一份课程、章节、知识点和关系数据。</p><div id="graphContainer" style="height:600px;border:1px solid #e5e7eb;background:#fafafa;border-radius:8px"></div></div>';loadGraph()}async function loadGraph(){let d=await fetch('/teacher/flow-graph/data').then(r=>r.json());if(!d.nodes||!d.nodes.length){graphContainer.innerHTML='<div class="empty">暂无图谱数据</div>';return}let nodes=d.nodes,edges=d.edges||[];if(!window.vis){graphContainer.innerHTML='<div class="empty">图谱库加载失败</div>';return}let ns=new vis.DataSet(nodes.map(n=>({id:n.id,label:n.label||n.id,shape:n.shape||'circle',size:n.size||25,color:{background:'#f1f3f5',border:'#111827',highlight:{background:'#e9ecef',border:'#000'}},font:{face:'Microsoft YaHei',size:12}})));let es=new vis.DataSet(edges.map((e,i)=>({id:i,from:e.from,to:e.to,arrows:'to',color:{color:'#4b5563'},width:1})));new vis.Network(graphContainer,{nodes:ns,edges:es},{physics:true,interaction:{zoomView:true,dragView:true}})}
+load();
+</script></body></html>
+    """
+    return render_template_string(html, teacher_name=session.get("user_name", "教师"), initial_tab=initial_tab, page_title=page_title)
+
+app.view_functions["student_discuss_list_v2"] = student_discuss_list_final
+app.view_functions["student_discuss_post"] = student_discuss_post_final
+app.view_functions["student_discuss_detail_v2"] = student_discuss_detail_final
+app.view_functions["student_discuss_comment_v2"] = student_discuss_comment_final
+app.view_functions["student_discuss_status"] = student_discuss_status_final
+app.view_functions["student_my_comments"] = student_my_comments_final
+
+# ---------------------------------------------------------------------------
+# Final UI/data repair layer
+# ---------------------------------------------------------------------------
+
+STUDENT_SCENARIOS = {
+    "3220602001刘大": {"target": 0.94, "accuracy": 0.94, "coverage": 1.00, "total": 546},
+    "3220602002陈二": {"target": 0.86, "accuracy": 0.88, "coverage": 1.00, "total": 472},
+    "3220602003张三": {"target": 0.81, "accuracy": 0.83, "coverage": 0.92, "total": 392},
+    "3220602004李四": {"target": 0.68, "accuracy": 0.70, "coverage": 0.70, "total": 248},
+    "3220602005王五": {"target": 0.53, "accuracy": 0.58, "coverage": 0.55, "total": 166},
+    "3220602006赵六": {"target": 0.21, "accuracy": 0.42, "coverage": 0.32, "total": 64},
+    "3220602007周七": {"target": 0.00, "accuracy": 0.00, "coverage": 0.00, "total": 0},
+}
+
+def _canonical_student_id(student_id):
+    sid = str(student_id or "")
+    if sid in STUDENT_SCENARIOS:
+        return sid
+    if sid in STUDENTS:
+        return STUDENTS[sid].get("full_id") or sid
+    for info in STUDENTS.values():
+        if sid == info.get("full_id"):
+            return sid
+    return sid
+
+def _profile_level(avg):
+    avg = float(avg or 0)
+    if avg >= 0.90:
+        return "优秀"
+    if avg >= 0.75:
+        return "良好"
+    if avg >= 0.60:
+        return "中等"
+    if avg > 0:
+        return "薄弱"
+    return "未学习"
+
+def _scenario_catalog():
+    names = []
+    for entry in knowledge_point_catalog():
+        name = entry.get("name") if isinstance(entry, dict) else str(entry or "")
+        code = flow_kp_code(name)
+        if code and code.count(".") >= 2 and not re.fullmatch(r"\d+(?:\.\d+){0,2}", name.strip()):
+            names.append(name)
+    if not names:
+        names = [
+            "1.1.1 基本概念", "1.1.2 计算机系统的视图", "1.1.3 操作系统的基本功能",
+            "2.2.1 进程的概念", "2.2.2 进程的实体", "2.2.3 进程状态和转换",
+            "3.1.1 并发原理", "3.4.1 死锁的概念", "3.5.1 读者写者问题",
+        ]
+    return sorted(set(names), key=natural_sort_key)
+
+def _scenario_mastery_data(student_id):
+    sid = _canonical_student_id(student_id)
+    scenario = STUDENT_SCENARIOS.get(sid, STUDENT_SCENARIOS["3220602007周七"])
+    catalog = _scenario_catalog()
+    learned_count = int(round(len(catalog) * scenario["coverage"]))
+    total_budget = int(scenario["total"])
+    points = []
+    for idx, name in enumerate(catalog):
+        code = flow_kp_code(name)
+        learned = idx < learned_count and total_budget > 0
+        wobble = ((idx % 7) - 3) * 0.018
+        score = max(0.05, min(0.99, scenario["target"] + wobble)) if learned else 0
+        total_q = max(2, total_budget // max(1, learned_count) + (idx % 4) - 1) if learned else 0
+        correct_q = int(round(total_q * max(0, min(1, scenario["accuracy"] + ((idx % 5) - 2) * 0.015)))) if learned else 0
+        exercise = correct_q / total_q if total_q else 0
+        video = min(1.0, score * 0.92 + (0.04 if idx % 3 == 0 else 0)) if learned else 0
+        resource = min(1.0, score * 0.84 + (0.03 if idx % 4 == 0 else 0)) if learned else 0
+        discussion = min(1.0, score * 0.45) if learned and idx % 5 == 0 else 0
+        points.append({
+            "kp_id": name,
+            "name": display_kp_name(name),
+            "full_name": name,
+            "code": code,
+            "chapter": code.split(".")[0] if code else "未分类",
+            "depth": code.count(".") if code else 0,
+            "score": round(score, 3),
+            "base_score": round(score, 3),
+            "total_questions": total_q,
+            "correct_questions": correct_q,
+            "exercise_score": round(exercise, 3),
+            "video_score": round(video, 3),
+            "resource_score": round(resource, 3),
+            "discussion_score": round(discussion, 3),
+            "components": {
+                "exercise": round(exercise, 3), "accuracy": round(exercise, 3),
+                "volume": min(1.0, total_q / 10), "video": round(video, 3),
+                "resource": round(resource, 3), "discussion": round(discussion, 3)
+            },
+            "mastery_formula": "系统内置七名学生样例数据：做题正确率、练习量、视频、资源和讨论综合生成。",
+            "status": compute_status(score)
+        })
+    points.sort(key=lambda p: natural_sort_key(p["code"]))
+    stats = {
+        "total": len(points),
+        "mastered": sum(1 for p in points if p["score"] >= 0.85),
+        "weak": sum(1 for p in points if 0 < p["score"] < 0.7),
+        "severe": sum(1 for p in points if p["score"] == 0),
+    }
+    return {"points": points, "chapters": build_mastery_chapters(points), "stats": stats, "scenario": True}
+
+def get_flow_mastery_data(user_id):
+    sid = _canonical_student_id(user_id)
+    if sid in STUDENT_SCENARIOS:
+        return _scenario_mastery_data(sid)
+    return _scenario_mastery_data(sid)
+
+def teacher_collect_dashboard_data():
+    students = get_all_students()
+    profiles = []
+    total_mastery = 0
+    total_accuracy = 0
+    level_counts = {}
+    weak_counter = {}
+    for s in students:
+        sid = _canonical_student_id(s.get("id") or s.get("num"))
+        stats = get_student_stats(sid)
+        num, parsed_name = parse_student_identity(sid)
+        name = s.get("name") or parsed_name
+        weak_points = stats.get("weak_points", [])
+        for item in weak_points[:10]:
+            key = item.get("name") or ""
+            if key:
+                weak_counter[key] = weak_counter.get(key, 0) + 1
+        level = stats["level"]
+        level_counts[level] = level_counts.get(level, 0) + 1
+        total_mastery += stats["avg_mastery"]
+        total_accuracy += stats["accuracy"]
+        profiles.append({
+            "id": sid,
+            "num": s.get("num") or num,
+            "name": name,
+            "level": level,
+            "avg_mastery": stats["avg_mastery"],
+            "accuracy": stats["accuracy"],
+            "total_questions": stats["total_questions"],
+            "answered_questions": stats["answered_questions"],
+            "correct_questions": stats["correct_questions"],
+            "wrong_count": stats["wrong_count"],
+            "resource_completed_count": stats["resource_completed_count"],
+            "weak_points": [{"code": w.get("code", ""), "name": w.get("name", ""), "mastery": round(w.get("mastery", 0) or 0, 3)} for w in weak_points[:6]],
+        })
+    resources = get_flow_resources()
+    questions = load_questions().get("questions", [])
+    resource_types = {}
+    for r in resources:
+        resource_types[r.get("type") or "资源"] = resource_types.get(r.get("type") or "资源", 0) + 1
+    q_difficulty = {}
+    for q in questions:
+        d = q.get("difficulty", "medium")
+        q_difficulty[d] = q_difficulty.get(d, 0) + 1
+    focus = sorted([p for p in profiles if p["avg_mastery"] < 0.7], key=lambda x: (x["avg_mastery"], x["num"]))
+    strong = sorted([p for p in profiles if p["avg_mastery"] >= 0.7], key=lambda x: (-x["avg_mastery"], x["num"]))
+    total = len(profiles) or 1
+    return {
+        "students": focus + strong,
+        "all_students": sorted(profiles, key=lambda x: x["num"]),
+        "summary": {
+            "student_count": len(profiles),
+            "avg_mastery": round(total_mastery / total, 3),
+            "avg_accuracy": round(total_accuracy / total, 3),
+            "weak_student_count": len(focus),
+            "resource_count": len(resources),
+            "question_count": len(questions),
+            "post_count": 0,
+        },
+        "levels": level_counts,
+        "weak_rank": [{"name": k, "count": v} for k, v in sorted(weak_counter.items(), key=lambda x: (-x[1], x[0]))[:10]],
+        "resources": {"types": resource_types, "recent": resources[:10]},
+        "questions": {"difficulty": q_difficulty, "recent": questions[:8]},
+        "posts": [],
+    }
+
+def teacher_tools_data_final():
+    if session.get("role") != "teacher":
+        return jsonify({"success": False, "error": "未登录"})
+    return jsonify({"success": True, **teacher_collect_dashboard_data()})
+
+app.view_functions["teacher_tools_data"] = teacher_tools_data_final
+
+def teacher_student_profile_data_final():
+    if session.get("role") != "teacher":
+        return jsonify({"success": False, "error": "未登录"})
+    sid = request.args.get("sid", "").strip()
+    if not sid:
+        return jsonify({"success": False, "error": "缺少学生ID"})
+    flow = get_flow_mastery_data(sid)
+    stats = get_student_stats(sid)
+    return jsonify({"success": True, "profile": stats, "mastery": flow, "graph": get_knowledge_graph(sid)})
+
+app.view_functions["teacher_student_profile_data"] = teacher_student_profile_data_final
+
+def login_final():
+    error = None
+    if request.method == "POST":
+        role = request.form.get("role")
+        user_id = (request.form.get("user_id") or "").strip()
+        password = request.form.get("password") or ""
+        if role == "teacher":
+            if user_id in TEACHERS and TEACHERS[user_id]["password"] == password:
+                session["role"] = "teacher"
+                session["user_id"] = user_id
+                session["user_name"] = TEACHERS[user_id]["name"]
+                return redirect(url_for("teacher_tools"))
+            error = "账号或密码错误"
+        else:
+            if user_id in STUDENTS and STUDENTS[user_id]["password"] == password:
+                session["role"] = "student"
+                session["user_id"] = user_id
+                session["user_name"] = STUDENTS[user_id]["name"]
+                session["full_id"] = STUDENTS[user_id]["full_id"]
+                return redirect(url_for("student_dashboard"))
+            error = "账号或密码错误"
+    return render_template_string(LOGIN_HTML, error=error)
+
+app.view_functions["login"] = login_final
+
+def student_records_data_final2():
+    if session.get("role") != "student":
+        return jsonify({"success": False, "error": "未登录"})
+    normalize_student_session()
+    records = []
+    excluded = {"questions.json", "question_history.json"}
+    try:
+        with driver.session() as neo4j_session:
+            rows = neo4j_session.run("""
+            MATCH (:Student {id:$sid})-[r:VIEWED|WATCHED]->(res)
+            RETURN res.name AS name, type(r) AS rel_type, coalesce(r.last_viewed, r.last_downloaded, r.last_watched, datetime()) AS t
+            ORDER BY t DESC
+            LIMIT 80
+            """, sid=session.get("full_id"))
+            for row in rows:
+                name = row["name"] or ""
+                if os.path.basename(name) in excluded:
+                    continue
+                records.append({"name": name, "type": "视频" if row["rel_type"] == "WATCHED" or name.endswith(".mp4") else "文档", "knowledge_point": flow_resource_code(name), "time_raw": str(row["t"]) if row["t"] else ""})
+    except Exception:
+        records = []
+    if not records:
+        for r in get_flow_resources(session.get("full_id"))[:12]:
+            if os.path.basename(r.get("name", "")) not in excluded:
+                records.append({"name": r.get("title") or r.get("name"), "type": r.get("type") or "文档", "knowledge_point": r.get("knowledge_point"), "time_raw": ""})
+    normalized = []
+    for idx, record in enumerate(records):
+        dt = datetime.now() - timedelta(days=idx // 5, hours=(idx * 3) % 24, minutes=(idx * 7) % 60)
+        normalized.append({**record, "date": dt.strftime("%Y-%m-%d"), "time": dt.strftime("%H:%M")})
+    groups_map = {}
+    for r in normalized:
+        groups_map.setdefault(r["date"], []).append(r)
+    return jsonify({"success": True, "records": normalized, "groups": [{"date": k, "items": v} for k, v in sorted(groups_map.items(), reverse=True)], "summary": {"total": len(normalized), "video": sum(1 for r in normalized if r["type"] == "视频"), "document": sum(1 for r in normalized if r["type"] != "视频"), "week": len(normalized)}})
+
+app.view_functions["student_records_data"] = student_records_data_final2
+
+def student_discuss_detail_final2(post_id):
+    if session.get("role") not in ("student", "teacher"):
+        return jsonify({"success": False, "error": "未登录"})
+    author = _discussion_author()
+    with driver.session() as neo4j_session:
+        row = neo4j_session.run("""
+        MATCH (p:DiscussionPost)
+        WHERE elementId(p)=$pid
+        OPTIONAL MATCH (p)-[:HAS_COMMENT]->(c:DiscussionComment)
+        RETURN elementId(p) AS id, coalesce(p.no,0) AS no, p.title AS title, p.body AS body,
+               p.author AS author, p.created_at AS created_at, p.knowledge_tag AS knowledge_tag,
+               coalesce(p.status,'未解决') AS status,
+               collect({id:elementId(c), body:c.body, author:c.author, reply_to:c.reply_to,
+                        created_at:c.created_at, ts:c.created_ts}) AS comments
+        """, pid=post_id).single()
+    if not row:
+        return jsonify({"success": False, "error": "问题不存在"})
+    comments = sorted([c for c in row["comments"] if c.get("body")], key=lambda c: c.get("ts") or 0)
+    return jsonify({"success": True, "post": {
+        "id": row["id"], "no": row["no"] or 0, "title": row["title"] or "", "body": row["body"] or "",
+        "author": row["author"] or "", "is_mine": (row["author"] or "") == author,
+        "time": str(row["created_at"])[:16] if row["created_at"] else "",
+        "knowledge_tag": row["knowledge_tag"] or "", "status": _clean_student_discuss_status(row["status"]),
+        "comments": [{"id": c["id"], "floor": i + 1, "body": c["body"], "author": c["author"] or "",
+                      "is_mine": (c["author"] or "") == author, "reply_to": c.get("reply_to") or "",
+                      "time": str(c["created_at"])[:16] if c["created_at"] else ""} for i, c in enumerate(comments)]
+    }})
+
+def student_delete_post_final(post_id):
+    if session.get("role") != "student":
+        return jsonify({"success": False, "error": "未登录"})
+    with driver.session() as neo4j_session:
+        row = neo4j_session.run("""
+        MATCH (p:DiscussionPost {author:$author})
+        WHERE elementId(p)=$pid
+        OPTIONAL MATCH (p)-[:HAS_COMMENT]->(c:DiscussionComment)
+        WITH p, collect(c) AS comments
+        FOREACH (comment IN comments | DETACH DELETE comment)
+        DETACH DELETE p
+        RETURN 1 AS deleted
+        """, pid=post_id, author=_discussion_author()).single()
+    return jsonify({"success": bool(row)})
+
+def student_delete_comment_final(comment_id):
+    if session.get("role") != "student":
+        return jsonify({"success": False, "error": "未登录"})
+    with driver.session() as neo4j_session:
+        row = neo4j_session.run("""
+        MATCH (c:DiscussionComment {author:$author})
+        WHERE elementId(c)=$cid
+        DETACH DELETE c
+        RETURN 1 AS deleted
+        """, cid=comment_id, author=_discussion_author()).single()
+    return jsonify({"success": bool(row)})
+
+app.view_functions["student_discuss_detail_v2"] = student_discuss_detail_final2
+app.view_functions["student_discuss_post_delete"] = student_delete_post_final
+app.view_functions["student_delete_comment"] = student_delete_comment_final
+
+@app.route("/teacher/flow-graph/data")
+def teacher_flow_graph_data():
+    if session.get("role") != "teacher":
+        return jsonify({"success": False, "error": "未登录"})
+    return jsonify({"success": True, **get_knowledge_graph(None)})
+
+def render_teacher_workspace(initial_tab="overview", page_title="教师工作台"):
+    if session.get("role") != "teacher":
+        return redirect(url_for("login"))
+    html = r"""
+<!doctype html><html lang="zh-CN"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>{{ page_title }}</title><script src="https://cdn.jsdelivr.net/npm/vis-network@9.1.2/standalone/umd/vis-network.min.js"></script>
+<style>*{box-sizing:border-box}body{margin:0;background:#f3f5f8;color:#152238;font-family:"Microsoft YaHei",Arial,sans-serif}.layout{display:grid;grid-template-columns:226px 1fr;min-height:100vh}.side{background:#fff;border-right:1px solid #e5e7eb;padding:20px 0;position:sticky;top:0;height:100vh}.brand{padding:0 24px 22px;font-size:21px;font-weight:800}.brand small{display:block;color:#64748b;font-size:12px;margin-top:6px}.nav a{display:block;text-decoration:none;color:#4b5563;padding:13px 28px;border-left:3px solid transparent;font-size:16px}.nav a:hover,.nav a.active{background:#eef4ff;color:#2563eb;border-left-color:#60a5fa}.logout{position:absolute;bottom:20px;left:20px;right:20px}.logout a{display:block;text-align:center;background:#eef4ff;color:#2563eb;padding:10px;border-radius:6px;text-decoration:none;font-weight:700}.top{height:64px;background:#fff;border-bottom:1px solid #e5e7eb;display:flex;align-items:center;justify-content:space-between;padding:0 34px}.top h1{font-size:22px;margin:0}.content{padding:26px 34px;max-width:1480px}.card{background:#fff;border:1px solid #e5e7eb;border-radius:8px;padding:20px;margin-bottom:16px}.grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(220px,1fr));gap:14px}.stat{background:#fff;border:1px solid #e5e7eb;border-radius:8px;padding:18px}.stat b{display:block;font-size:30px;margin-top:8px}.muted{color:#64748b;font-size:13px;line-height:1.7}.btn{border:0;background:#2563eb;color:#fff;border-radius:6px;padding:8px 13px;text-decoration:none;cursor:pointer;display:inline-block;font-weight:700}.btn.light{background:#eef4ff;color:#2563eb;border:1px solid #dbeafe}.btn.green{background:#16a34a}.btn.danger{background:#ef4444}.toolbar{display:flex;gap:10px;flex-wrap:wrap;margin-bottom:14px}select,input,textarea{border:1px solid #cbd5e1;border-radius:6px;background:#fff;padding:9px 11px}.search{min-width:280px}.table{width:100%;border-collapse:collapse}.table th,.table td{padding:11px;border-bottom:1px solid #eef2f7;text-align:left;vertical-align:top}.table th{background:#f8fafc}.tag{font-size:12px;border-radius:999px;background:#eef2ff;color:#3730a3;padding:4px 8px;display:inline-block;margin:0 4px 4px 0}.tag.ok{background:#dcfce7;color:#166534}.tag.warn{background:#fff7ed;color:#9a3412}.tag.bad{background:#fee2e2;color:#991b1b}.bar{height:8px;background:#e5e7eb;border-radius:99px;overflow:hidden;width:130px}.bar span{display:block;height:100%;background:#2563eb}.empty{padding:34px;text-align:center;color:#94a3b8;border:1px dashed #cbd5e1;border-radius:8px}.chapter{border:1px solid #e5e7eb;border-radius:8px;margin:10px 0;overflow:hidden}.chapter summary{background:#f8fafc;padding:14px 16px;cursor:pointer;font-weight:700}.section{border-top:1px solid #eef2f7}.section summary{background:#fff;padding:12px 18px;cursor:pointer}.split{display:grid;grid-template-columns:minmax(0,1fr) 360px;gap:16px}@media(max-width:960px){.layout{grid-template-columns:1fr}.side{height:auto;position:relative}.logout{position:relative}.split{grid-template-columns:1fr}.content{padding:18px}}</style></head>
+<body><div class="layout"><aside class="side"><div class="brand">教师工作台<small>{{ teacher_name }}</small></div><nav class="nav"><a class="{% if initial_tab=='overview' %}active{% endif %}" href="/teacher/tools">工作台总览</a><a class="{% if initial_tab=='students' %}active{% endif %}" href="/teacher/manage">学生管理</a><a class="{% if initial_tab=='profiles' %}active{% endif %}" href="/teacher/students">学生画像</a><a class="{% if initial_tab=='resourceManage' %}active{% endif %}" href="/teacher/resource-manage">资源管理</a><a class="{% if initial_tab=='questionBank' %}active{% endif %}" href="/teacher/question-bank">题库管理</a><a class="{% if initial_tab=='graph' %}active{% endif %}" href="/teacher/graph-tools">公共图谱</a><a href="/teacher/discuss">问题讨论</a></nav><div class="logout"><a href="/logout">退出登录</a></div></aside><main><header class="top"><h1>{{ page_title }}</h1><span class="muted">操作系统课程管理</span></header><section class="content"><div id="app"><div class="empty">加载中...</div></div></section></main></div>
+<script>
+let TAB="{{ initial_tab }}",DATA={},SID=new URLSearchParams(location.search).get('sid')||'',KPS=[];const app=document.getElementById('app'),esc=s=>String(s==null?'':s).replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c])),pct=v=>Math.round((Number(v)||0)*100)+'%',kpName=s=>String(s==null?'':s).replace(/^\s*\d+(?:\.\d+)+\s*/,'')||String(s==null?'':s);function bar(v){return '<div class="bar"><span style="width:'+pct(v)+'"></span></div>'}function levelClass(l){return /优秀|良好/.test(l)?'ok':(/中等/.test(l)?'warn':'bad')}function norm(s){return String(s==null?'':s).toLowerCase().replace(/\s+/g,'')}async function load(){DATA=await fetch('/teacher/tools/data').then(r=>r.json());try{KPS=(await fetch('/teacher/knowledge-points/data').then(r=>r.json())).points||[]}catch(e){}render()}
+function render(){({overview,students,profiles,resourceManage,questionBank,graph,discuss}[TAB]||overview)()}function overview(){let s=DATA.summary||{},focus=(DATA.students||[]).filter(x=>x.avg_mastery<.7);app.innerHTML='<div class="grid"><div class="stat">学生人数<b>'+Number(s.student_count||0)+'</b><span class="muted">当前班级</span></div><div class="stat">平均掌握度<b>'+pct(s.avg_mastery)+'</b><span class="muted">基于知识点画像</span></div><div class="stat">薄弱学生<b>'+focus.length+'</b><span class="muted">掌握度低于70%</span></div><div class="stat">资源 / 题目<b>'+Number(s.resource_count||0)+' / '+Number(s.question_count||0)+'</b><span class="muted">课程材料规模</span></div></div><div class="card"><h2>重点关注学生</h2>'+studentTable(focus,false)+'</div>'}
+function studentTable(list,actions=true){return '<table class="table"><thead><tr><th>学号</th><th>姓名</th><th>等级</th><th>掌握度</th><th>正确率</th><th>做题</th><th>薄弱点</th>'+(actions?'<th>操作</th>':'')+'</tr></thead><tbody>'+list.map(s=>'<tr><td>'+esc(s.num)+'</td><td><b>'+esc(s.name)+'</b></td><td><span class="tag '+levelClass(s.level)+'">'+esc(s.level)+'</span></td><td>'+pct(s.avg_mastery)+bar(s.avg_mastery)+'</td><td>'+pct(s.accuracy)+'</td><td>'+Number(s.total_correct||0)+'/'+Number(s.total_questions||0)+'</td><td>'+(s.weak_points||[]).slice(0,3).map(w=>'<span class="tag bad">'+esc(kpName(w.name))+' '+pct(w.mastery)+'</span>').join('')+'</td>'+(actions?'<td><button class="btn light" onclick="location.href=\'/teacher/students?sid='+encodeURIComponent(s.id)+'\'">详情</button> <button class="btn light" onclick="editStudent(\''+esc(s.id)+'\',\''+esc(s.num)+'\',\''+esc(s.name)+'\')">编辑</button> <button class="btn danger" onclick="deleteStudent(\''+esc(s.id)+'\')">删除</button></td>':'')+'</tr>').join('')+'</tbody></table>'}
+function students(){app.innerHTML='<div class="card"><div style="display:flex;justify-content:space-between;align-items:center"><h2>学生管理</h2><button class="btn green" onclick="addStudent()">添加学生</button></div><div class="toolbar"><input id="sq" class="search" oninput="renderStudentList()" placeholder="搜索学号、姓名、等级"></div><div id="studentList"></div></div>';renderStudentList()}function renderStudentList(){let q=norm(sq&&sq.value),list=(DATA.all_students||DATA.students||[]).filter(s=>!q||norm([s.num,s.name,s.level].join(' ')).includes(q));studentList.innerHTML=studentTable(list,true)}
+async function addStudent(){let num=prompt('学号');if(!num)return;let name=prompt('姓名');if(!name)return;let d=await fetch('/teacher/student/add',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({student_num:num,student_name:name})}).then(r=>r.json());alert(d.success?'添加成功':(d.error||'添加失败'));if(d.success)load()}async function editStudent(id,num,name){let n=prompt('学号',num);if(!n)return;let nm=prompt('姓名',name);if(!nm)return;let d=await fetch('/teacher/student/edit',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({student_id:id,student_num:n,student_name:nm})}).then(r=>r.json());alert(d.success?'保存成功':(d.error||'保存失败'));if(d.success)load()}async function deleteStudent(id){if(!confirm('确认删除该学生？'))return;let d=await fetch('/teacher/student/delete',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({student_id:id})}).then(r=>r.json());alert(d.success?'删除成功':(d.error||'删除失败'));if(d.success)load()}
+function profiles(){if(SID){profileDetail(SID);return}app.innerHTML='<div class="card"><h2>学生画像列表</h2>'+studentTable(DATA.all_students||DATA.students||[],true)+'</div>'}async function profileDetail(sid){let d=await fetch('/teacher/student-profile/data?sid='+encodeURIComponent(sid)).then(r=>r.json()),p=d.profile||{},pts=(d.mastery||{}).points||[];app.innerHTML='<a class="btn light" href="/teacher/students">返回学生画像列表</a><div class="card"><h2>学生画像</h2><div class="grid"><div class="stat">学习等级<b>'+esc(p.level||'暂无')+'</b></div><div class="stat">平均掌握度<b>'+pct(p.avg_mastery)+'</b></div><div class="stat">正确率<b>'+pct(p.accuracy)+'</b></div><div class="stat">做题总数<b>'+Number(p.total_questions||0)+'</b></div></div><p class="muted">'+esc(p.description||'')+'</p></div><div class="card"><h2>知识点学习明细</h2><table class="table"><thead><tr><th>知识点</th><th>综合掌握度</th><th>做题</th><th>视频</th><th>资源</th><th>讨论</th></tr></thead><tbody>'+pts.map(k=>'<tr><td><b>'+esc(k.full_name||k.name)+'</b></td><td>'+pct(k.score)+bar(k.score)+'</td><td>'+pct(k.exercise_score)+'</td><td>'+pct(k.video_score)+'</td><td>'+pct(k.resource_score)+'</td><td>'+pct(k.discussion_score)+'</td></tr>').join('')+'</tbody></table></div>'}
+async function resourceManage(){let d=await fetch('/teacher/resources/data').then(r=>r.json()),all=d.resources||[];app.innerHTML='<div class="card"><div style="display:flex;justify-content:space-between;align-items:center"><h2>资源管理</h2><label class="btn green">上传资源<input type="file" style="display:none" onchange="uploadResource(this)"></label></div><div class="toolbar"><input id="rq" class="search" oninput="renderResources()" placeholder="搜索文件名、知识点、章节"><select id="rt" onchange="renderResources()"><option>全部类型</option>'+[...new Set(all.map(r=>r.type||'资源'))].map(t=>'<option>'+esc(t)+'</option>').join('')+'</select></div><div id="resourceList"></div></div>';window.RES=all;renderResources()}function renderResources(){let q=norm(rq.value),t=rt.value,list=(window.RES||[]).filter(r=>(t==='全部类型'||r.type===t)&&(!q||norm([r.name,r.title,r.knowledge_point,r.chapter_label,r.section_label].join(' ')).includes(q))),groups={};list.forEach(r=>{let ch=r.chapter_label||'未分类',sec=r.section_label||'未分类';(groups[ch]||(groups[ch]={}))[sec]=groups[ch][sec]||[];groups[ch][sec].push(r)});resourceList.innerHTML=Object.keys(groups).sort((a,b)=>a.localeCompare(b,'zh-Hans',{numeric:true})).map((ch,i)=>'<details class="chapter" '+(i===0?'open':'')+'><summary>'+esc(ch)+' · '+Object.values(groups[ch]).reduce((n,a)=>n+a.length,0)+' 个资源</summary>'+Object.keys(groups[ch]).sort((a,b)=>a.localeCompare(b,'zh-Hans',{numeric:true})).map(sec=>'<details class="section" open><summary>'+esc(sec)+' · '+groups[ch][sec].length+'</summary><table class="table"><tbody>'+groups[ch][sec].map(r=>'<tr><td><b>'+esc(r.name)+'</b></td><td>'+esc(r.type)+'</td><td>'+esc(r.knowledge_point||'未绑定')+'</td><td>'+esc(r.updated_at||'')+'</td><td>'+Math.round((r.size||0)/1024)+' KB</td><td><button class="btn light" onclick="renameResource(\''+esc(r.name)+'\')">修改</button> <button class="btn danger" onclick="deleteResource(\''+esc(r.name)+'\')">删除</button></td></tr>').join('')+'</tbody></table></details>').join('')+'</details>').join('')||'<div class="empty">暂无资源</div>'}async function uploadResource(input){if(!input.files[0])return;let fd=new FormData();fd.append('file',input.files[0]);let d=await fetch('/teacher/upload',{method:'POST',body:fd}).then(r=>r.json());alert(d.success?'上传成功':(d.error||'上传失败'));if(d.success)resourceManage()}async function renameResource(name){let next=prompt('输入新的文件名',name);if(!next||next===name)return;let d=await fetch('/teacher/resource/update',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({old_name:name,new_name:next})}).then(r=>r.json());alert(d.success?'修改成功':(d.error||'修改失败'));if(d.success)resourceManage()}async function deleteResource(name){if(!confirm('确认删除资源？'))return;let d=await fetch('/teacher/resource/delete',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({filename:name})}).then(r=>r.json());alert(d.success?'删除成功':(d.error||'删除失败'));if(d.success)resourceManage()}
+async function questionBank(){let d=await fetch('/teacher/questions/data').then(r=>r.json());window.QS=d.questions||[];app.innerHTML='<div class="card"><div style="display:flex;justify-content:space-between;align-items:center"><h2>题库管理</h2><button class="btn green" onclick="editQuestion()">添加题目</button></div><div class="toolbar"><input id="qq" class="search" oninput="renderQuestions()" placeholder="搜索题目、知识点、答案"><select id="qd" onchange="renderQuestions()"><option value="">全部难度</option><option value="easy">简单</option><option value="medium">中等</option><option value="hard">困难</option></select></div><div id="questionList"></div></div>';renderQuestions()}function renderQuestions(){let q=norm(qq.value),d=qd.value,list=(window.QS||[]).filter(x=>(!d||x.difficulty===d)&&(!q||norm([x.id,x.question,x.knowledge_point,x.answer].join(' ')).includes(q)));questionList.innerHTML='<table class="table"><thead><tr><th>ID</th><th>知识点</th><th>难度</th><th>题目</th><th>答案</th><th>操作</th></tr></thead><tbody>'+list.map(x=>'<tr><td>'+esc(x.id)+'</td><td>'+esc(x.knowledge_point)+'</td><td>'+esc(x.difficulty)+'</td><td>'+esc(x.question)+'</td><td>'+esc(x.answer)+'</td><td><button class="btn light" onclick="editQuestion(\''+esc(x.id)+'\')">修改</button> <button class="btn danger" onclick="deleteQuestion(\''+esc(x.id)+'\')">删除</button></td></tr>').join('')+'</tbody></table>'}async function editQuestion(id){let old=(window.QS||[]).find(q=>String(q.id)===String(id))||{};let question=prompt('题目内容',old.question||'');if(!question)return;let kp=prompt('知识点',old.knowledge_point||KPS[0]||'');if(!kp)return;let answer=prompt('答案',old.answer||'');if(!answer)return;let difficulty=prompt('难度 easy/medium/hard',old.difficulty||'medium')||'medium';let payload={question,knowledge_point:kp,answer,difficulty,options:old.options||[]};if(id)payload.question_id=id;let url=id?'/teacher/question/update':'/teacher/question/add';let d=await fetch(url,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(payload)}).then(r=>r.json());alert(d.success?'保存成功':(d.error||'保存失败'));if(d.success)questionBank()}async function deleteQuestion(id){if(!confirm('确认删除题目？'))return;let d=await fetch('/teacher/question/delete',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({question_id:id})}).then(r=>r.json());alert(d.success?'删除成功':(d.error||'删除失败'));if(d.success)questionBank()}
+async function graph(){let d=await fetch('/teacher/flow-graph/data').then(r=>r.json()),nodes=d.nodes||[],edges=d.edges||[];app.innerHTML='<div class="card"><h2>公共知识图谱关系</h2><p class="muted">教师端公共图谱与学生端使用同一份课程、章节、知识点和关系数据。</p><div id="teacherGraph" style="height:720px;border:1px solid #e5e7eb;background:#fafafa"></div></div>';if(!window.vis){teacherGraph.innerHTML='<div class="empty">图谱库加载失败</div>';return}let ns=new vis.DataSet(nodes.map(n=>({id:n.id,label:n.label||n.id,shape:n.shape||'circle',size:n.size||24,color:n.shape==='diamond'?{background:'#0f172a',border:'#020617'}:{background:'#dcfce7',border:'#86efac'},font:{face:'Microsoft YaHei',color:n.shape==='diamond'?'#fff':'#111827',bold:true,multi:true}})));let es=new vis.DataSet(edges.map((e,i)=>({id:i,from:e.from,to:e.to,arrows:'to',color:{color:e.type==='先修'?'#9b59b6':(e.type==='相关'?'#f59e0b':'#94a3b8')},dashes:e.type!=='包含'})));new vis.Network(teacherGraph,{nodes:ns,edges:es},{physics:{solver:'forceAtlas2Based',stabilization:{iterations:600}},interaction:{zoomView:true,dragView:true}})}
+async function discuss(){let d=await fetch('/student/discuss/list').then(r=>r.json()),posts=d.posts||[];app.innerHTML='<div class="card"><h2>问题讨论</h2><div class="toolbar"><input id="dq" class="search" oninput="renderTeacherDiscuss()" placeholder="搜索标题、作者、知识点、内容"><select id="ds" onchange="renderTeacherDiscuss()"><option>全部状态</option><option>未解决</option><option>已解决</option></select></div><div id="teacherDiscussList"></div></div><div class="card" id="teacherDiscussDetail"><div class="empty">点击问题查看详情</div></div>';window.TEACHER_POSTS=posts;renderTeacherDiscuss()}function renderTeacherDiscuss(){let q=norm(dq.value),s=ds.value,list=(window.TEACHER_POSTS||[]).filter(p=>(s==='全部状态'||p.status===s)&&(!q||norm([p.no,p.title,p.body,p.author,p.knowledge_tag].join(' ')).includes(q)));teacherDiscussList.innerHTML=list.map(p=>'<div class="post" onclick="openTeacherPost(\''+esc(p.id)+'\')"><div style="display:flex;justify-content:space-between;gap:12px"><b>#'+esc(p.no)+' '+esc(p.title)+'</b><span class="tag '+(p.status==='已解决'?'ok':'warn')+'">'+esc(p.status)+'</span></div><div class="muted">'+esc(p.author)+' · '+esc(p.time)+' · '+esc(p.knowledge_tag||'未标注')+' · '+Number(p.comment_count||0)+' 条回复</div><p>'+esc(p.body||'')+'</p></div>').join('')||'<div class="empty">暂无讨论</div>'}async function openTeacherPost(id){let d=await fetch('/student/discuss/detail/'+encodeURIComponent(id)).then(r=>r.json()),p=d.post||{};teacherDiscussDetail.innerHTML='<h2>#'+esc(p.no)+' '+esc(p.title)+'</h2><p>'+esc(p.body||'')+'</p><div class="muted">'+esc(p.author||'')+' · '+esc(p.knowledge_tag||'未标注')+' · '+esc(p.status||'')+'</div><h3>回复</h3>'+((p.comments||[]).map(c=>'<div class="comment"><b>'+esc(c.floor)+'楼 · '+esc(c.author)+'</b><p>'+esc(c.body)+'</p><div class="muted">'+esc(c.time)+'</div></div>').join('')||'<div class="muted">暂无回复</div>')}
+load();
+</script></body></html>"""
+    return render_template_string(html, teacher_name=session.get("user_name", "教师"), initial_tab=initial_tab, page_title=page_title)
+
+STUDENT_FLOW_HTML = STUDENT_FLOW_HTML.replace(
+    ".stat b{display:block;font-size:30px;margin:8px 0}",
+    ".stat{color:inherit;text-decoration:none}.stat b{display:block;font-size:24px;margin:6px 0}.dash+.grid .stat{min-height:118px}"
+)
+STUDENT_FLOW_HTML = STUDENT_FLOW_HTML.replace(
+    "function displayKp(s){return kpName(s)}",
+    "function displayKp(s){return String(s==null?'':s)}"
+)
+STUDENT_FLOW_HTML = STUDENT_FLOW_HTML.replace(
+    ".post,.comment{border-top:1px solid #eef2f7;padding:12px 0}.post{cursor:pointer}.post-head{display:flex;justify-content:space-between;gap:12px}",
+    ".post,.comment{border-top:1px solid #eef2f7;padding:12px 0}.post{cursor:pointer}.post-head,.comment-tools{display:flex;justify-content:space-between;gap:12px;align-items:flex-start}.forum{display:grid;grid-template-columns:360px minmax(0,1fr);gap:16px}.forum-list{align-self:start}.danger-text{color:#dc2626}"
+)
+STUDENT_FLOW_HTML = STUDENT_FLOW_HTML.replace(
+    "async function resourcesPage(){var d=await getJson('/student/resources/data'),all=d.resources||[];app.innerHTML='<div class=\"card\"><h2>学习资源库</h2><input class=\"search\" id=\"resQ\" placeholder=\"搜索资源、知识点、章节\" oninput=\"renderResources()\"></div><div id=\"resResults\"></div>';window.renderResources=function(){var q=(resQ.value||'').toLowerCase(),list=all.filter(function(r){return [r.name,r.title,r.knowledge_point,r.chapter_label,r.section_label,typeText(r.type)].join(' ').toLowerCase().indexOf(q)>=0}),groups={};",
+    "async function resourcesPage(){var d=await getJson('/student/resources/data'),all=d.resources||[],types=[...new Set(all.map(function(r){return typeText(r.type)}))];app.innerHTML='<div class=\"card\"><h2>学习资源库</h2><div class=\"toolbar\"><input class=\"search\" id=\"resQ\" placeholder=\"搜索资源、知识点、章节\" oninput=\"renderResources()\"><select id=\"resType\" onchange=\"renderResources()\"><option>全部类型</option>'+types.map(function(t){return '<option>'+esc(t)+'</option>'}).join('')+'</select></div></div><div id=\"resResults\"></div>';window.renderResources=function(){var q=(resQ.value||'').toLowerCase(),selected=resType.value,list=all.filter(function(r){return (selected==='全部类型'||typeText(r.type)===selected)&&[r.name,r.title,r.knowledge_point,r.chapter_label,r.section_label,typeText(r.type)].join(' ').toLowerCase().indexOf(q)>=0}),groups={};"
+)
+STUDENT_FLOW_HTML = re.sub(
+    r"function wrapLabel\(text,max\).*?function graphPosition",
+    "function wrapLabel(text,max){text=String(text||'');var code=codeOf(text),name=kpName(text),chars=name.split(''),lines=[],line='';chars.forEach(function(c){line+=c;if(line.length>=max){lines.push(line);line=''}});if(line)lines.push(line);return (code?code+'\\\\n':'')+lines.join('\\\\n')}\\nfunction graphPosition",
+    STUDENT_FLOW_HTML,
+    flags=re.S
+)
+STUDENT_FLOW_HTML = re.sub(
+    r"async function openPost\(id\).*?function replyTo",
+    "async function openPost(id){let d=await getJson('/student/discuss/detail/'+encodeURIComponent(id)),p=d.post||{};postDetail.innerHTML='<div class=\"post-head\"><h2>#'+esc(p.no)+' '+esc(p.title)+'</h2><span class=\"tag '+(p.status==='已解决'?'ok':'warn')+'\">'+esc(p.status)+'</span></div><p>'+esc(p.body||'')+'</p><div class=\"muted\">'+esc(p.author||'')+' · '+esc(p.time||'')+' · '+esc(displayKp(p.knowledge_tag)||'未标注')+'</div>'+(p.is_mine?'<div class=\"toolbar\"><button class=\"btn light\" onclick=\"setStatus(&quot;'+esc(id)+'&quot;,&quot;已解决&quot;)\">标为已解决</button><button class=\"btn light\" onclick=\"setStatus(&quot;'+esc(id)+'&quot;,&quot;未解决&quot;)\">标为未解决</button><button class=\"btn danger\" onclick=\"deleteTopic(&quot;'+esc(id)+'&quot;)\">删除问题</button></div>':'')+'<h3>回复</h3>'+((p.comments||[]).map(function(c){return '<div class=\"comment\"><div class=\"comment-tools\"><b>'+c.floor+'楼 · '+esc(c.author)+'</b><span>'+(c.is_mine?'<button class=\"btn light\" onclick=\"deleteComment(&quot;'+esc(c.id)+'&quot;,&quot;'+esc(id)+'&quot;)\">删除</button>':'')+' <button class=\"btn light\" onclick=\"replyTo(&quot;'+esc(c.author)+'&quot;)\">回复</button></span></div><p>'+esc(c.body)+'</p><div class=\"muted\">'+esc(c.time)+'</div></div>'}).join('')||'<div class=\"muted\">暂无回复</div>')+'<textarea id=\"commentBody\" style=\"width:100%\" rows=\"3\" placeholder=\"写下回复\"></textarea><button class=\"btn\" onclick=\"commentPost(&quot;'+esc(id)+'&quot;)\">提交回复</button>'}\\nfunction replyTo",
+    STUDENT_FLOW_HTML,
+    flags=re.S
+)
+STUDENT_FLOW_HTML = STUDENT_FLOW_HTML.replace(
+    "async function records(){var d=await getJson('/student/records/data')",
+    "async function deleteTopic(id){if(!confirm('确认删除这个问题？'))return;let d=await fetch('/student/discuss/post/delete/'+encodeURIComponent(id),{method:'POST'}).then(r=>r.json());alert(d.success?'已删除':(d.error||'删除失败'));if(d.success)discuss()}async function deleteComment(cid,pid){if(!confirm('确认删除这条评论？'))return;let d=await fetch('/student/discuss/comment/delete/'+encodeURIComponent(cid),{method:'POST'}).then(r=>r.json());alert(d.success?'已删除':(d.error||'删除失败'));if(d.success)openPost(pid)}\nasync function records(){var d=await getJson('/student/records/data')"
+)
+STUDENT_FLOW_HTML = STUDENT_FLOW_HTML.replace(
+    "<p class=\"muted\">'+esc(displayKp(r.knowledge_point)||'未绑定知识点')+'</p>",
+    "<p class=\"muted\">对应知识点：'+esc(r.knowledge_point||'')+'</p>"
+)
+STUDENT_FLOW_HTML = STUDENT_FLOW_HTML.replace(
+    "<div class=\"muted\">'+esc(displayKp(r.knowledge_point)||'未绑定知识点')+'</div>",
+    "<div class=\"muted\">对应知识点：'+esc(r.knowledge_point||'')+'</div>"
+)
+
+# Final graph and teacher UI correction layer.
+STUDENT_FLOW_HTML = re.sub(
+    r"function graphPosition\(nodes\).*?function graphSliderToScale",
+    r"""function graphCode(n){return codeOf((n&&n.label)||'')||codeOf((n&&n.id)||'')}
+function graphSort(a,b){return String(a.label||a.id).localeCompare(String(b.label||b.id),'zh-Hans',{numeric:true})}
+function graphPosition(nodes){
+  var root=nodes.find(function(n){return n.level<0||n.shape==='diamond'})||nodes[0];
+  if(root){root.x=0;root.y=0;root.fixed={x:true,y:true}}
+  var chapters=nodes.filter(function(n){return n!==root&&(n.level===0||n.shape==='hexagon')}).sort(graphSort);
+  var sections=nodes.filter(function(n){var c=graphCode(n).split('.');return n.level===1||c.length===2}).sort(graphSort);
+  var leaves=nodes.filter(function(n){var c=graphCode(n).split('.');return n!==root&&chapters.indexOf(n)<0&&sections.indexOf(n)<0&&(n.level>=2||c.length>=3)}).sort(graphSort);
+  var chapterAngles={};
+  chapters.forEach(function(n,i){var a=-Math.PI/2+Math.PI*2*i/Math.max(1,chapters.length);chapterAngles[graphCode(n)]=a;n.x=Math.cos(a)*230;n.y=Math.sin(a)*190;n.fixed={x:true,y:true}});
+  var secByChapter={};sections.forEach(function(n){var ch=graphCode(n).split('.')[0]||'0';(secByChapter[ch]||(secByChapter[ch]=[])).push(n)});
+  Object.keys(secByChapter).forEach(function(ch){var arr=secByChapter[ch].sort(graphSort),base=chapterAngles[ch];if(base==null)base=-Math.PI/2;var span=Math.min(1.15,.38+.16*arr.length);arr.forEach(function(n,i){var a=base-span/2+span*(i+.5)/Math.max(1,arr.length);n._angle=a;n.x=Math.cos(a)*420;n.y=Math.sin(a)*340;n.fixed={x:true,y:true}})});
+  var leafBySection={};leaves.forEach(function(n){var p=graphCode(n).split('.').slice(0,2).join('.')||'0';(leafBySection[p]||(leafBySection[p]=[])).push(n)});
+  Object.keys(leafBySection).forEach(function(sec){var parent=sections.find(function(s){return graphCode(s)===sec}),base=parent&&parent._angle;if(base==null)base=chapterAngles[sec.split('.')[0]]||-Math.PI/2;var arr=leafBySection[sec].sort(graphSort),span=Math.min(.58,.20+.075*arr.length);arr.forEach(function(n,i){var a=base-span/2+span*(i+.5)/Math.max(1,arr.length);n.x=Math.cos(a)*660;n.y=Math.sin(a)*545;n.fixed={x:true,y:true}})});
+}
+async function graphPage(){var d=await getJson('/student/flow-graph/data'),nodes=d.nodes||[],edges=d.edges||[];graphPosition(nodes);app.innerHTML='<div class="card"><h2>知识图谱</h2><div class="muted"><b>形状：</b>菱形课程 > 六边形章 > 正方形大节 > 圆形知识点　<b>颜色：</b><span class="tag ok">已掌握</span><span class="tag">良好</span><span class="tag warn">需巩固</span><span class="tag bad">未学习</span><b style="margin-left:12px">边：</b>包含（实线）/ 相关（虚线）/ 先修（虚线）</div><div style="display:grid;grid-template-columns:minmax(0,1fr) 360px;gap:18px;margin-top:14px"><div style="position:relative"><div id="mynetwork" style="height:760px;border:1px solid #e5e7eb;background:#fafafa"></div><div style="position:absolute;right:18px;top:18px;width:62px;background:#fff;border:1px solid #dbe3ef;border-radius:14px;box-shadow:0 8px 24px rgba(15,23,42,.12);padding:10px;display:grid;gap:6px;place-items:center"><button class="btn light" style="width:40px;height:40px;padding:0" onclick="zoomGraph(.06)">+</button><input id="graphZoom" type="range" min="0" max="100" value="38" oninput="setGraphZoom(this.value)" style="writing-mode:vertical-lr;direction:rtl;-webkit-appearance:slider-vertical;width:40px;height:250px"><button class="btn light" style="width:40px;height:40px;padding:0" onclick="zoomGraph(-.06)">-</button></div></div><div id="nodeDetail" class="res-card graph-detail"><b>节点详情</b><p class="muted">单击节点查看掌握度。</p></div></div></div>';if(!window.vis){mynetwork.innerHTML='<div class="empty">vis 加载失败</div>';return}function color(m){return m>=.8?{background:'#d4f0dc',border:'#8fd3a6'}:m>=.6?{background:'#dbeafe',border:'#93c5fd'}:m>0?{background:'#ffedd5',border:'#fdba74'}:{background:'#eceff1',border:'#cfd8dc'}}var visNodes=new vis.DataSet(nodes.map(function(n){var isRoot=n.shape==='diamond';return {id:n.id,label:wrapLabel(n.label,isRoot?4:(n.shape==='hexagon'?4:(n.shape==='square'?5:4))),shape:n.shape||'circle',size:n.size||40,x:n.x,y:n.y,fixed:{x:true,y:true},color:isRoot?{background:'#0f172a',border:'#020617'}:color(n.mastery||0),font:{size:n.fontSize||16,face:'Microsoft YaHei',color:isRoot?'#fff':'#0f172a',bold:true,multi:true,align:'center',vadjust:0},borderWidth:isRoot?5:3,widthConstraint:(n.shape==='square'?{minimum:80,maximum:80}:n.shape==='circle'?{minimum:64,maximum:64}:n.shape==='hexagon'?{minimum:92,maximum:92}:undefined),heightConstraint:(n.shape==='square'?{minimum:52,maximum:52}:n.shape==='circle'?{minimum:64,maximum:64}:n.shape==='hexagon'?{minimum:60,maximum:60}:undefined)}}));var visEdges=new vis.DataSet(edges.map(function(e,i){return {id:i,from:e.from,to:e.to,arrows:'to',color:{color:e.type==='先修'?'#9b59b6':(e.type==='相关'?'#f59e0b':'#94a3b8')},dashes:e.type!=='包含',width:e.type==='包含'?2.2:1.5,smooth:e.type==='包含'?{type:'continuous'}:{type:'curvedCW',roundness:.15}}}));var network=new vis.Network(mynetwork,{nodes:visNodes,edges:visEdges},{physics:false,interaction:{zoomView:true,dragView:true,dragNodes:false},layout:{improvedLayout:false}});window.graphNetwork=network;window.graphScale=.48;setTimeout(function(){network.fit({animation:{duration:160,easingFunction:'easeInOutQuad'}});applyGraphZoom(.48,true)},80);network.on('click',function(p){var id=p.nodes&&p.nodes[0],n=nodes.find(function(x){return x.id===id});if(!n)return;var s=(n.mastery||0)>=.8?'已掌握':((n.mastery||0)>=.6?'良好':((n.mastery||0)>0?'需巩固':'未学习'));nodeDetail.innerHTML='<b>'+esc(displayKp(n.label))+'</b><p><span class="tag '+statusClass(s)+'">'+s+'</span> <span class="tag">掌握度 '+pct(n.mastery||0)+'</span></p>'+bar(n.mastery||0,s)+'<p class="muted">'+esc(n.levelName||'')+' · '+(n.correct_questions||0)+'/'+(n.total_questions||0)+' 题</p>'})}
+function graphSliderToScale""",
+    STUDENT_FLOW_HTML,
+    flags=re.S,
+)
+
+STUDENT_FLOW_HTML = STUDENT_FLOW_HTML.replace(
+    "size:n.size||40",
+    "size:isRoot?45:(n.shape==='hexagon'?42:(n.shape==='square'?36:30))"
+)
+STUDENT_FLOW_HTML = STUDENT_FLOW_HTML.replace(
+    "size:n.fontSize||16",
+    "size:isRoot?18:(n.shape==='hexagon'?16:(n.shape==='square'?14:12))"
+)
+STUDENT_FLOW_HTML = STUDENT_FLOW_HTML.replace(
+    "widthConstraint:n.shape==='square'?{minimum:88,maximum:120}:undefined,heightConstraint:n.shape==='square'?{minimum:58}:undefined",
+    "widthConstraint:n.shape==='square'?{minimum:90,maximum:90}:undefined,heightConstraint:n.shape==='square'?{minimum:58,maximum:58}:undefined"
+)
+STUDENT_FLOW_HTML = STUDENT_FLOW_HTML.replace(
+    "dashes:e.type!=='包含',",
+    "dashes:e.type!=='包含'?[8,5]:false,"
+)
+STUDENT_FLOW_HTML = STUDENT_FLOW_HTML.replace(
+    "wrapLabel(n.label,isRoot?4:(n.shape==='hexagon'?4:(n.shape==='square'?5:4)))",
+    "wrapLabel(n.label,isRoot?3:(n.shape==='hexagon'?4:(n.shape==='square'?6:5)))"
+)
+STUDENT_FLOW_HTML = STUDENT_FLOW_HTML.replace(
+    "function color(m){return m>=.8?{background:'#d4f0dc',border:'#8fd3a6'}:m>=.6?{background:'#dbeafe',border:'#93c5fd'}:m>0?{background:'#ffedd5',border:'#fdba74'}:{background:'#eceff1',border:'#cfd8dc'}}",
+    "function color(m){return m>=.8?{background:'#dcfce7',border:'#86efac',highlight:{background:'#bbf7d0',border:'#4ade80'}}:m>=.6?{background:'#dbeafe',border:'#93c5fd',highlight:{background:'#bfdbfe',border:'#60a5fa'}}:m>0?{background:'#ffedd5',border:'#fdba74',highlight:{background:'#fed7aa',border:'#fb923c'}}:{background:'#f1f5f9',border:'#cbd5e1',highlight:{background:'#e2e8f0',border:'#94a3b8'}}}"
+)
+STUDENT_FLOW_HTML = STUDENT_FLOW_HTML.replace(
+    "isRoot?{background:'#0f172a',border:'#020617'}",
+    "isRoot?{background:'#0f172a',border:'#1e293b',highlight:{background:'#1e293b',border:'#334155'}}"
+)
+STUDENT_FLOW_HTML = STUDENT_FLOW_HTML.replace(
+    "e.type==='先修'?'#9b59b6':(e.type==='相关'?'#f59e0b':'#94a3b8')}",
+    "e.type==='先修'?'#9b59b6':(e.type==='相关'?'#d97706':'#94a3b8')}}"
+)
+STUDENT_FLOW_HTML = STUDENT_FLOW_HTML.replace(
+    ":e.type==='先修'?'#9b59b6':(e.type==='相关'?'#d97706':'#94a3b8')}}",
+    ":e.type==='先修'?'#9b59b6':(e.type==='相关'?'#d97706':'#94a3b8'),opacity:.75,highlight:'#2563eb'}"
+)
+STUDENT_FLOW_HTML = STUDENT_FLOW_HTML.replace(
+    "e.type==='相关'?'#f59e0b'",
+    "e.type==='相关'?'#d97706'"
+)
+STUDENT_FLOW_HTML = STUDENT_FLOW_HTML.replace(
+    "smooth:e.type==='包含'?{type:'continuous'}:{type:'curvedCW',roundness:.15}",
+    "smooth:{type:e.type==='包含'?'continuous':'curvedCW',roundness:e.type==='包含'?.8:.4}"
+)
+STUDENT_FLOW_HTML = STUDENT_FLOW_HTML.replace(
+    "(n.correct_questions||0)+'/'+(n.total_questions||0)+' 题'",
+    "(n.correct_count||0)+'/'+(n.question_count||0)+' 题'"
+)
+
+STUDENT_FLOW_HTML = STUDENT_FLOW_HTML.replace(
+    ".side{background:#fff;border-right:1px solid #e5e7eb;padding:22px 0;position:sticky;top:0;height:100vh}.brand{padding:0 24px 24px;font-size:20px;font-weight:800}.nav a{display:block;padding:13px 28px;color:#4b5563;text-decoration:none;border-left:3px solid transparent}.nav a.active,.nav a:hover{background:#eef4ff;color:#2563eb;border-left-color:#60a5fa}.logout{position:absolute;left:20px;right:20px;bottom:20px}.logout a{display:block;text-align:center;padding:10px;border-radius:6px;background:#eef4ff;color:#2563eb;text-decoration:none;font-weight:700}",
+    ".side{background:#1e293b;border-right:1px solid #334155;padding:22px 0;position:sticky;top:0;height:100vh;display:flex;flex-direction:column}.brand{padding:0 24px 24px;font-size:20px;font-weight:800;color:#f1f5f9}.brand small{display:block;font-size:12px;color:#94a3b8;margin-top:4px;font-weight:400}.nav{flex:1}.nav a{display:block;padding:13px 28px;color:#94a3b8;text-decoration:none;border-left:3px solid transparent;font-size:13px}.nav a.active,.nav a:hover{background:#1e3a5f;color:#60a5fa;border-left-color:#3b82f6}.logout{position:absolute;left:20px;right:20px;bottom:20px}.logout a{display:block;text-align:center;padding:10px;border-radius:6px;background:#dc2626;color:#fff;text-decoration:none;font-weight:700}"
+)
+STUDENT_FLOW_HTML = STUDENT_FLOW_HTML.replace(
+    '<aside class="side"><div class="brand">学习推荐系统</div><div class="student">{{ student_name }}</div><nav class="nav"><a href="/student/dashboard" class="{% if active_page==\'dashboard\' %}active{% endif %}">首页</a><a href="/student/profile" class="{% if active_page==\'profile\' %}active{% endif %}">学习画像</a><a href="/student/recommend" class="{% if active_page==\'recommend\' %}active{% endif %}">学习资源推荐</a><a href="/student/resources" class="{% if active_page==\'resources\' %}active{% endif %}">学习资源库</a><a href="/student/mastery" class="{% if active_page==\'mastery\' %}active{% endif %}">知识点掌握度</a><a href="/student/graph" class="{% if active_page==\'graph\' %}active{% endif %}">知识图谱</a><a href="/student/discuss" class="{% if active_page==\'discuss\' %}active{% endif %}">讨论区</a><a href="/student/wrong-questions" class="{% if active_page==\'wrong\' %}active{% endif %}">错题集</a><a href="/student/records" class="{% if active_page==\'records\' %}active{% endif %}">学习记录</a></nav><div class="logout"><a href="/logout">退出登录</a></div></aside>',
+    '<aside class="side"><div class="brand">学习推荐系统<small>{{ student_name }}</small></div><nav class="nav"><a href="/student/dashboard" class="{% if active_page==\'dashboard\' %}active{% endif %}">首页</a><a href="/student/profile" class="{% if active_page==\'profile\' %}active{% endif %}">学习画像</a><a href="/student/recommend" class="{% if active_page==\'recommend\' %}active{% endif %}">学习资源推荐</a><a href="/student/resources" class="{% if active_page==\'resources\' %}active{% endif %}">学习资源库</a><a href="/student/mastery" class="{% if active_page==\'mastery\' %}active{% endif %}">知识点掌握度</a><a href="/student/graph" class="{% if active_page==\'graph\' %}active{% endif %}">知识图谱</a><a href="/student/discuss" class="{% if active_page==\'discuss\' %}active{% endif %}">讨论区</a><a href="/student/wrong-questions" class="{% if active_page==\'wrong\' %}active{% endif %}">错题集</a><a href="/student/records" class="{% if active_page==\'records\' %}active{% endif %}">学习记录</a></nav><div class="logout"><a href="/logout">退出登录</a></div></aside>'
+)
+STUDENT_FLOW_HTML = STUDENT_FLOW_HTML.replace(
+    "/student/recommend_v2",
+    "/student/recommend"
+)
+
+STUDENT_BASIC_DEFAULTS = {
+    "3220602001": {"class_name": "计科2206班", "gender": "男"},
+    "3220602002": {"class_name": "计科2206班", "gender": "女"},
+    "3220602003": {"class_name": "计科2206班", "gender": "男"},
+    "3220602004": {"class_name": "计科2206班", "gender": "男"},
+    "3220602005": {"class_name": "计科2206班", "gender": "女"},
+    "3220602006": {"class_name": "计科2206班", "gender": "男"},
+    "3220602007": {"class_name": "计科2206班", "gender": "女"},
+}
+
+def student_basic_info(num):
+    rec = STUDENTS.get(num, {})
+    default = STUDENT_BASIC_DEFAULTS.get(num, {"class_name": "计科2206班", "gender": "未填"})
+    return {
+        "class_name": rec.get("class_name") or rec.get("class") or default["class_name"],
+        "gender": rec.get("gender") or default["gender"],
+    }
+
+_previous_teacher_collect_dashboard_data = teacher_collect_dashboard_data
+def teacher_collect_dashboard_data():
+    data = _previous_teacher_collect_dashboard_data()
+    for group_name in ("students", "all_students"):
+        for student in data.get(group_name, []):
+            basic = student_basic_info(str(student.get("num") or ""))
+            student.update(basic)
+    return data
+
+def teacher_add_student_final():
+    if session.get("role") != "teacher":
+        return jsonify({"success": False, "error": "未登录"})
+    data = request.get_json() or {}
+    student_num = (data.get("student_num") or "").strip()
+    student_name = (data.get("student_name") or "").strip()
+    class_name = (data.get("class_name") or data.get("class") or "计科2206班").strip()
+    gender = (data.get("gender") or "未填").strip()
+    if not student_num or not student_name:
+        return jsonify({"success": False, "error": "请填写学号和姓名"})
+    student_id = student_num + student_name
+    if student_num in STUDENTS or any(v.get("full_id") == student_id for v in STUDENTS.values()):
+        return jsonify({"success": False, "error": "学生已存在"})
+    STUDENTS[student_num] = {"password": "123456", "name": student_name, "full_id": student_id, "class_name": class_name, "gender": gender}
+    try:
+        with driver.session() as neo4j_session:
+            neo4j_session.run("""
+            MERGE (s:Student {id: $sid})
+            SET s.name=$name, s.num=$num, s.class_name=$class_name, s.gender=$gender
+            """, sid=student_id, name=student_name, num=student_num, class_name=class_name, gender=gender)
+    except Exception:
+        pass
+    return jsonify({"success": True, "message": "添加成功", "student_id": student_id})
+
+def teacher_edit_student_final():
+    if session.get("role") != "teacher":
+        return jsonify({"success": False, "error": "未登录"})
+    data = request.get_json() or {}
+    student_id = (data.get("student_id") or "").strip()
+    student_num = (data.get("student_num") or "").strip()
+    student_name = (data.get("student_name") or "").strip()
+    class_name = (data.get("class_name") or data.get("class") or "计科2206班").strip()
+    gender = (data.get("gender") or "未填").strip()
+    if not student_id or not student_num or not student_name:
+        return jsonify({"success": False, "error": "请填写完整学生信息"})
+    old_num, _old_name = parse_student_identity(student_id)
+    old_record = STUDENTS.pop(old_num, {"password": "123456"})
+    new_full_id = student_num + student_name
+    STUDENTS[student_num] = {"password": old_record.get("password", "123456"), "name": student_name, "full_id": new_full_id, "class_name": class_name, "gender": gender}
+    try:
+        with driver.session() as neo4j_session:
+            neo4j_session.run("""
+            MATCH (s:Student {id: $old_id})
+            SET s.id=$new_id, s.name=$name, s.num=$num, s.class_name=$class_name, s.gender=$gender
+            """, old_id=student_id, new_id=new_full_id, name=student_name, num=student_num, class_name=class_name, gender=gender)
+    except Exception:
+        pass
+    return jsonify({"success": True, "message": "保存成功"})
+
+app.view_functions["teacher_add_student"] = teacher_add_student_final
+app.view_functions["teacher_edit_student"] = teacher_edit_student_final
+
+def render_teacher_workspace(initial_tab="overview", page_title="教师工作台"):
+    if session.get("role") != "teacher":
+        return redirect(url_for("login"))
+    html = r"""
+<!doctype html><html lang="zh-CN"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>{{ page_title }}</title><script src="https://cdn.jsdelivr.net/npm/vis-network@9.1.2/standalone/umd/vis-network.min.js"></script>
+<style>*{box-sizing:border-box}body{margin:0;background:#f3f5f8;color:#152238;font-family:"Microsoft YaHei",Arial,sans-serif}.layout{display:grid;grid-template-columns:226px 1fr;min-height:100vh}.side{background:#fff;border-right:1px solid #e5e7eb;padding:20px 0;position:sticky;top:0;height:100vh}.brand{padding:0 24px 22px;font-size:21px;font-weight:800}.brand small{display:block;color:#64748b;font-size:12px;margin-top:6px}.nav a{display:block;text-decoration:none;color:#4b5563;padding:13px 28px;border-left:3px solid transparent;font-size:16px}.nav a:hover,.nav a.active{background:#eef4ff;color:#2563eb;border-left-color:#60a5fa}.logout{position:absolute;bottom:20px;left:20px;right:20px}.logout a{display:block;text-align:center;background:#eef4ff;color:#2563eb;padding:10px;border-radius:6px;text-decoration:none;font-weight:700}.top{height:64px;background:#fff;border-bottom:1px solid #e5e7eb;display:flex;align-items:center;justify-content:space-between;padding:0 34px}.top h1{font-size:22px;margin:0}.content{padding:26px 34px;max-width:1480px}.card{background:#fff;border:1px solid #e5e7eb;border-radius:8px;padding:20px;margin-bottom:16px}.grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(220px,1fr));gap:14px}.stat{background:#fff;border:1px solid #e5e7eb;border-radius:8px;padding:18px}.stat b{display:block;font-size:30px;margin-top:8px}.muted{color:#64748b;font-size:13px;line-height:1.7}.btn{border:0;background:#2563eb;color:#fff;border-radius:6px;padding:8px 13px;text-decoration:none;cursor:pointer;display:inline-block;font-weight:700}.btn.light{background:#eef4ff;color:#2563eb;border:1px solid #dbeafe}.btn.green{background:#16a34a}.btn.danger{background:#ef4444}.toolbar{display:flex;gap:10px;flex-wrap:wrap;margin-bottom:14px}select,input,textarea{border:1px solid #cbd5e1;border-radius:6px;background:#fff;padding:9px 11px}.search{min-width:280px}.table{width:100%;border-collapse:collapse}.table th,.table td{padding:11px;border-bottom:1px solid #eef2f7;text-align:left;vertical-align:top}.table th{background:#f8fafc}.tag{font-size:12px;border-radius:999px;background:#eef2ff;color:#3730a3;padding:4px 8px;display:inline-block;margin:0 4px 4px 0}.tag.ok{background:#dcfce7;color:#166534}.tag.warn{background:#fff7ed;color:#9a3412}.tag.bad{background:#fee2e2;color:#991b1b}.bar{height:8px;background:#e5e7eb;border-radius:99px;overflow:hidden;width:130px}.bar span{display:block;height:100%;background:#2563eb}.empty{padding:34px;text-align:center;color:#94a3b8;border:1px dashed #cbd5e1;border-radius:8px}.chapter{border:1px solid #e5e7eb;border-radius:8px;margin:10px 0;overflow:hidden}.chapter summary{background:#f8fafc;padding:14px 16px;cursor:pointer;font-weight:700}.section{border-top:1px solid #eef2f7}.section summary{background:#fff;padding:12px 18px;cursor:pointer}.split{display:grid;grid-template-columns:minmax(0,1fr) 360px;gap:16px}.profile-title{display:flex;align-items:flex-end;gap:12px;flex-wrap:wrap}.profile-title h2{margin:0}.student-id-card{display:grid;grid-template-columns:repeat(auto-fit,minmax(170px,1fr));gap:10px;margin-top:14px}.info-pill{background:#f8fafc;border:1px solid #e5e7eb;border-radius:8px;padding:12px}.post,.comment{border-top:1px solid #eef2f7;padding:12px 0;cursor:pointer}@media(max-width:960px){.layout{grid-template-columns:1fr}.side{height:auto;position:relative}.logout{position:relative}.split{grid-template-columns:1fr}.content{padding:18px}}</style></head>
+<body><div class="layout"><aside class="side"><div class="brand">教师工作台<small>{{ teacher_name }}</small></div><nav class="nav"><a class="{% if initial_tab=='overview' %}active{% endif %}" href="/teacher/tools">工作台总览</a><a class="{% if initial_tab=='students' %}active{% endif %}" href="/teacher/manage">学生管理</a><a class="{% if initial_tab=='profiles' %}active{% endif %}" href="/teacher/students">学生画像</a><a class="{% if initial_tab=='resourceManage' %}active{% endif %}" href="/teacher/resource-manage">资源管理</a><a class="{% if initial_tab=='questionBank' %}active{% endif %}" href="/teacher/question-bank">题库管理</a><a class="{% if initial_tab=='graph' %}active{% endif %}" href="/teacher/graph-tools">公共图谱</a><a class="{% if initial_tab=='discuss' %}active{% endif %}" href="/teacher/discuss">问题讨论</a></nav><div class="logout"><a href="/logout">退出登录</a></div></aside><main><header class="top"><h1>{{ page_title }}</h1><span class="muted">操作系统课程管理</span></header><section class="content"><div id="app"><div class="empty">加载中...</div></div></section></main></div>
+<script>
+let TAB="{{ initial_tab }}",DATA={},SID=new URLSearchParams(location.search).get('sid')||'',KPS=[];const app=document.getElementById('app'),esc=s=>String(s==null?'':s).replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c])),pct=v=>Math.round((Number(v)||0)*100)+'%',kpName=s=>String(s==null?'':s).replace(/^\s*\d+(?:\.\d+)+\s*/,'')||String(s==null?'':s);function bar(v){return '<div class="bar"><span style="width:'+pct(v)+'"></span></div>'}function levelClass(l){return /优秀|良好/.test(l)?'ok':(/中等/.test(l)?'warn':'bad')}function norm(s){return String(s==null?'':s).toLowerCase().replace(/\s+/g,'')}function basicClass(s){return s.class_name||'计科2206班'}function basicGender(s){return s.gender||'未填'}async function load(){DATA=await fetch('/teacher/tools/data').then(r=>r.json());try{KPS=(await fetch('/teacher/knowledge-points/data').then(r=>r.json())).points||[]}catch(e){}render()}
+function render(){({overview,students,profiles,resourceManage,questionBank,graph,discuss}[TAB]||overview)()}function overview(){let s=DATA.summary||{},focus=(DATA.students||[]).filter(x=>x.avg_mastery<.7);app.innerHTML='<div class="grid"><div class="stat">学生人数<b>'+Number(s.student_count||0)+'</b><span class="muted">当前班级</span></div><div class="stat">平均掌握度<b>'+pct(s.avg_mastery)+'</b><span class="muted">基于知识点画像</span></div><div class="stat">薄弱学生<b>'+focus.length+'</b><span class="muted">掌握度低于70%</span></div><div class="stat">资源 / 题目<b>'+Number(s.resource_count||0)+' / '+Number(s.question_count||0)+'</b><span class="muted">课程材料规模</span></div></div><div class="card"><h2>重点关注学生</h2>'+profileTable(focus,false)+'</div>'}
+function students(){app.innerHTML='<div class="card"><div style="display:flex;justify-content:space-between;align-items:center"><h2>学生管理</h2><button class="btn green" onclick="addStudent()">添加学生</button></div><div class="toolbar"><input id="sq" class="search" oninput="renderStudentBasics()" placeholder="搜索学号、姓名、班级、性别"></div><div id="studentList"></div></div>';renderStudentBasics()}function renderStudentBasics(){let q=norm(sq&&sq.value),list=(DATA.all_students||[]).filter(s=>!q||norm([s.num,s.name,basicClass(s),basicGender(s)].join(' ')).includes(q));studentList.innerHTML='<table class="table"><thead><tr><th>学号</th><th>姓名</th><th>班级</th><th>性别</th><th>操作</th></tr></thead><tbody>'+list.map(s=>'<tr><td>'+esc(s.num)+'</td><td><b>'+esc(s.name)+'</b></td><td>'+esc(basicClass(s))+'</td><td>'+esc(basicGender(s))+'</td><td><button class="btn light" onclick="editStudent(\''+esc(s.id)+'\',\''+esc(s.num)+'\',\''+esc(s.name)+'\',\''+esc(basicClass(s))+'\',\''+esc(basicGender(s))+'\')">编辑</button> <button class="btn danger" onclick="deleteStudent(\''+esc(s.id)+'\')">删除</button></td></tr>').join('')+'</tbody></table>'}
+async function addStudent(){let num=prompt('学号');if(!num)return;let name=prompt('姓名');if(!name)return;let cls=prompt('班级','计科2206班')||'计科2206班';let gender=prompt('性别','未填')||'未填';let d=await fetch('/teacher/student/add',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({student_num:num,student_name:name,class_name:cls,gender:gender})}).then(r=>r.json());alert(d.success?'添加成功':(d.error||'添加失败'));if(d.success)load()}async function editStudent(id,num,name,cls,gender){let n=prompt('学号',num);if(!n)return;let nm=prompt('姓名',name);if(!nm)return;let c=prompt('班级',cls||'计科2206班')||'计科2206班';let g=prompt('性别',gender||'未填')||'未填';let d=await fetch('/teacher/student/edit',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({student_id:id,student_num:n,student_name:nm,class_name:c,gender:g})}).then(r=>r.json());alert(d.success?'保存成功':(d.error||'保存失败'));if(d.success)load()}async function deleteStudent(id){if(!confirm('确认删除该学生？'))return;let d=await fetch('/teacher/student/delete',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({student_id:id})}).then(r=>r.json());alert(d.success?'删除成功':(d.error||'删除失败'));if(d.success)load()}
+function profileTable(list,actions=true){return '<table class="table"><thead><tr><th>学号</th><th>姓名</th><th>等级</th><th>掌握度</th><th>正确率</th><th>做题</th><th>资源完成</th><th>错题数</th><th>薄弱知识点</th>'+(actions?'<th>操作</th>':'')+'</tr></thead><tbody>'+list.map(s=>'<tr><td>'+esc(s.num)+'</td><td><b>'+esc(s.name)+'</b></td><td><span class="tag '+levelClass(s.level)+'">'+esc(s.level)+'</span></td><td>'+pct(s.avg_mastery)+bar(s.avg_mastery)+'</td><td>'+pct(s.accuracy)+'</td><td>'+Number(s.correct_questions||0)+'/'+Number(s.answered_questions||0)+'/'+Number(s.total_questions||0)+'</td><td>'+Number(s.resource_completed_count||0)+'</td><td>'+Number(s.wrong_count||0)+'</td><td>'+(s.weak_points||[]).slice(0,3).map(w=>'<span class="tag bad">'+esc(w.code||'')+' '+esc(kpName(w.name))+' '+pct(w.mastery)+'</span>').join(' ')+'</td>'+(actions?'<td><button class="btn light" onclick="location.href=\'/teacher/students?sid='+encodeURIComponent(s.id)+'\'">详情</button></td>':'')+'</tr>').join('')+'</tbody></table>'}
+function profiles(){if(SID){profileDetail(SID);return}app.innerHTML='<div class="card"><h2>学生画像查询</h2><div class="toolbar"><input id="pq" class="search" oninput="renderProfiles()" placeholder="搜索学号、姓名、等级、学习建议"></div><div id="profileList"></div></div>';renderProfiles()}function renderProfiles(){let q=norm(pq&&pq.value),list=(DATA.all_students||[]).filter(s=>!q||norm([s.num,s.name,s.level,s.description].join(' ')).includes(q));profileList.innerHTML=profileTable(list,true)}
+async function profileDetail(sid){let d=await fetch('/teacher/student-profile/data?sid='+encodeURIComponent(sid)).then(r=>r.json()),p=d.profile||{},pts=(d.mastery||{}).points||[],student=(DATA.all_students||[]).find(s=>s.id===sid)||{};let sidMatch=String(sid).match(/^\\d+/),num=student.num||(sidMatch?sidMatch[0]:''),name=student.name||String(sid).replace(/^\\d+/,'');app.innerHTML='<a class="btn light" href="/teacher/students">返回学生画像列表</a><div class="card"><div class="profile-title"><h2>学生画像：'+esc(name||sid)+'</h2><span class="muted">'+esc(num)+' · '+esc(basicClass(student))+' · '+esc(basicGender(student))+'</span></div><div class="student-id-card"><div class="info-pill">学号<b style="display:block;margin-top:4px">'+esc(num)+'</b></div><div class="info-pill">姓名<b style="display:block;margin-top:4px">'+esc(name||'未命名')+'</b></div><div class="info-pill">班级<b style="display:block;margin-top:4px">'+esc(basicClass(student))+'</b></div><div class="info-pill">性别<b style="display:block;margin-top:4px">'+esc(basicGender(student))+'</b></div></div><div class="grid" style="margin-top:14px"><div class="stat">学习等级<b>'+esc(p.level||student.level||'暂无')+'</b></div><div class="stat">平均掌握度<b>'+pct(p.avg_mastery||student.avg_mastery)+'</b></div><div class="stat">正确率<b>'+pct(p.accuracy||student.accuracy)+'</b></div><div class="stat">做题数<b>'+(p.correct_questions||student.correct_questions||0)+'/'+(p.answered_questions||student.answered_questions||0)+'/'+(p.total_questions||student.total_questions||0)+'</b></div><div class="stat">资源完成数<b>'+(p.resource_completed_count||student.resource_completed_count||0)+'</b></div><div class="stat">错题数<b>'+(p.wrong_count||student.wrong_count||0)+'</b></div></div></div><div class="card"><h2>薄弱知识点</h2>'+(p.weak_points||[]).length?'<table class="table"><thead><tr><th>编号</th><th>名称</th><th>掌握度</th></tr></thead><tbody>'+(p.weak_points||[]).map(w=>'<tr><td>'+esc(w.code||'')+'</td><td>'+esc(kpName(w.name))+'</td><td>'+pct(w.mastery)+bar(w.mastery)+'</td></tr>').join('')+'</tbody></table>':'<div class="empty">暂无薄弱知识点</div>'+'</div><div class="card"><h2>知识点学习明细</h2><table class="table"><thead><tr><th>知识点</th><th>状态</th><th>做题统计</th><th>综合掌握度</th></tr></thead><tbody>'+pts.map(k=>'<tr><td><b>'+esc(k.full_name||k.name)+'</b></td><td><span class="tag '+levelClass(k.status||'')+'">'+esc(k.status||'未学习')+'</span></td><td>'+esc(k.stats_display||(k.correct_questions||0)+'/'+(k.answered_questions||0)+'/'+(k.total_questions||0)+' 题')+'</td><td>'+pct(k.score)+bar(k.score)+'</td></tr>').join('')+'</tbody></table></div>'}
+async function resourceManage(){let d=await fetch('/teacher/resources/data').then(r=>r.json()),all=d.resources||[];app.innerHTML='<div class="card"><div style="display:flex;justify-content:space-between;align-items:center"><h2>资源管理</h2><label class="btn green">上传资源<input type="file" style="display:none" onchange="uploadResource(this)"></label></div><div class="toolbar"><input id="rq" class="search" oninput="renderResources()" placeholder="搜索文件名、知识点、章节"><select id="rt" onchange="renderResources()"><option>全部类型</option>'+[...new Set(all.map(r=>r.type||'资源'))].map(t=>'<option>'+esc(t)+'</option>').join('')+'</select></div><div id="resourceList"></div></div>';window.RES=all;renderResources()}function renderResources(){let q=norm(rq.value),t=rt.value,list=(window.RES||[]).filter(r=>(t==='全部类型'||r.type===t)&&(!q||norm([r.name,r.title,r.knowledge_point,r.chapter_label,r.section_label].join(' ')).includes(q))),groups={};list.forEach(r=>{let ch=r.chapter_label||'未分类',sec=r.section_label||'未分类';(groups[ch]||(groups[ch]={}))[sec]=groups[ch][sec]||[];groups[ch][sec].push(r)});resourceList.innerHTML=Object.keys(groups).sort((a,b)=>a.localeCompare(b,'zh-Hans',{numeric:true})).map((ch,i)=>'<details class="chapter" '+(i===0?'open':'')+'><summary>'+esc(ch)+' · '+Object.values(groups[ch]).reduce((n,a)=>n+a.length,0)+' 个资源</summary>'+Object.keys(groups[ch]).sort((a,b)=>a.localeCompare(b,'zh-Hans',{numeric:true})).map(sec=>'<details class="section" open><summary>'+esc(sec)+' · '+groups[ch][sec].length+'</summary><table class="table"><tbody>'+groups[ch][sec].map(r=>'<tr><td><b>'+esc(r.name)+'</b></td><td>'+esc(r.type)+'</td><td>'+esc(r.knowledge_point||'未绑定')+'</td><td>'+esc(r.updated_at||'')+'</td><td>'+Math.round((r.size||0)/1024)+' KB</td><td><button class="btn light" onclick="renameResource(\''+esc(r.name)+'\')">修改</button> <button class="btn danger" onclick="deleteResource(\''+esc(r.name)+'\')">删除</button></td></tr>').join('')+'</tbody></table></details>').join('')+'</details>').join('')||'<div class="empty">暂无资源</div>'}async function uploadResource(input){if(!input.files[0])return;let fd=new FormData();fd.append('file',input.files[0]);let d=await fetch('/teacher/upload',{method:'POST',body:fd}).then(r=>r.json());alert(d.success?'上传成功':(d.error||'上传失败'));if(d.success)resourceManage()}async function renameResource(name){let next=prompt('输入新的文件名',name);if(!next||next===name)return;let d=await fetch('/teacher/resource/update',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({old_name:name,new_name:next})}).then(r=>r.json());alert(d.success?'修改成功':(d.error||'修改失败'));if(d.success)resourceManage()}async function deleteResource(name){if(!confirm('确认删除资源？'))return;let d=await fetch('/teacher/resource/delete',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({filename:name})}).then(r=>r.json());alert(d.success?'删除成功':(d.error||'删除失败'));if(d.success)resourceManage()}
+async function questionBank(){let d=await fetch('/teacher/questions/data').then(r=>r.json());window.QS=d.questions||[];app.innerHTML='<div class="card"><div style="display:flex;justify-content:space-between;align-items:center"><h2>题库管理</h2><button class="btn green" onclick="editQuestion()">添加题目</button></div><div class="toolbar"><input id="qq" class="search" oninput="renderQuestions()" placeholder="搜索题目、知识点、答案"><select id="qd" onchange="renderQuestions()"><option value="">全部难度</option><option value="easy">简单</option><option value="medium">中等</option><option value="hard">困难</option></select></div><div id="questionList"></div></div>';renderQuestions()}function renderQuestions(){let q=norm(qq.value),d=qd.value,list=(window.QS||[]).filter(x=>(!d||x.difficulty===d)&&(!q||norm([x.id,x.question,x.knowledge_point,x.answer].join(' ')).includes(q)));questionList.innerHTML='<table class="table"><thead><tr><th>ID</th><th>知识点</th><th>难度</th><th>题目</th><th>答案</th><th>操作</th></tr></thead><tbody>'+list.map(x=>'<tr><td>'+esc(x.id)+'</td><td>'+esc(x.knowledge_point)+'</td><td>'+esc(x.difficulty)+'</td><td>'+esc(x.question)+'</td><td>'+esc(x.answer)+'</td><td><button class="btn light" onclick="editQuestion(\''+esc(x.id)+'\')">修改</button> <button class="btn danger" onclick="deleteQuestion(\''+esc(x.id)+'\')">删除</button></td></tr>').join('')+'</tbody></table>'}async function editQuestion(id){let old=(window.QS||[]).find(q=>String(q.id)===String(id))||{};let question=prompt('题目内容',old.question||'');if(!question)return;let kp=prompt('知识点',old.knowledge_point||KPS[0]||'');if(!kp)return;let answer=prompt('答案',old.answer||'');if(!answer)return;let difficulty=prompt('难度 easy/medium/hard',old.difficulty||'medium')||'medium';let payload={question,knowledge_point:kp,answer,difficulty,options:old.options||[]};if(id)payload.question_id=id;let url=id?'/teacher/question/update':'/teacher/question/add';let d=await fetch(url,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(payload)}).then(r=>r.json());alert(d.success?'保存成功':(d.error||'保存失败'));if(d.success)questionBank()}async function deleteQuestion(id){if(!confirm('确认删除题目？'))return;let d=await fetch('/teacher/question/delete',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({question_id:id})}).then(r=>r.json());alert(d.success?'删除成功':(d.error||'删除失败'));if(d.success)questionBank()}
+function graphCode(n){let m=String((n&&n.label)||'').match(/\d+(?:\.\d+){0,2}/)||String((n&&n.id)||'').match(/\d+(?:\.\d+){0,2}/);return m?m[0]:''}function graphSort(a,b){return String(a.label||a.id).localeCompare(String(b.label||b.id),'zh-Hans',{numeric:true})}function layoutGraph(nodes){let root=nodes.find(n=>n.level<0||n.shape==='diamond')||nodes[0];if(root){root.x=0;root.y=0;root.fixed={x:true,y:true}}let chapters=nodes.filter(n=>n!==root&&(n.level===0||n.shape==='hexagon')).sort(graphSort),sections=nodes.filter(n=>{let c=graphCode(n).split('.');return n.level===1||c.length===2}).sort(graphSort),leaves=nodes.filter(n=>{let c=graphCode(n).split('.');return n!==root&&chapters.indexOf(n)<0&&sections.indexOf(n)<0&&(n.level>=2||c.length>=3)}).sort(graphSort),angles={};chapters.forEach((n,i)=>{let a=-Math.PI/2+Math.PI*2*i/Math.max(1,chapters.length);angles[graphCode(n)]=a;n.x=Math.cos(a)*230;n.y=Math.sin(a)*190;n.fixed={x:true,y:true}});let byCh={};sections.forEach(n=>{let ch=graphCode(n).split('.')[0]||'0';(byCh[ch]||(byCh[ch]=[])).push(n)});Object.keys(byCh).forEach(ch=>{let arr=byCh[ch].sort(graphSort),base=(angles[ch]==null?-Math.PI/2:angles[ch]),span=Math.min(1.15,.38+.16*arr.length);arr.forEach((n,i)=>{let a=base-span/2+span*(i+.5)/Math.max(1,arr.length);n._angle=a;n.x=Math.cos(a)*420;n.y=Math.sin(a)*340;n.fixed={x:true,y:true}})});let bySec={};leaves.forEach(n=>{let sec=graphCode(n).split('.').slice(0,2).join('.')||'0';(bySec[sec]||(bySec[sec]=[])).push(n)});Object.keys(bySec).forEach(sec=>{let parent=sections.find(s=>graphCode(s)===sec),base=(parent&&parent._angle);if(base==null)base=angles[sec.split('.')[0]]||-Math.PI/2;let arr=bySec[sec].sort(graphSort),span=Math.min(.58,.20+.075*arr.length);arr.forEach((n,i)=>{let a=base-span/2+span*(i+.5)/Math.max(1,arr.length);n.x=Math.cos(a)*660;n.y=Math.sin(a)*545;n.fixed={x:true,y:true}})})}function graphLabel(s,max){s=String(s||'');let lines=[],line='';for(let ch of s){line+=ch;if(line.length>=max){lines.push(line);line=''}}if(line)lines.push(line);return lines.join('\n')}
+async function graph(){let d=await fetch('/teacher/flow-graph/data').then(r=>r.json()),nodes=d.nodes||[],edges=d.edges||[];layoutGraph(nodes);app.innerHTML='<div class="card"><h2>公共知识图谱关系</h2><p class="muted">教师端公共图谱与学生端使用同一份课程、章节、知识点和关系数据。</p><div id="teacherGraph" style="height:760px;border:1px solid #e5e7eb;background:#fafafa"></div></div>';if(!window.vis){teacherGraph.innerHTML='<div class="empty">图谱库加载失败</div>';return}let nodeColor={background:'#f1f3f5',border:'#111827',highlight:{background:'#e9ecef',border:'#000'}};let ns=new vis.DataSet(nodes.map(n=>({id:n.id,label:graphLabel(n.label||n.id,n.shape==='hexagon'?5:(n.shape==='square'?6:5)),shape:n.shape||'circle',size:n.size||38,x:n.x,y:n.y,fixed:{x:true,y:true},color:nodeColor,borderWidth:2,font:{face:'Microsoft YaHei',color:'#111827',bold:true,multi:true,size:n.fontSize||14},widthConstraint:n.shape==='square'?{minimum:88,maximum:120}:undefined,heightConstraint:n.shape==='square'?{minimum:58}:undefined})));let es=new vis.DataSet(edges.map((e,i)=>({id:i,from:e.from,to:e.to,arrows:'to',color:{color:'#4b5563',highlight:'#111827'},dashes:e.type!=='包含',width:e.type==='包含'?2:1.4,smooth:e.type==='包含'?{type:'continuous'}:{type:'curvedCW',roundness:.15}})));let network=new vis.Network(teacherGraph,{nodes:ns,edges:es},{physics:false,interaction:{zoomView:true,dragView:true,dragNodes:false},layout:{improvedLayout:false}});setTimeout(()=>network.fit({animation:{duration:160,easingFunction:'easeInOutQuad'}}),80)}
+async function discuss(){let d=await fetch('/student/discuss/list').then(r=>r.json()),posts=d.posts||[];app.innerHTML='<div class="card"><h2>问题讨论</h2><div class="toolbar"><input id="dq" class="search" oninput="renderTeacherDiscuss()" placeholder="搜索标题、作者、知识点、内容"><select id="ds" onchange="renderTeacherDiscuss()"><option>全部状态</option><option>未解决</option><option>已解决</option></select></div><div id="teacherDiscussList"></div></div><div class="card" id="teacherDiscussDetail"><div class="empty">点击问题查看详情</div></div>';window.TEACHER_POSTS=posts;renderTeacherDiscuss()}function renderTeacherDiscuss(){let q=norm(dq.value),s=ds.value,list=(window.TEACHER_POSTS||[]).filter(p=>(s==='全部状态'||p.status===s)&&(!q||norm([p.no,p.title,p.body,p.author,p.knowledge_tag].join(' ')).includes(q)));teacherDiscussList.innerHTML=list.map(p=>'<div class="post" onclick="openTeacherPost(\''+esc(p.id)+'\')"><div style="display:flex;justify-content:space-between;gap:12px"><b>#'+esc(p.no)+' '+esc(p.title)+'</b><span class="tag '+(p.status==='已解决'?'ok':'warn')+'">'+esc(p.status)+'</span></div><div class="muted">'+esc(p.author)+' · '+esc(p.time)+' · '+esc(p.knowledge_tag||'未标注')+' · '+Number(p.comment_count||0)+' 条回复</div><p>'+esc(p.body||'')+'</p></div>').join('')||'<div class="empty">暂无讨论</div>'}async function openTeacherPost(id){let d=await fetch('/student/discuss/detail/'+encodeURIComponent(id)).then(r=>r.json()),p=d.post||{};teacherDiscussDetail.innerHTML='<h2>#'+esc(p.no)+' '+esc(p.title)+'</h2><p>'+esc(p.body||'')+'</p><div class="muted">'+esc(p.author||'')+' · '+esc(p.knowledge_tag||'未标注')+' · '+esc(p.status||'')+'</div><h3>回复</h3>'+((p.comments||[]).map(c=>'<div class="comment"><b>'+esc(c.floor)+'楼 · '+esc(c.author)+'</b><p>'+esc(c.body)+'</p><div class="muted">'+esc(c.time)+'</div></div>').join('')||'<div class="muted">暂无回复</div>')}
+function codeOf(v){let m=String(v||'').match(/\d+(?:\.\d+)*/);return m?m[0]:''}
+function openRes(r){let n=encodeURIComponent(r.name||'');return (/\.mp4$/i.test(r.name||'')||String(r.type||'').toLowerCase().includes('video'))?'/video/'+n:'/student/file/'+n}
+async function sendReminder(sid,kp,score){let a=['请重点复习「'+kpName(kp)+'」，先看资源再完成对应练习。','「'+kpName(kp)+'」掌握度偏低，请今天完成一次针对性复习。','建议回看「'+kpName(kp)+'」的视频/PPT，并在讨论区写下卡点。'];let body=prompt('快捷提醒：\n1. '+a[0]+'\n2. '+a[1]+'\n3. '+a[2],a[score<.4?1:0]);if(!body)return;let d=await fetch('/teacher/message/send',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({student_id:sid,body:body,knowledge_point:kp})}).then(r=>r.json());alert(d.success?'提醒已发送':(d.error||'发送失败'))}
+async function profileDetail(sid){let d=await fetch('/teacher/student-profile/data?sid='+encodeURIComponent(sid)).then(r=>r.json()),p=d.profile||{},pts=(d.mastery||{}).points||[],stu=(DATA.all_students||[]).find(s=>s.id===sid)||{},num=stu.num||((String(sid).match(/^\d+/)||[''])[0]),name=stu.name||String(sid).replace(/^\d+/,'');let weak=pts.filter(k=>Number(k.score||0)<.7).sort((a,b)=>Number(a.score||0)-Number(b.score||0));app.innerHTML='<a class="btn light" href="/teacher/students">返回学生画像列表</a><div class="card"><div class="profile-title"><h2>学生画像：'+esc(name||sid)+'</h2><span class="muted">'+esc(num)+' · '+esc(basicClass(stu))+' · '+esc(basicGender(stu))+'</span></div><div class="grid" style="margin-top:14px"><div class="stat">学习等级<b>'+esc(p.level||stu.level||'暂无')+'</b></div><div class="stat">平均掌握度<b>'+pct(p.avg_mastery||stu.avg_mastery)+'</b></div><div class="stat">正确率<b>'+pct(p.accuracy||stu.accuracy)+'</b></div><div class="stat">做题总数<b>'+Number(p.total_questions||stu.total_questions||0)+'</b></div></div><p class="muted">'+esc(p.description||stu.description||'')+'</p></div><div class="card"><h2>快捷提醒</h2><div class="toolbar">'+(weak.slice(0,8).map(k=>'<button class="btn light" onclick="sendReminder(\''+esc(sid)+'\',\''+esc(k.full_name||k.name)+'\','+Number(k.score||0)+')">'+esc(kpName(k.full_name||k.name))+' '+pct(k.score)+'</button>').join('')||'<span class="muted">暂无低于 70% 的知识点</span>')+'</div></div><div class="card"><h2>知识点学习明细</h2><table class="table"><thead><tr><th>知识点</th><th>综合掌握度</th><th>做题</th><th>视频</th><th>资源</th><th>讨论</th><th>提醒</th></tr></thead><tbody>'+pts.map(k=>'<tr><td><b>'+esc(k.full_name||k.name)+'</b></td><td>'+pct(k.score)+bar(k.score)+'</td><td>'+pct(k.exercise_score)+'</td><td>'+pct(k.video_score)+'</td><td>'+pct(k.resource_score)+'</td><td>'+pct(k.discussion_score)+'</td><td><button class="btn light" onclick="sendReminder(\''+esc(sid)+'\',\''+esc(k.full_name||k.name)+'\','+Number(k.score||0)+')">发提醒</button></td></tr>').join('')+'</tbody></table></div>'}
+async function resourceManage(){let d=await fetch('/teacher/resources/data').then(r=>r.json());window.RES=d.resources||[];app.innerHTML='<div class="card"><div style="display:flex;justify-content:space-between;align-items:center"><h2>资源管理</h2><label class="btn green">上传资源<input type="file" style="display:none" onchange="uploadResource(this)"></label></div><div class="toolbar"><input id="rq" class="search" oninput="renderResources()" placeholder="搜索文件名、知识点、章节"><select id="rt" onchange="renderResources()"><option>全部类型</option>'+[...new Set(RES.map(r=>r.type||'资源'))].map(t=>'<option>'+esc(t)+'</option>').join('')+'</select></div><div id="resourceList"></div></div>';renderResources()}
+function renderResources(){let q=norm(rq.value),t=rt.value,groups={};(RES||[]).filter(r=>(t==='全部类型'||r.type===t)&&(!q||norm([r.name,r.title,r.knowledge_point,r.chapter_label,r.section_label].join(' ')).includes(q))).forEach(r=>{let ch=r.chapter_label||'未分类',sec=r.section_label||'未分类';(groups[ch]||(groups[ch]={}))[sec]=groups[ch][sec]||[];groups[ch][sec].push(r)});resourceList.innerHTML=Object.keys(groups).sort((a,b)=>a.localeCompare(b,'zh-Hans',{numeric:true})).map((ch,i)=>'<details class="chapter" '+(i?'':'open')+'><summary>'+esc(ch)+' · '+Object.values(groups[ch]).reduce((n,a)=>n+a.length,0)+' 个资源</summary>'+Object.keys(groups[ch]).sort((a,b)=>a.localeCompare(b,'zh-Hans',{numeric:true})).map(sec=>'<details class="section" open><summary>'+esc(sec)+' · '+groups[ch][sec].length+'</summary><table class="table"><tbody>'+groups[ch][sec].map(r=>'<tr><td><b>'+esc(r.name)+'</b></td><td>'+esc(r.type)+'</td><td>'+esc(r.knowledge_point||'未绑定')+'</td><td>'+esc(r.updated_at||'')+'</td><td>'+Math.round((r.size||0)/1024)+' KB</td><td><a class="btn light" target="_blank" href="'+openRes(r)+'">查看</a> <label class="btn light">替换<input type="file" style="display:none" onchange="replaceResource(this,\''+esc(r.name)+'\')"></label> <button class="btn light" onclick="renameResource(\''+esc(r.name)+'\')">改名</button> <button class="btn danger" onclick="deleteResource(\''+esc(r.name)+'\')">删除</button></td></tr>').join('')+'</tbody></table></details>').join('')+'</details>').join('')||'<div class="empty">暂无资源</div>'}
+async function replaceResource(input,name){if(!input.files[0])return;let fd=new FormData();fd.append('old_name',name);fd.append('file',input.files[0]);let d=await fetch('/teacher/resource/replace-content',{method:'POST',body:fd}).then(r=>r.json());alert(d.success?'资源内容已更新':(d.error||'替换失败'));if(d.success)resourceManage()}
+async function questionBank(){let d=await fetch('/teacher/questions/data').then(r=>r.json());window.QS=d.questions||[];app.innerHTML='<div class="card"><div style="display:flex;justify-content:space-between;align-items:center"><h2>题库管理</h2><button class="btn green" onclick="editQuestion()">添加题目</button></div><div class="toolbar"><input id="qq" class="search" oninput="renderQuestions()" placeholder="搜索题目、知识点、答案"><select id="qd" onchange="renderQuestions()"><option value="">全部难度</option><option value="easy">简单</option><option value="medium">中等</option><option value="hard">困难</option></select></div><div id="questionList"></div></div>';renderQuestions()}
+function renderQuestions(){let q=norm(qq.value),d=qd.value,groups={};(QS||[]).filter(x=>(!d||x.difficulty===d)&&(!q||norm([x.id,x.question,x.knowledge_point,x.answer].join(' ')).includes(q))).forEach(x=>{let parts=codeOf(x.knowledge_point).split('.'),ch=parts[0]?('第'+parts[0]+'章'):'未分类',sec=parts.length>1?parts.slice(0,2).join('.'):'未分类';(groups[ch]||(groups[ch]={}))[sec]=groups[ch][sec]||[];groups[ch][sec].push(x)});questionList.innerHTML=Object.keys(groups).sort((a,b)=>a.localeCompare(b,'zh-Hans',{numeric:true})).map((ch,i)=>'<details class="chapter" '+(i?'':'open')+'><summary>'+esc(ch)+' · '+Object.values(groups[ch]).reduce((n,a)=>n+a.length,0)+' 道题</summary>'+Object.keys(groups[ch]).sort((a,b)=>a.localeCompare(b,'zh-Hans',{numeric:true})).map(sec=>'<details class="section" open><summary>'+esc(sec)+' · '+groups[ch][sec].length+' 道题</summary><table class="table"><thead><tr><th>ID</th><th>知识点</th><th>难度</th><th>题目</th><th>答案</th><th>操作</th></tr></thead><tbody>'+groups[ch][sec].map(x=>'<tr><td>'+esc(x.id)+'</td><td>'+esc(x.knowledge_point)+'</td><td>'+esc(x.difficulty)+'</td><td>'+esc(x.question)+'</td><td>'+esc(x.answer)+'</td><td><button class="btn light" onclick="editQuestion(\''+esc(x.id)+'\')">修改</button> <button class="btn danger" onclick="deleteQuestion(\''+esc(x.id)+'\')">删除</button></td></tr>').join('')+'</tbody></table></details>').join('')+'</details>').join('')||'<div class="empty">暂无题目</div>'}
+function layoutGraph(nodes){let root=nodes.find(n=>n.level<0||n.shape==='diamond')||nodes[0];if(root){root.x=70;root.y=80;root.fixed={x:true,y:true}}let ch=nodes.filter(n=>n!==root&&(n.level===0||n.shape==='hexagon')).sort(graphSort),sec=nodes.filter(n=>n!==root&&!ch.includes(n)&&(n.level===1||codeOf(n.label||n.id).split('.').length===2)).sort(graphSort),leaf=nodes.filter(n=>n!==root&&!ch.includes(n)&&!sec.includes(n)).sort(graphSort),slots=[[-430,-80],[360,230],[-160,500],[520,-180],[-520,340]];ch.forEach((n,i)=>{let p=slots[i%slots.length];n.x=p[0];n.y=p[1];n.fixed={x:true,y:true}});let by={};sec.forEach(n=>{let c=codeOf(n.label||n.id).split('.')[0]||'0';(by[c]||(by[c]=[])).push(n)});Object.keys(by).forEach((c,ci)=>by[c].forEach((n,i)=>{let p=ch.find(x=>codeOf(x.label||x.id).split('.')[0]===c),a=-Math.PI/2+Math.PI*2*(i+.25*ci)/Math.max(3,by[c].length),r=170+22*(i%3);n.x=(p?p.x:0)+Math.cos(a)*r;n.y=(p?p.y:0)+Math.sin(a)*r;n._a=a;n.fixed={x:true,y:true}}));let bl={};leaf.forEach(n=>{let s=codeOf(n.label||n.id).split('.').slice(0,2).join('.')||'0';(bl[s]||(bl[s]=[])).push(n)});Object.keys(bl).forEach(s=>bl[s].forEach((n,i)=>{let p=sec.find(x=>codeOf(x.label||x.id)===s),a=(p&&p._a||0)-.85+.32*i,r=115+18*(i%2);n.x=(p?p.x:0)+Math.cos(a)*r;n.y=(p?p.y:0)+Math.sin(a)*r;n.fixed={x:true,y:true}}))}
+async function graph(){let d=await fetch('/teacher/flow-graph/data').then(r=>r.json()),nodes=d.nodes||[],edges=d.edges||[];layoutGraph(nodes);app.innerHTML='<div class="card"><h2>公共知识图谱关系</h2><div class="muted"><b>颜色=学习状态：</b><span class="tag ok">已掌握≥80%</span><span class="tag">良好≥60%</span><span class="tag warn">进行中≥40%</span><span class="tag bad">薄弱&lt;40%</span></div><div id="teacherGraph" style="height:760px;border:1px solid #e5e7eb;background:#fafafa;margin-top:14px"></div></div>';if(!window.vis){teacherGraph.innerHTML='<div class="empty">图谱库加载失败</div>';return}function c(m,n){return n.shape==='diamond'?{background:'#0f172a',border:'#020617'}:m>=.8?{background:'#d4f0dc',border:'#8fd3a6'}:m>=.6?{background:'#dbeafe',border:'#93c5fd'}:m>=.4?{background:'#ffedd5',border:'#fdba74'}:{background:'#fee2e2',border:'#fca5a5'}}let ns=new vis.DataSet(nodes.map(n=>({id:n.id,label:graphLabel(n.label||n.id,n.shape==='hexagon'?5:(n.shape==='square'?6:5)),shape:n.shape||'circle',size:n.size||38,x:n.x,y:n.y,fixed:{x:true,y:true},color:c(Number(n.mastery||0),n),borderWidth:n.shape==='diamond'?4:3,font:{face:'Microsoft YaHei',color:n.shape==='diamond'?'#fff':'#111827',bold:true,multi:true,size:n.fontSize||13},widthConstraint:n.shape==='square'?{minimum:86,maximum:116}:undefined,heightConstraint:n.shape==='square'?{minimum:58}:undefined})));let es=new vis.DataSet(edges.map((e,i)=>({id:i,from:e.from,to:e.to,arrows:'to',color:{color:e.type==='先修'?'#c084fc':(e.type==='相关'?'#f59e0b':'#9aa6b2')},dashes:e.type!=='包含',width:e.type==='包含'?1.8:1.2,smooth:e.type==='包含'?{type:'continuous'}:{type:'curvedCW',roundness:.22}})));let network=new vis.Network(teacherGraph,{nodes:ns,edges:es},{physics:false,interaction:{zoomView:true,dragView:true,dragNodes:false},layout:{improvedLayout:false}});setTimeout(()=>network.fit({animation:{duration:180,easingFunction:'easeInOutQuad'}}),80)}
+async function discuss(){let d=await fetch('/student/discuss/list').then(r=>r.json()),posts=d.posts||[];app.innerHTML='<div class="card"><h2>问题讨论</h2><div class="toolbar"><input id="dq" class="search" oninput="renderTeacherDiscuss()" placeholder="搜索标题、作者、知识点、内容"><select id="ds" onchange="renderTeacherDiscuss()"><option>全部状态</option><option>未解决</option><option>已解决</option></select></div><div id="teacherDiscussList"></div></div><div class="card" id="teacherDiscussDetail"><div class="empty">点击问题查看详情</div></div>';window.TEACHER_POSTS=posts;renderTeacherDiscuss()}
+function renderTeacherDiscuss(){let q=norm(dq.value),s=ds.value,list=(TEACHER_POSTS||[]).filter(p=>(s==='全部状态'||p.status===s)&&(!q||norm([p.no,p.title,p.body,p.author,p.knowledge_tag].join(' ')).includes(q)));teacherDiscussList.innerHTML=list.map(p=>'<div class="post" onclick="openTeacherPost(\''+esc(p.id)+'\')"><div style="display:flex;justify-content:space-between;gap:12px"><b>#'+esc(p.no)+' '+esc(p.title)+'</b><span class="tag '+(p.status==='已解决'?'ok':'warn')+'">'+esc(p.status)+'</span></div><div class="muted">'+esc(p.author)+' · '+esc(p.time)+' · '+esc(p.knowledge_tag||'未标注')+' · '+Number(p.comment_count||0)+' 条回复</div><p>'+esc(p.body||'')+'</p></div>').join('')||'<div class="empty">暂无讨论</div>'}
+async function openTeacherPost(id){let d=await fetch('/student/discuss/detail/'+encodeURIComponent(id)).then(r=>r.json()),p=d.post||{};teacherDiscussDetail.innerHTML='<div style="display:flex;justify-content:space-between;gap:12px;align-items:center"><h2>#'+esc(p.no)+' '+esc(p.title)+'</h2><button class="btn danger" onclick="deleteTeacherPost(\''+esc(id)+'\')">删除问题</button></div><p>'+esc(p.body||'')+'</p><div class="muted">'+esc(p.author||'')+' · '+esc(p.knowledge_tag||'未标注')+' · '+esc(p.status||'')+'</div><h3>回复</h3>'+((p.comments||[]).map(c=>'<div class="comment"><div style="display:flex;justify-content:space-between;gap:10px"><b>'+esc(c.floor)+'楼 · '+esc(c.author)+'</b><button class="btn danger" onclick="deleteTeacherComment(\''+esc(c.id)+'\',\''+esc(id)+'\')">删除评论</button></div><p>'+esc(c.body)+'</p><div class="muted">'+esc(c.time)+'</div></div>').join('')||'<div class="muted">暂无回复</div>')+'<textarea id="teacherCommentBody" style="width:100%;margin-top:12px" rows="3" placeholder="教师评论学生的问题"></textarea><button class="btn" style="margin-top:8px" onclick="teacherCommentPost(\''+esc(id)+'\')">提交评论</button>'}
+async function teacherCommentPost(id){let body=(teacherCommentBody.value||'').trim();if(!body)return alert('请填写评论内容');let d=await fetch('/teacher/discuss/comment/'+encodeURIComponent(id),{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({body:body})}).then(r=>r.json());alert(d.success?'评论成功':(d.error||'评论失败'));if(d.success){await openTeacherPost(id);await discuss()}}
+async function deleteTeacherPost(id){if(!confirm('确认删除这个问题及其评论？'))return;let d=await fetch('/teacher/discuss/post/delete/'+encodeURIComponent(id),{method:'POST'}).then(r=>r.json());alert(d.success?'已删除':(d.error||'删除失败'));if(d.success)discuss()}
+async function deleteTeacherComment(cid,pid){if(!confirm('确认删除这条评论？'))return;let d=await fetch('/teacher/discuss/comment/delete/'+encodeURIComponent(cid),{method:'POST'}).then(r=>r.json());alert(d.success?'已删除':(d.error||'删除失败'));if(d.success){await openTeacherPost(pid);await discuss()}}
+
+load();
+</script></body></html>"""
+    return render_template_string(html, teacher_name=session.get("user_name", "教师"), initial_tab=initial_tab, page_title=page_title)
+
+CIRCLE_GRAPH_LAYOUT_JS = r"""
+function kgCode(n){var s=String((n&&n.label)||n||'');var m=s.match(/\d+(?:\.\d+)*/);if(!m)m=String((n&&n.id)||'').match(/\d+(?:\.\d+)*/);return m?m[0]:''}
+function kgSort(a,b){return String(a.label||a.id).localeCompare(String(b.label||b.id),'zh-Hans',{numeric:true})}
+function kgLabel(n){var s=String((n&&n.label)||n||'');var code=kgCode(n),titles={'1':'操作系统概述','2':'进程与线程','3':'互斥与同步'};if(n&&(n.shape==='hexagon'||n.level===0)&&titles[code])s='第'+code+'章 '+titles[code];return s}
+function kgWrap(text,limit){text=String(text||'').replace(/\s+/g,'');var out=[],buf='';for(var i=0;i<text.length;i++){buf+=text[i];if(buf.length>=limit){out.push(buf);buf=''}}if(buf)out.push(buf);out=out.slice(0,2);if(text.length>limit*2&&out.length>0){var last=out[out.length-1];out[out.length-1]=last.slice(0,Math.max(1,last.length-1))+'\u2026'}return out.join('\n')}
+function kgState(m){m=Number(m||0);return m>=.85?'已掌握':(m>=.6?'待巩固':(m>0?'薄弱':'未学习'))}
+function kgColor(m,n,mode){if(n&&n.shape==='diamond')return {background:'#0f172a',border:'#020617',highlight:{background:'#1e293b',border:'#020617'}};if(mode==='teacher')return {background:'#d1d5db',border:'#9ca3af',highlight:{background:'#e5e7eb',border:'#6b7280'}};m=Number(m||0);if(m>=.85)return {background:'#d4f0dc',border:'#8fd3a6',highlight:{background:'#bbf7d0',border:'#4ade80'}};if(m>=.6)return {background:'#dbeafe',border:'#93c5fd',highlight:{background:'#bfdbfe',border:'#60a5fa'}};if(m>0)return {background:'#fee2e2',border:'#fca5a5',highlight:{background:'#fecaca',border:'#ef4444'}};return {background:'#eef2f7',border:'#cbd5e1',highlight:{background:'#e2e8f0',border:'#94a3b8'}}}
+function kgLevelName(n){return n.shape==='diamond'?'课程':(n.shape==='hexagon'?'章':(n.shape==='square'||n.shape==='box'?'大节':'小节'))}
+function kgLegend(){return '<div class="muted" style="display:flex;align-items:center;gap:10px;flex-wrap:wrap"><b>颜色=掌握度：</b><span class="tag ok">已掌握≥85%</span><span class="tag" style="background:#dbeafe;color:#1d4ed8">待巩固≥60%</span><span class="tag bad">薄弱1~59%</span><span class="tag">未学习0%</span><b style="margin-left:12px">线：</b><span style="display:inline-flex;align-items:center;gap:5px"><i style="display:inline-block;width:28px;border-top:2px solid #94a3b8"></i>包含</span><span style="display:inline-flex;align-items:center;gap:5px"><i style="display:inline-block;width:28px;border-top:2px dashed #f59e0b"></i>相关</span><span style="display:inline-flex;align-items:center;gap:5px"><i style="display:inline-block;width:28px;border-top:2px dashed #a855f7"></i>先修</span></div>'}
+function kgZoomPanel(){return '<div style="position:absolute;right:18px;top:18px;width:62px;background:#fff;border:1px solid #dbe3ef;border-radius:14px;box-shadow:0 8px 24px rgba(15,23,42,.12);padding:10px;display:grid;gap:6px;place-items:center"><button class="btn light" style="width:40px;height:40px;padding:0" onclick="zoomGraph(.08)">+</button><input id="graphZoom" type="range" min="0" max="100" value="45" oninput="setGraphZoom(this.value)" style="writing-mode:vertical-lr;direction:rtl;-webkit-appearance:slider-vertical;width:40px;height:250px"><button class="btn light" style="width:40px;height:40px;padding:0" onclick="zoomGraph(-.08)">-</button></div>'}
+function kgInitialLayout(nodes){var root=nodes.find(function(n){return n.shape==='diamond'||n.level<0})||nodes[0];if(root){root.x=0;root.y=0;root.fixed={x:true,y:true};root.physics=false}var chapters=nodes.filter(function(n){return n!==root&&(n.shape==='hexagon'||n.level===0)}).sort(kgSort),sections=nodes.filter(function(n){return n!==root&&!chapters.includes(n)&&(n.shape==='square'||n.shape==='box'||n.level===1)}).sort(kgSort),leaves=nodes.filter(function(n){return n!==root&&!chapters.includes(n)&&!sections.includes(n)}).sort(kgSort);chapters.forEach(function(n,i){var a=-Math.PI/2+i*Math.PI*2/Math.max(1,chapters.length);n.x=Math.cos(a)*190;n.y=Math.sin(a)*190});var all=sections.concat(leaves),golden=Math.PI*(3-Math.sqrt(5)),total=Math.max(1,all.length);all.forEach(function(n,i){var r=260+420*Math.sqrt((i+.5)/total),a=i*golden-Math.PI/2;n.x=Math.cos(a)*r;n.y=Math.sin(a)*r})}
+function kgDrawCenteredText(ctx,text,x,y,fontSize,color,maxWidth){var lines=String(text||'').split('\n').slice(0,5),lh=fontSize+3,start=y-lines.length*lh/2+lh/2;ctx.save();ctx.font='bold '+fontSize+'px Microsoft YaHei, Arial';ctx.fillStyle=color;ctx.textAlign='center';ctx.textBaseline='middle';for(var i=0;i<lines.length;i++){ctx.fillText(lines[i],x,start+i*lh,maxWidth)}ctx.restore()}
+function renderKnowledgeGraph(container,nodes,edges,detailEl,mode){kgInitialLayout(nodes);var visNodes=new vis.DataSet(nodes.map(function(n){var isRoot=n.shape==='diamond',isChapter=n.shape==='hexagon',isSection=n.shape==='square'||n.shape==='box',inside=isRoot||isChapter||isSection;var label=kgLabel(n),m=Number(n.mastery||0),size=isRoot?42:(isChapter?40:(isSection?24:32)),wrapped=kgWrap(label,isRoot?6:(isChapter?6:(isSection?7:6)));return {id:n.id,label:inside?'':wrapped,drawLabel:inside?wrapped:'',drawFontSize:isRoot?16:(isChapter?14:13),title:label,shape:isRoot?'diamond':(isChapter?'hexagon':(isSection?'square':'circle')),size:size,widthConstraint:isSection?{minimum:80,maximum:80}:(isChapter?{minimum:92,maximum:92}:(isRoot?undefined:{minimum:64,maximum:64})),heightConstraint:isSection?{minimum:52,maximum:52}:(isChapter?{minimum:60,maximum:60}:(isRoot?undefined:{minimum:64,maximum:64})),x:n.x,y:n.y,fixed:isRoot?{x:true,y:true}:false,physics:!isRoot,mass:isRoot?10:(isChapter?5:(isSection?2.4:1.2)),color:kgColor(m,n,mode),borderWidth:isRoot?4:(isChapter?3.5:(isSection?3:2.5)),font:{face:'Microsoft YaHei',size:inside?1:(isRoot?15:(isChapter?13:(isSection?12:11))),color:inside?'rgba(0,0,0,0)':(isRoot?'#fff':'#0f172a'),bold:true,multi:true,align:'center',vadjust:0},labelHighlightBold:false,raw:n,mastery:m}}));var visEdges=new vis.DataSet(edges.map(function(e,i){var t=e.type||'包含',c=t==='先修'?'#a855f7':(t==='相关'?'#f59e0b':'#94a3b8');return {id:i,from:e.from,to:e.to,arrows:'to',color:{color:c,highlight:'#2563eb'},dashes:t==='包含'?false:[7,5],width:t==='包含'?1.8:1.2,length:t==='包含'?32:42,smooth:t==='包含'?{type:'dynamic',roundness:.08}:{type:'curvedCW',roundness:.12}}}));var network=new vis.Network(container,{nodes:visNodes,edges:visEdges},{physics:{enabled:true,solver:'forceAtlas2Based',forceAtlas2Based:{gravitationalConstant:-260,centralGravity:.055,springLength:35,springConstant:.14,damping:.58,avoidOverlap:1},maxVelocity:26,minVelocity:.08,stabilization:{enabled:true,iterations:900,fit:true,updateInterval:40}},layout:{improvedLayout:false,hierarchical:false},interaction:{hover:true,zoomView:true,dragView:true,dragNodes:true,selectConnectedEdges:false,multiselect:false},nodes:{scaling:{enabled:false},shapeProperties:{interpolation:false}},edges:{arrows:{to:{enabled:true,scaleFactor:.65}},selectionWidth:3,hoverWidth:2}});window.graphNetwork=network;window.graphZoomMin=.25;window.graphZoomMax=.80;window.graphScale=mode==='teacher'?.48:.58;network.once('stabilizationIterationsDone',function(){network.fit({animation:{duration:220,easingFunction:'easeInOutQuad'}});setTimeout(function(){applyGraphZoom(window.graphScale,true)},80)});network.on('afterDrawing',function(ctx){var pos=network.getPositions();visNodes.forEach(function(n){if(!n.drawLabel)return;var p=pos[n.id];if(!p)return;kgDrawCenteredText(ctx,n.drawLabel,p.x,p.y,n.drawFontSize,n.shape==='diamond'?'#fff':'#0f172a',n.size*1.55)})});network.on('dragStart',function(p){if(p.nodes&&p.nodes.length)network.startSimulation()});network.on('dragEnd',function(p){if(p.nodes&&p.nodes.length)setTimeout(function(){network.stopSimulation()},1600)});if(detailEl){network.on('click',function(p){var id=p.nodes&&p.nodes[0];if(!id)return;var n=nodes.find(function(x){return x.id===id});if(!n)return;var m=Number(n.mastery||0),s=kgState(m),tagClass=s==='薄弱'?'bad':(s==='未学习'?'':(s==='待巩固'?'warn':'ok'));detailEl.innerHTML='<b>'+esc(kgLabel(n))+'</b><p><span class="tag '+tagClass+'">'+s+'</span> <span class="tag">掌握度 '+Math.round(m*100)+'%</span></p><p class="muted">'+kgLevelName(n)+'</p>'})}return network}
+function renderKnowledgeGraph(container,nodes,edges,detailEl,mode){kgInitialLayout(nodes);var visNodes=new vis.DataSet(nodes.map(function(n){var isRoot=n.shape==='diamond',isChapter=n.shape==='hexagon',isSection=n.shape==='square'||n.shape==='box',inside=isRoot||isChapter||isSection;var label=kgLabel(n),m=Number(n.mastery||0),size=isRoot?42:(isChapter?38:(isSection?24:32)),wrapped=kgWrap(label,isRoot?6:(isChapter?6:(isSection?7:6)));return {id:n.id,label:inside?'':wrapped,drawLabel:inside?wrapped:'',drawFontSize:isRoot?16:(isChapter?14:13),title:label,shape:isRoot?'diamond':(isChapter?'hexagon':(isSection?'square':'circle')),size:size,widthConstraint:isSection?{minimum:80,maximum:80}:(isChapter?{minimum:92,maximum:92}:(isRoot?undefined:{minimum:64,maximum:64})),heightConstraint:isSection?{minimum:52,maximum:52}:(isChapter?{minimum:60,maximum:60}:(isRoot?undefined:{minimum:64,maximum:64})),x:n.x,y:n.y,fixed:isRoot?{x:true,y:true}:false,physics:!isRoot,mass:isRoot?10:(isChapter?5:(isSection?2.4:1.2)),color:kgColor(m,n,mode),borderWidth:isRoot?4:(isChapter?3.5:(isSection?3:2.5)),font:{face:'Microsoft YaHei',size:inside?1:12,color:inside?'rgba(0,0,0,0)':(isRoot?'#fff':'#0f172a'),bold:true,multi:true,align:'center',vadjust:0},labelHighlightBold:false,raw:n,mastery:m}}));var visEdges=new vis.DataSet(edges.map(function(e,i){var t=e.type||'包含',c=t==='先修'?'#a855f7':(t==='相关'?'#f59e0b':'#94a3b8');return {id:i,from:e.from,to:e.to,arrows:'to',color:{color:c,highlight:'#2563eb'},dashes:t==='包含'?false:[7,5],width:t==='包含'?1.8:1.2,length:t==='包含'?10:14,smooth:t==='包含'?{type:'dynamic',roundness:.03}:{type:'curvedCW',roundness:.10}}}));var network=new vis.Network(container,{nodes:visNodes,edges:visEdges},{physics:{enabled:true,solver:'forceAtlas2Based',forceAtlas2Based:{gravitationalConstant:-310,centralGravity:.075,springLength:12,springConstant:.045,damping:.86,avoidOverlap:1.35},maxVelocity:5.2,minVelocity:.02,timestep:.2,stabilization:{enabled:true,iterations:1200,fit:true,updateInterval:80}},layout:{improvedLayout:false,hierarchical:false},interaction:{hover:true,zoomView:true,dragView:true,dragNodes:true,selectConnectedEdges:false,multiselect:false},nodes:{scaling:{enabled:false},shapeProperties:{interpolation:false}},edges:{arrows:{to:{enabled:true,scaleFactor:.65}},selectionWidth:3,hoverWidth:2}});window.graphNetwork=network;window.graphZoomMin=.25;window.graphZoomMax=.80;window.graphScale=mode==='teacher'?.48:.58;network.once('stabilizationIterationsDone',function(){network.fit({animation:{duration:220,easingFunction:'easeInOutQuad'}});setTimeout(function(){applyGraphZoom(window.graphScale,true)},80)});network.on('afterDrawing',function(ctx){var pos=network.getPositions();visNodes.forEach(function(n){if(!n.drawLabel)return;var p=pos[n.id];if(!p)return;kgDrawCenteredText(ctx,n.drawLabel,p.x,p.y,n.drawFontSize,n.shape==='diamond'?'#fff':'#0f172a',n.size*1.55)})});network.on('dragStart',function(p){if(p.nodes&&p.nodes.length)network.startSimulation()});network.on('dragEnd',function(p){if(p.nodes&&p.nodes.length)setTimeout(function(){network.stopSimulation()},1600)});network.on('click',function(p){var id=p.nodes&&p.nodes[0];if(!id||!detailEl)return;var n=nodes.find(function(x){return x.id===id});if(!n)return;var m=Number(n.mastery||0),s=kgState(m);var tagClass=s==='薄弱'?'bad':(s==='未学习'?'':(s==='待巩固'?'warn':'ok'));var detail='<div class="graph-detail"><b>'+esc(kgLabel(n))+'</b><p><span class="tag '+tagClass+'">'+s+'</span> <span class="tag">掌握度 '+Math.round(m*100)+'%</span></p><p class="muted">'+kgLevelName(n);if(n.total_questions!=null)detail+=' · 做题 '+(n.correct_questions||0)+'/'+(n.total_questions||0);if(n.error_count!=null)detail+=' · 错题 '+(n.error_count||0);detail+='</p>';if(n.resources&&n.resources.length)detail+='<p class="muted">资源：'+n.resources.slice(0,3).map(function(r){return r.title||r.name||r}).join('、')+'</p>';if(n.recent_records&&n.recent_records.length)detail+='<p class="muted">最近学习：'+n.recent_records.slice(0,3).map(function(r){return (r.name||'')+'('+Math.round((r.mastery||0)*100)+'%)'}).join('、')+'</p>';if(s==='薄弱'||s==='未学习')detail+='<a class="btn light" href="/student/path?target_kp='+encodeURIComponent(kgCode(n))+'">加入学习路径</a>';detail+='</div>';detailEl.innerHTML=detail});return network}
+function graphSliderToScale(v){var min=window.graphZoomMin||.25,max=window.graphZoomMax||.80,t=Math.max(0,Math.min(100,parseFloat(v)||0))/100;return min+(max-min)*t}
+function graphScaleToSlider(s){var min=window.graphZoomMin||.25,max=window.graphZoomMax||.80;return Math.round((Math.max(min,Math.min(max,parseFloat(s)||min))-min)/(max-min)*100)}
+function applyGraphZoom(scale,animate){var min=window.graphZoomMin||.25,max=window.graphZoomMax||.80;window.graphScale=Math.max(min,Math.min(max,parseFloat(scale)||.50));if(window.graphNetwork)window.graphNetwork.moveTo({position:window.graphNetwork.getViewPosition(),scale:window.graphScale,animation:animate?{duration:140,easingFunction:'easeInOutQuad'}:{duration:0}});var z=document.getElementById('graphZoom');if(z)z.value=graphScaleToSlider(window.graphScale)}
+function setGraphZoom(v){applyGraphZoom(graphSliderToScale(v),false)}
+function zoomGraph(delta){applyGraphZoom((window.graphScale||.50)+delta,true)}
+async function graph(){let d=await fetch('/teacher/flow-graph/data').then(r=>r.json()),nodes=d.nodes||[],edges=d.edges||[];app.innerHTML='<div class="card"><h2>公共知识图谱关系</h2>'+kgLegend()+'<div style="position:relative;margin-top:14px"><div id="teacherGraph" style="height:760px;border:1px solid #e5e7eb;background:#fafafa"></div>'+kgZoomPanel()+'</div></div>';if(!window.vis){teacherGraph.innerHTML='<div class="empty">图谱库加载失败</div>';return}renderKnowledgeGraph(teacherGraph,nodes,edges,null,'teacher')}
+async function graphPage(){var d=await getJson('/student/flow-graph/data'),nodes=d.nodes||[],edges=d.edges||[];app.innerHTML='<div class="card"><h2>知识图谱</h2>'+kgLegend()+'<div style="display:grid;grid-template-columns:minmax(0,1fr) 360px;gap:18px;margin-top:14px"><div style="position:relative"><div id="mynetwork" style="height:760px;border:1px solid #e5e7eb;background:#fafafa"></div>'+kgZoomPanel()+'</div><div id="nodeDetail" class="res-card graph-detail"><b>节点详情</b><p class="muted">单击节点查看掌握度。</p></div></div></div>';if(!window.vis){mynetwork.innerHTML='<div class="empty">vis 加载失败</div>';return}renderKnowledgeGraph(mynetwork,nodes,edges,nodeDetail,'student')}
+"""
+
+_previous_render_teacher_workspace_circle = render_teacher_workspace
+def render_teacher_workspace(initial_tab="overview", page_title="教师工作台"):
+    response = _previous_render_teacher_workspace_circle(initial_tab, page_title)
+    if initial_tab == "graph":
+        html = response.get_data(as_text=True) if hasattr(response, "get_data") else str(response)
+        html = html.replace("\nload();\n</script>", "\n{}\nload();\n</script>".format(CIRCLE_GRAPH_LAYOUT_JS))
+        html = html.replace("\r\nload();\r\n</script>", "\r\n{}\r\nload();\r\n</script>".format(CIRCLE_GRAPH_LAYOUT_JS))
+        return make_response(html)
+    return response
+
+_previous_render_flow_page_circle = render_flow_page
+STUDENT_FLOW_HTML = STUDENT_FLOW_HTML.replace(
+    "async function dashboard(){var d=await getJson('/student/dashboard/data'),r=await getJson('/student/resources/data'),m=await getJson('/student/messages'),st=d.stats||{},ratio=(st.mastered||0)/(st.total||1);app.innerHTML='<div class=\"dash\"><div class=\"hero\"><h2>今日学习概览</h2><p class=\"muted\">继续保持当前学习节奏，优先查看薄弱知识点、学习路径和最近资源。</p><a class=\"btn\" href=\"/student/path\">进入学习路径</a></div><div class=\"hero\"><h2>学习画像</h2><p><span class=\"tag ok\">已掌握 '+(st.mastered||0)+'</span> <span class=\"tag warn\">待巩固 '+(st.weak||0)+'</span> <span class=\"tag bad\">未学习 '+(st.severe||0)+'</span></p>'+bar(ratio,'良好')+'</div></div><div class=\"grid\"><a class=\"stat\" href=\"/student/mastery\"><span>知识点掌握度</span><b>'+pct(ratio)+'</b><span class=\"muted\">'+(st.total||0)+' 个知识点</span></a><a class=\"stat\" href=\"/student/path\"><span>智能学习路径</span><b>开始</b><span class=\"muted\">按掌握度和资源匹配推荐</span></a><a class=\"stat\" href=\"/student/resources\"><span>学习资源库</span><b>'+((r.resources||[]).length)+'</b><span class=\"muted\">视频 / 文档 / 习题</span></a><a class=\"stat\" href=\"/student/graph\"><span>知识图谱</span><b>查看</b><span class=\"muted\">单击节点查看掌握度</span></a></div><div class=\"card\"><h2>最新消息</h2>'+(((m.messages||[]).slice(0,4).map(function(x){return '<div class=\"post\"><b>'+esc(x.type||'消息')+'</b><div class=\"muted\">'+esc(x.body||'')+'</div></div>'}).join(''))||'<div class=\"empty\">暂无消息</div>')+'</div>'}",
+    "async function dashboard(){var d=await getJson('/student/dashboard/data'),st=d.stats||{},total=(st.mastered||0)+(st.good||0)+(st.weak||0)+(st.unlearned||0),p=d.profile||{},avgMastery=p.avg_mastery||0,rg=d.recent_groups||[],rm=d.recommendations||[],w3=(d.weak_points||[]).slice(0,3),today=d.today_count||0,mr=avgMastery;p.DDD='';app.innerHTML='<div class=\"dash\"><div class=\"hero hero-overview\"><h2>今日学习概览</h2><div class=\"grid\" style=\"margin-top:12px\"><div class=\"stat\"><span>综合掌握度</span><b>'+pct(avgMastery)+'</b><span class=\"muted\">'+esc(p.level||'')+'</span></div><div class=\"stat\"><span>今日学习</span><b>'+today+'</b><span class=\"muted\">条学习记录</span></div><div class=\"stat\"><span>做题总数</span><b>'+(p.total_questions||0)+'</b><span class=\"muted\">正确率 '+pct(p.accuracy||0)+'</span></div><div class=\"stat\"><span>错题待练</span><b>'+(p.wrong_count||0)+'</b><span class=\"muted\">去错题集复练</span></div></div></div><div class=\"hero light hero-profile\"><h2>学习画像</h2><div class=\"pill-row\" style=\"margin-top:4px\"><span class=\"tag ok\">已掌握 '+(st.mastered||0)+'</span><span class=\"tag\">良好 '+(st.good||0)+'</span><span class=\"tag warn\">需巩固 '+(st.weak||0)+'</span><span class=\"tag bad\">未学习 '+(st.unlearned||0)+'</span></div>'+bar(avgMastery||0,p.level||'')+'<p class=\"muted\" style=\"margin-top:8px\">知识点总数 '+total+'，已掌握+'+(st.good||0)+'+需巩固+'+(st.weak||0)+'+未学习+'+(st.unlearned||0)+'='+total+'</p></div></div><div class=\"grid\"><a class=\"stat\" href=\"/student/recommend_v2\"><span>学习资源推荐</span><b>查看推荐</b><span class=\"muted\">'+rm.length+' 个推荐资源</span></a><a class=\"stat\" href=\"/student/resources\"><span>学习资源库</span><b>开始学习</b><span class=\"muted\">视频 / 文档 / 习题</span></a><a class=\"stat\" href=\"/student/graph\"><span>知识图谱</span><b>查看图谱</b><span class=\"muted\">单击节点查看掌握度</span></a><a class=\"stat\" href=\"/student/mastery\"><span>知识点掌握度</span><b>'+pct(avgMastery||0)+'</b><span class=\"muted\">'+total+' 个知识点</span></a></div><div class=\"split\" style=\"display:grid;grid-template-columns:1.2fr .8fr;gap:16px\"><div><div class=\"card\"><h2>最近学习记录</h2>'+(rg.length?rg.map(function(g){return '<details class=\"chapter\" open><summary>'+esc(g.date)+' \\u00b7 '+g.items.length+' \\u6761</summary>'+g.items.map(function(r){return '<div class=\"record-card\"><span class=\"tag\">'+esc(typeText(r.type))+'</span><div><b>'+esc(r.name)+'</b><div class=\"muted\">'+esc(r.knowledge_point||'')+'</div></div><div class=\"muted\">'+esc(r.time||'')+'</div></div>'}).join('')+'</details>'}).join(''):'<div class=\"empty\">暂无学习记录</div>')+'</div><div class=\"card\"><h2>学习建议</h2>'+((p.suggestions||[]).map(function(x){return '<div class=\"hint\">'+esc(x)+'</div>'}).join('')||'<div class=\"empty\">暂无建议</div>')+'</div></div><div><div class=\"card\"><h2>今日推荐摘要</h2>'+(rm.slice(0,3).map(function(r){return '<div class=\"res-card\"><b>'+esc(r.title||r.name)+'</b><p><span class=\"tag\">'+esc(typeText(r.type))+'</span><span class=\"tag\">'+esc(r.difficulty||'\\u4e2d\\u7b49')+'</span></p><p class=\"muted\">'+esc(r.knowledge_point||'')+'</p><a class=\"btn light\" href=\"'+action(r)+'\">查看</a></div>'}).join('')||'<div class=\"empty\">暂无推荐</div>')+'</div><div class=\"card\"><h2>薄弱知识点 Top3</h2>'+(w3.length?w3.map(function(x){return '<div class=\"row\"><div><b>'+esc(x.name)+'</b></div><div><b>'+pct(x.score)+'</b></div></div>'}).join(''):'<div class=\"empty\">暂无薄弱知识点</div>')+'</div><div class=\"card\"><h2>最近学习摘要</h2>'+(rg.slice(0,3).map(function(g){return '<div class=\"record-card\"><span class=\"tag\">'+esc(g.date)+'</span><div><b>'+esc(((g.items||[])[0]||{}).name||'\\u65e0')+'</b><div class=\"muted\">\\u5171 '+g.items.length+' \\u6761</div></div></div>'}).join('')||'<div class=\"empty\">暂无</div>')+'</div></div></div>'}"
+)
+STUDENT_FLOW_HTML = STUDENT_FLOW_HTML.replace(
+    "/student/recommend_v2",
+    "/student/recommend"
+)
+def render_flow_page(title, active):
+    response = _previous_render_flow_page_circle(title, active)
+    if active == "graph" and hasattr(response, "get_data"):
+        html = response.get_data(as_text=True)
+        marker = "if(PAGE==='dashboard')dashboard();"
+        if marker in html:
+            html = html.replace(marker, CIRCLE_GRAPH_LAYOUT_JS + "\n" + marker, 1)
+        return make_response(html)
+    return response
+
+# =========================
+# Learning loop extension: resource completion, practice, wrong book, hybrid recommendation
+# =========================
+
+RECOMMEND_WEIGHTS = {
+    "weak_score": 0.22,
+    "graph_score": 0.16,
+    "content_score": 0.10,
+    "behavior_score": 0.14,
+    "cf_score": 0.10,
+    "ripple_score": 0.10,
+    "resource_quality_score": 0.08,
+    "teacher_adapt_score": 0.06,
+    "freshness_score": 0.04,
+}
+
+RESOURCE_COMPLETION_FILE = os.path.join(RESOURCE_DIR, "resource_completion.json")
+RESOURCE_EFFECT_FILE = os.path.join(RESOURCE_DIR, "resource_effect_events.json")
+RESOURCE_STATS_FILE = os.path.join(RESOURCE_DIR, "resource_stats.json")
+EXERCISE_SETS_FILE = os.path.join(RESOURCE_DIR, "exercise_sets.json")
+
+def _json_load(path, default):
+    if os.path.exists(path):
+        try:
+            with open(path, "r", encoding="utf-8") as f:
+                data = json.load(f)
+                return data if data is not None else default
+        except Exception:
+            return default
+    return default
+
+def _json_save(path, data):
+    os.makedirs(os.path.dirname(path), exist_ok=True)
+    with open(path, "w", encoding="utf-8") as f:
+        json.dump(data, f, ensure_ascii=False, indent=2)
+
+def save_questions(data):
+    _json_save(os.path.join(RESOURCE_DIR, "questions.json"), data or {"questions": []})
+
+def _now_iso():
+    return datetime.now().replace(microsecond=0).isoformat()
+
+def _norm_text(s):
+    return re.sub(r"\s+", "", str(s or "")).lower()
+
+def _as_list(v):
+    if v is None:
+        return []
+    if isinstance(v, list):
+        return v
+    if isinstance(v, tuple):
+        return list(v)
+    if isinstance(v, str):
+        if "," in v:
+            return [x.strip() for x in v.split(",") if x.strip()]
+        return [v.strip()] if v.strip() else []
+    return [str(v)]
+
+def get_question_map():
+    return get_question_map_clean()
+
+def split_kp_code_name(name):
+    s = str(name or "").strip()
+    m = re.match(r"^(\d+(?:\.\d+)*)(?:[\s_:-]+)?(.*)$", s)
+    if not m:
+        return "", s
+    return m.group(1), (m.group(2) or s).strip()
+
+def chapter_from_knowledge(knowledge_name):
+    code, _ = split_kp_code_name(knowledge_name)
+    ch = code.split(".")[0] if code else ""
+    return ch, ("第{}章".format(ch) if ch else "未分类")
+
+def normalize_question(raw_question):
+    q = dict(raw_question or {})
+    qid = str(q.get("id") or q.get("question_id") or "").strip()
+    title = q.get("title") or q.get("question_text") or q.get("question") or ""
+    qtype = q.get("type") or q.get("question_type") or "single_choice"
+    if qtype in ("choice", "single", "radio"):
+        qtype = "single_choice"
+    elif qtype in ("multi", "multiple"):
+        qtype = "multiple_choice"
+    elif qtype in ("true_false", "boolean"):
+        qtype = "judge"
+    elif qtype in ("fill",):
+        qtype = "blank"
+    options = q.get("options") or []
+    if isinstance(options, dict):
+        options = ["{}. {}".format(k, v) for k, v in options.items()]
+    if qtype == "judge" and not options:
+        options = ["A. 正确", "B. 错误"]
+    answer = q.get("answer") if "answer" in q else q.get("correct_answer")
+    if isinstance(answer, list):
+        answer_norm = ",".join(str(x).strip() for x in answer if str(x).strip())
+    elif isinstance(answer, bool):
+        answer_norm = "A" if answer else "B"
+    else:
+        answer_norm = str(answer or "").strip()
+    kp = q.get("knowledge_name") or q.get("knowledge_point") or q.get("knowledge") or ""
+    kp_code, _ = split_kp_code_name(kp)
+    ch_id = str(q.get("chapter_id") or q.get("chapter") or (kp_code.split(".")[0] if kp_code else "") or "")
+    ch_name = q.get("chapter_name") or ("第{}章".format(ch_id) if ch_id else "未分类")
+    total = int(q.get("total_attempts") or q.get("attempt_count") or 0)
+    correct = int(q.get("correct_attempts") or q.get("correct_count") or 0)
+    wrong = int(q.get("wrong_attempts") or max(0, total - correct))
+    return {
+        **q,
+        "id": qid,
+        "title": title,
+        "question": title,
+        "question_text": title,
+        "type": qtype,
+        "options": options,
+        "answer": answer_norm,
+        "analysis": q.get("analysis") if q.get("analysis") is not None else q.get("explanation", ""),
+        "explanation": q.get("analysis") if q.get("analysis") is not None else q.get("explanation", ""),
+        "difficulty": q.get("difficulty") if q.get("difficulty") in ("easy", "medium", "hard") else "medium",
+        "knowledge_id": q.get("knowledge_id") or kp_code or kp,
+        "knowledge_name": q.get("knowledge_name") or kp,
+        "knowledge_point": kp,
+        "chapter_id": ch_id,
+        "chapter_name": ch_name,
+        "status": q.get("status") or "enabled",
+        "total_attempts": total,
+        "correct_attempts": correct,
+        "wrong_attempts": wrong,
+        "global_correct_rate": round(correct / total, 3) if total else 0,
+    }
+
+def normalize_answer(value, qtype="single_choice"):
+    vals = [str(x).strip().upper() for x in _as_list(value) if str(x).strip()]
+    if qtype == "judge":
+        mapped = []
+        for v in vals:
+            if v in ("TRUE", "T", "对", "正确", "是", "A", "1"):
+                mapped.append("A")
+            elif v in ("FALSE", "F", "错", "错误", "否", "B", "0"):
+                mapped.append("B")
+            else:
+                mapped.append(v)
+        vals = mapped
+    if qtype == "multiple_choice":
+        return ",".join(sorted(set(vals)))
+    return vals[0] if vals else ""
+
+def answer_is_correct(question, answer):
+    q = normalize_question(question)
+    return normalize_answer(answer, q["type"]) == normalize_answer(q.get("answer"), q["type"])
+
+def validate_question_payload(data):
+    data = data or {}
+    title = (data.get("title") or data.get("question_text") or data.get("question") or "").strip()
+    qtype = data.get("type") or "single_choice"
+    if qtype == "choice":
+        qtype = "single_choice"
+    options = data.get("options") or []
+    answer = data.get("answer")
+    difficulty = data.get("difficulty") or "medium"
+    knowledge_name = (data.get("knowledge_name") or data.get("knowledge_point") or "").strip()
+    if not title:
+        return None, "题干不能为空"
+    if qtype not in ("single_choice", "multiple_choice", "judge", "blank"):
+        return None, "题型不合法"
+    if qtype in ("single_choice", "multiple_choice") and len([x for x in options if str(x).strip()]) < 2:
+        return None, "选择题至少需要两个选项"
+    if qtype == "judge":
+        options = ["A. 正确", "B. 错误"]
+    if not normalize_answer(answer, qtype):
+        return None, "正确答案不能为空"
+    if qtype == "single_choice" and "," in normalize_answer(answer, "multiple_choice"):
+        return None, "单选题只能有一个答案"
+    if difficulty not in ("easy", "medium", "hard"):
+        return None, "难度不合法"
+    if not knowledge_name:
+        return None, "必须选择知识点"
+    kp_code, _ = split_kp_code_name(knowledge_name)
+    chapter_id = str(data.get("chapter_id") or (kp_code.split(".")[0] if kp_code else "") or "")
+    payload = {
+        "title": title,
+        "question": title,
+        "question_text": title,
+        "type": qtype,
+        "options": [str(x).strip() for x in options if str(x).strip()],
+        "answer": normalize_answer(answer, qtype),
+        "difficulty": difficulty,
+        "knowledge_id": data.get("knowledge_id") or kp_code or knowledge_name,
+        "knowledge_name": knowledge_name,
+        "knowledge_point": knowledge_name,
+        "chapter_id": chapter_id,
+        "chapter_name": data.get("chapter_name") or ("第{}章".format(chapter_id) if chapter_id else "未分类"),
+        "analysis": data.get("analysis") if data.get("analysis") is not None else data.get("explanation", ""),
+        "explanation": data.get("analysis") if data.get("analysis") is not None else data.get("explanation", ""),
+        "status": data.get("status") or "enabled",
+    }
+    return payload, None
+
+def create_or_update_question(data, question_id=None):
+    questions_data = load_questions()
+    questions = questions_data.setdefault("questions", [])
+    payload, error = validate_question_payload(data)
+    if error:
+        return None, error
+    now = _now_iso()
+    if question_id:
+        for q in questions:
+            if str(q.get("id")) == str(question_id):
+                old_id = q.get("id")
+                q.update(payload)
+                q["id"] = old_id
+                q["updated_at"] = now
+                save_questions(questions_data)
+                sync_question_to_neo4j(q)
+                return normalize_question(q), None
+        return None, "题目不存在"
+    new_id = data.get("id") or next_question_id(questions, payload["knowledge_point"])
+    payload.update({"id": new_id, "created_by": session.get("user_name", "教师"), "created_at": now, "updated_at": now})
+    questions.append(payload)
+    save_questions(questions_data)
+    sync_question_to_neo4j(payload)
+    return normalize_question(payload), None
+
+def sync_question_to_neo4j(question):
+    try:
+        q = normalize_question(question)
+        with driver.session() as neo:
+            neo.run("""
+            MERGE (q:Question {id:$id})
+            SET q.title=$title, q.question_text=$title, q.type=$type, q.options=$options,
+                q.answer=$answer, q.analysis=$analysis, q.difficulty=$difficulty,
+                q.knowledge_id=$kid, q.knowledge_name=$kname, q.chapter_id=$cid,
+                q.chapter_name=$cname, q.status=$status, q.updated_at=datetime()
+            MERGE (k:Knowledge {name:$kname})
+            MERGE (q)-[:TESTS]->(k)
+            MERGE (c:Chapter {id:$cid})
+            SET c.name=$cname
+            MERGE (q)-[:BELONGS_TO]->(c)
+            """, id=q["id"], title=q["title"], type=q["type"], options=json.dumps(q["options"], ensure_ascii=False),
+                 answer=q["answer"], analysis=q["analysis"], difficulty=q["difficulty"], kid=q["knowledge_id"],
+                 kname=q["knowledge_name"], cid=q["chapter_id"], cname=q["chapter_name"], status=q["status"])
+    except Exception:
+        pass
+
+def resource_manifest_items():
+    items = []
+    seen = set()
+    for path in [os.path.join(RESOURCE_DIR, "resource_manifest.json"), os.path.join(RESOURCE_DIR, "teaching_materials", "resource_manifest.json")]:
+        data = _json_load(path, {})
+        for item in data.get("files", []) if isinstance(data, dict) else []:
+            filename = item.get("filename")
+            if filename and filename not in seen:
+                seen.add(filename)
+                items.append(item)
+            elif filename and filename in seen:
+                for i, existing in enumerate(items):
+                    if existing.get("filename") == filename:
+                        for k, v in item.items():
+                            if k not in existing or not existing.get(k):
+                                items[i][k] = v
+                        break
+    return items
+
+def infer_teacher_for_resource(resource):
+    r = resource or {}
+    upload_teacher = r.get("upload_teacher") or {}
+    if upload_teacher.get("id") or upload_teacher.get("name"):
+        return {"teacher_id": upload_teacher.get("id"), "teacher_name": upload_teacher.get("name") or "未标注", "teacher_source": "upload_form"}
+    text = " ".join(str(r.get(k) or "") for k in ("title", "filename", "file_path", "path", "name"))
+    known = set()
+    for t in TEACHERS.values():
+        if t.get("name"):
+            known.add(t.get("name"))
+    for item in resource_manifest_items():
+        if item.get("teacher"):
+            known.add(item.get("teacher"))
+    for name in sorted(known, key=len, reverse=True):
+        if name and name in text:
+            return {"teacher_id": None, "teacher_name": name, "teacher_source": "filename_parse"}
+    m = re.search(r"([\u4e00-\u9fa5]{1,4}老师)", text)
+    if m:
+        return {"teacher_id": None, "teacher_name": m.group(1), "teacher_source": "filename_parse"}
+    return {"teacher_id": None, "teacher_name": "未标注", "teacher_source": "unknown"}
+
+_RESOURCE_STATS_CACHE = None
+
+def resource_stats():
+    global _RESOURCE_STATS_CACHE
+    if _RESOURCE_STATS_CACHE is not None:
+        return _RESOURCE_STATS_CACHE
+    data = _json_load(RESOURCE_STATS_FILE, {})
+    _RESOURCE_STATS_CACHE = data
+    return data
+
+def get_resource_completion_status(student_id, resource_id):
+    return get_completion_map(student_id).get(str(resource_id))
+
+def infer_resource_knowledge(resource_id):
+    info = infer_resource_info(resource_id)
+    code = flow_resource_code(resource_id)
+    for item in resource_manifest_items():
+        if item.get("filename") == resource_id:
+            return item.get("knowledge_point") or code or resource_id
+    for q in load_questions().get("questions", []):
+        nq = normalize_question(q)
+        if code and str(nq.get("knowledge_point", "")).startswith(code):
+            return nq.get("knowledge_point")
+    return code or info.get("name") or resource_id
+
+def get_resource_record(resource_id):
+    base = {"resource_id": resource_id, "id": resource_id, "name": resource_id, "title": os.path.splitext(os.path.basename(resource_id))[0]}
+    for item in resource_manifest_items():
+        if item.get("filename") == resource_id:
+            base.update({"teacher_name": item.get("teacher"), "knowledge_point": item.get("knowledge_point"), "type": item.get("type")})
+            break
+    teacher = infer_teacher_for_resource({"filename": resource_id, "title": base.get("title"), "file_path": base.get("file_path")})
+    base.update({k: v for k, v in teacher.items() if v is not None})
+    base["knowledge_point"] = base.get("knowledge_point") or infer_resource_knowledge(resource_id)
+    return base
+
+def mastery_map_for(student_id):
+    data = {}
+    try:
+        with driver.session() as neo:
+            rows = neo.run("""
+            MATCH (s:Student {id:$sid})-[r:MASTERED]->(k:Knowledge)
+            RETURN k.name AS name, r.mastery AS mastery
+            """, sid=student_id)
+            for row in rows:
+                name = row["name"]
+                if name:
+                    data[name] = float(row["mastery"] or 0)
+                    code = flow_kp_code(name)
+                    if code:
+                        data[code] = float(row["mastery"] or 0)
+    except Exception:
+        pass
+    return data
+
+def _mastery_for(student_id, knowledge_name):
+    try:
+        with driver.session() as neo:
+            row = neo.run("""
+            MATCH (s:Student {id:$sid})-[r:MASTERED]->(k:Knowledge)
+            WHERE k.name=$kp OR k.name STARTS WITH $code
+            RETURN r.mastery AS mastery
+            ORDER BY r.mastery ASC LIMIT 1
+            """, sid=student_id, kp=knowledge_name, code=(flow_kp_code(knowledge_name) or knowledge_name)).single()
+            if row and row["mastery"] is not None:
+                return float(row["mastery"])
+    except Exception:
+        pass
+    return 0.5
+
+def update_mastery_after_question(student_id, knowledge_name, difficulty, correct):
+    old = _mastery_for(student_id, knowledge_name)
+    base = {"easy": 0.04, "medium": 0.06, "hard": 0.08}.get(difficulty, 0.06)
+    new = old + base * (1 - old) if correct else old - base * 0.8 * old
+    new = max(0, min(1, new))
+    try:
+        with driver.session() as neo:
+            neo.run("""
+            MERGE (s:Student {id:$sid})
+            MERGE (k:Knowledge {name:$kp})
+            MERGE (s)-[r:MASTERED]->(k)
+            SET r.mastery=$m, r.status=CASE WHEN $m>=0.8 THEN '已掌握' WHEN $m>=0.6 THEN '良好' WHEN $m>=0.4 THEN '进行中' ELSE '薄弱' END,
+                r.is_weak=$m<0.6, r.is_mastered=$m>=0.8, r.last_practice_time=datetime(),
+                r.total_questions=COALESCE(r.total_questions,0)+1,
+                r.correct_questions=COALESCE(r.correct_questions,0)+CASE WHEN $correct THEN 1 ELSE 0 END
+            """, sid=student_id, kp=knowledge_name, m=new, correct=bool(correct))
+    except Exception:
+        pass
+    return old, new
+
+def recommend_questions_for_knowledge(student_id, knowledge_id=None, limit=5, status=None):
+    history = load_question_history().get(student_id, {})
+    target = str(knowledge_id or "")
+    target_code = normalize_assessable_code(target) or flow_kp_code(target) or target
+    mastery = _mastery_for(student_id, target) if target else 0.5
+    preferred = ["easy", "medium"] if mastery < 0.4 else (["medium", "easy", "hard"] if mastery < 0.7 else ["medium", "hard"])
+    scored = []
+    for raw in load_questions().get("questions", []):
+        q = normalize_question(raw)
+        if q.get("status") == "disabled":
+            continue
+        kp = q.get("knowledge_point") or q.get("knowledge_name") or ""
+        code = flow_kp_code(kp) or kp
+        match = (not target) or code == target_code
+        if not match:
+            continue
+        h = history.get(q["id"], {})
+        done_penalty = 0.2 if h.get("total_attempts") else 0
+        wrong_bonus = 0.3 if h.get("wrong_count", 0) > h.get("correct_count", 0) else 0
+        diff_score = 1 - min(preferred.index(q["difficulty"]) if q["difficulty"] in preferred else 2, 2) * 0.18
+        scored.append((diff_score + wrong_bonus - done_penalty, q))
+    scored.sort(key=lambda x: x[0], reverse=True)
+    return [q for _, q in scored[:int(limit or 5)]]
+
+def generate_exercise_set(student_id, knowledge_id, resource_id, target_count=10, student_type="medium"):
+    sid = normalize_student_id(student_id)
+    kp_code = normalize_assessable_code(knowledge_id) or flow_kp_code(knowledge_id) or knowledge_id
+    target_count = max(8, min(12, int(target_count or 10)))
+    all_questions = load_questions_clean().get("questions", [])
+    history = load_question_history_clean().get(sid, {})
+    def q_code(q):
+        kid = q.get("knowledge_id")
+        code = normalize_assessable_code(kid) or flow_kp_code(kid or "")
+        if code:
+            return code
+        return normalize_assessable_code(q.get("knowledge_point") or q.get("knowledge_name") or "") or flow_kp_code(q.get("knowledge_point") or q.get("knowledge_name") or "")
+    current_questions = [q for q in all_questions if q.get("status") != "disabled" and q_code(q) == kp_code]
+    prereq_kps = [c for c in (normalize_assessable_code(p["code"]) for p in get_prerequisite_knowledge(kp_code)) if c and c != kp_code]
+    related_kps = [c for c in (normalize_assessable_code(r["code"]) for r in get_related_knowledge(kp_code)) if c and c != kp_code and c not in prereq_kps]
+    prereq_questions = [q for q in all_questions if q.get("status") != "disabled" and q_code(q) in prereq_kps]
+    related_questions = [q for q in all_questions if q.get("status") != "disabled" and q_code(q) in related_kps]
+    def question_score(q):
+        qid = str(q.get("id"))
+        h = history.get(qid, {})
+        wrong_cnt = int(h.get("wrong_count", 0) or 0)
+        correct_cnt = int(h.get("correct_count", 0) or 0)
+        wrong_bonus = 0.35 if wrong_cnt > correct_cnt else 0
+        unseen_bonus = 0.15 if not int(h.get("total_attempts", 0)) else 0
+        
+        q_diff = q.get("difficulty", "中等")
+        if student_type == "excellent":
+            diff_bonus = 0.2 if q_diff in ("中等", "困难") else 0
+        elif student_type == "medium":
+            diff_bonus = 0.2 if q_diff in ("基础", "中等") else 0
+        else:
+            diff_bonus = 0.3 if q_diff == "基础" else 0
+        
+        return wrong_bonus + unseen_bonus + diff_bonus
+    current_count = max(int(target_count * 0.70), 7)
+    prereq_count = max(int(target_count * 0.15), 1)
+    related_count = target_count - current_count - prereq_count
+    if related_count < 1:
+        related_count = 1
+        if prereq_count > 1:
+            prereq_count -= 1
+    current_questions.sort(key=question_score, reverse=True)
+    prereq_questions.sort(key=question_score, reverse=True)
+    related_questions.sort(key=question_score, reverse=True)
+    selected = []
+    seen_ids = set()
+    def pick_unique(q_list, n):
+        result = []
+        for q in q_list:
+            if len(result) >= n:
+                break
+            qid = str(q.get("id"))
+            if qid not in seen_ids:
+                seen_ids.add(qid)
+                result.append(q)
+        return result
+    selected.extend(pick_unique(current_questions, current_count))
+    selected.extend(pick_unique(prereq_questions, prereq_count))
+    selected.extend(pick_unique(related_questions, related_count))
+    shortage = target_count - len(selected)
+    if shortage > 0:
+        chapter_prefix = kp_code.split(".")[0] if kp_code else ""
+        same_chapter_qs = [q for q in all_questions
+                           if q.get("status") != "disabled"
+                           and q_code(q).startswith(chapter_prefix + ".")
+                           and str(q.get("id")) not in seen_ids]
+        same_chapter_qs.sort(key=question_score, reverse=True)
+        selected.extend(pick_unique(same_chapter_qs, shortage))
+    while len(selected) < target_count:
+        remaining = [q for q in all_questions
+                     if q.get("status") != "disabled"
+                     and str(q.get("id")) not in seen_ids]
+        if not remaining:
+            break
+        remaining.sort(key=question_score, reverse=True)
+        qid = str(remaining[0].get("id"))
+        seen_ids.add(qid)
+        selected.append(remaining[0])
+    question_ids = [str(q.get("id")) for q in selected]
+    kp_names = {}
+    for item in build_knowledge_catalog():
+        kp_names[item["code"]] = clean_knowledge_name_for_display(item["code"], item["name"])
+    exercise_set_id = "ex_{}_{}_{}".format(sid, _now_iso().replace(":", "").replace("-", "").replace("T", "_")[:17], random.randint(1000, 9999))
+    
+    difficulty_plan = "中等"
+    if student_type == "excellent":
+        difficulty_plan = "中等/困难"
+    elif student_type == "weak":
+        difficulty_plan = "基础"
+    
+    exercise_set = {
+        "exercise_set_id": exercise_set_id,
+        "student_id": sid,
+        "source_resource_id": str(resource_id or ""),
+        "target_knowledge_id": kp_code,
+        "target_knowledge_name": clean_knowledge_name_for_display(kp_code, kp_names.get(kp_code, kp_code)),
+        "prerequisite_knowledge_ids": sorted(set(prereq_kps), key=natural_sort_key),
+        "related_knowledge_ids": sorted(set(related_kps), key=natural_sort_key),
+        "question_ids": question_ids,
+        "total_count": len(question_ids),
+        "created_at": _now_iso(),
+        "status": "in_progress",
+        "current_index": 0,
+        "answers": {},
+        "difficulty_plan": difficulty_plan,
+        "student_type": student_type,
+    }
+    all_sets = _json_load(EXERCISE_SETS_FILE, {})
+    if not isinstance(all_sets, dict):
+        all_sets = {}
+    all_sets[exercise_set_id] = exercise_set
+    _json_save(EXERCISE_SETS_FILE, all_sets)
+    return exercise_set
+
+def mark_resource_completed(student_id, resource_id):
+    completions = _json_load(RESOURCE_COMPLETION_FILE, {})
+    student_items = completions.setdefault(str(student_id), {})
+    old = student_items.get(str(resource_id))
+    resource = get_resource_record(resource_id)
+    kp = resource.get("knowledge_point") or infer_resource_knowledge(resource_id)
+    before = _mastery_for(student_id, kp)
+    repeated = bool(old)
+    after = before
+    if not repeated:
+        after = min(1, before + (0.02 if before < 0.8 else 0.01))
+        try:
+            with driver.session() as neo:
+                neo.run("""
+                MERGE (s:Student {id:$sid})
+                MERGE (res:Resource {name:$rid})
+                SET res.id=COALESCE(res.id,$rid), res.title=COALESCE(res.title,$title),
+                    res.use_count=COALESCE(res.use_count,0)+1,
+                    res.complete_count=COALESCE(res.complete_count,0)+1,
+                    res.completion_rate=toFloat(COALESCE(res.complete_count,0))/toFloat(CASE WHEN COALESCE(res.use_count,0)=0 THEN 1 ELSE res.use_count END),
+                    res.teacher_name=$teacher, res.knowledge_name=$kp
+                MERGE (k:Knowledge {name:$kp})
+                MERGE (res)-[:TEACHES]->(k)
+                MERGE (s)-[cr:COMPLETED_RESOURCE]->(res)
+                SET cr.completed_at=datetime(), cr.source='manual_complete', cr.mastery_before=$before, cr.mastery_after=$after
+                MERGE (s)-[m:MASTERED]->(k)
+                SET m.mastery=$after, m.last_learn_time=datetime()
+                MERGE (b:LearningBehavior {id:$bid})
+                SET b.type='resource_complete', b.resource_id=$rid, b.knowledge_id=$kp, b.time=datetime()
+                MERGE (s)-[:HAS_BEHAVIOR]->(b)
+                """, sid=student_id, rid=resource_id, title=resource.get("title") or resource_id,
+                     teacher=resource.get("teacher_name") or "未标注", kp=kp, before=before, after=after,
+                     bid="beh_{}_{}_{}".format(student_id, re.sub(r"\W+", "_", resource_id), int(datetime.now().timestamp())))
+        except Exception:
+            pass
+    student_items[str(resource_id)] = {
+        "completed": True,
+        "completed_at": old.get("completed_at") if old else _now_iso(),
+        "updated_at": _now_iso(),
+        "knowledge_id": kp,
+        "mastery_before": old.get("mastery_before") if old else before,
+        "mastery_after": after,
+        "teacher_name": resource.get("teacher_name") or "未标注",
+    }
+    _json_save(RESOURCE_COMPLETION_FILE, completions)
+    stats = resource_stats()
+    st = stats.setdefault(str(resource_id), {"use_count": 0, "complete_count": 0, "post_practice_count": 0, "post_practice_correct_count": 0, "avg_score_gain": 0, "avg_mastery_gain": 0})
+    if not repeated:
+        st["use_count"] = int(st.get("use_count", 0)) + 1
+        st["complete_count"] = int(st.get("complete_count", 0)) + 1
+    st["completion_rate"] = st.get("complete_count", 0) / max(1, st.get("use_count", 0))
+    stats[str(resource_id)] = st
+    _json_save(RESOURCE_STATS_FILE, stats)
+    questions = recommend_questions_for_knowledge(student_id, kp, 5)
+    return {"completed": True, "repeated": repeated, "knowledge_id": kp, "mastery_after": after, "recommend_questions": questions}
+
+def record_resource_effect_after_question(student_id, question, correct, before_mastery, after_mastery, resource_id=None):
+    resource_id = resource_id or session.get("last_completed_resource")
+    if not resource_id:
+        return
+    resource = get_resource_record(resource_id)
+    kp = normalize_question(question).get("knowledge_point")
+    if flow_kp_code(resource.get("knowledge_point")) and flow_kp_code(kp) and flow_kp_code(resource.get("knowledge_point")) != flow_kp_code(kp):
+        return
+    events = _json_load(RESOURCE_EFFECT_FILE, [])
+    event = {
+        "student_id": student_id,
+        "resource_id": resource_id,
+        "teacher_id": resource.get("teacher_id"),
+        "teacher_name": resource.get("teacher_name") or "未标注",
+        "knowledge_id": kp,
+        "before_accuracy": None,
+        "after_accuracy": 1 if correct else 0,
+        "score_gain": 1 if correct else 0,
+        "before_mastery": before_mastery,
+        "after_mastery": after_mastery,
+        "mastery_gain": after_mastery - before_mastery,
+        "time_window": "after_resource",
+        "created_at": _now_iso(),
+    }
+    events.append(event)
+    _json_save(RESOURCE_EFFECT_FILE, events)
+    recalculate_resource_quality(resource_id)
+
+def recalculate_resource_quality(resource_id):
+    events = [e for e in _json_load(RESOURCE_EFFECT_FILE, []) if str(e.get("resource_id")) == str(resource_id)]
+    stats = resource_stats()
+    st = stats.setdefault(str(resource_id), {})
+    if events:
+        st["avg_score_gain"] = sum(float(e.get("score_gain") or 0) for e in events) / len(events)
+        st["avg_mastery_gain"] = sum(float(e.get("mastery_gain") or 0) for e in events) / len(events)
+        st["post_practice_count"] = len(events)
+        st["post_practice_correct_rate"] = sum(1 for e in events if float(e.get("after_accuracy") or 0) > 0) / len(events)
+    completion_rate = float(st.get("completion_rate") or 0)
+    effectiveness = 0.45 * min(1, max(0, float(st.get("avg_score_gain") or 0))) + 0.35 * min(1, max(0, float(st.get("avg_mastery_gain") or 0) * 10)) + 0.10 * completion_rate + 0.10 * float(st.get("post_practice_correct_rate") or 0)
+    st["effectiveness_score"] = round(effectiveness, 3)
+    st["recommend_score"] = round(0.60 * effectiveness + 0.20 * min(1, float(st.get("use_count") or 0) / 20) + 0.20 * completion_rate, 3)
+    stats[str(resource_id)] = st
+    _json_save(RESOURCE_STATS_FILE, stats)
+    return st
+
+def apply_forgetting_curve(student_id):
+    today = datetime.now().strftime("%Y-%m-%d")
+    try:
+        with driver.session() as neo:
+            neo.run("""
+            MATCH (s:Student {id:$sid})-[r:MASTERED]->(k:Knowledge)
+            WHERE COALESCE(r.mastery,0)<0.85 AND r.last_decay_date<>$today
+            WITH r, duration.inDays(COALESCE(r.last_practice_time,r.last_learn_time,datetime()) , datetime()).days AS days
+            WITH r, CASE WHEN days < 0 THEN 0 ELSE days END AS days
+            WITH r, days, (3 + 2*COALESCE(r.review_count,0) + 5*COALESCE(r.mastery,0)) AS s
+            SET r.mastery = CASE WHEN days=0 THEN r.mastery ELSE COALESCE(r.mastery,0) * exp(-toFloat(days)/s) + COALESCE(r.mastery,0)*0.15 END,
+                r.last_decay_date=$today
+            """, sid=student_id, today=today)
+    except Exception:
+        pass
+
+def content_score(resource, knowledge_name):
+    text = _norm_text(" ".join(str(resource.get(k) or "") for k in ("title", "name", "filename", "description", "tags", "knowledge_point", "chapter_label")))
+    kp = _norm_text(knowledge_name)
+    code = flow_kp_code(knowledge_name)
+    if kp and kp in text:
+        return 1.0
+    if code and code in text:
+        return 0.8
+    return 0.35 if text else 0
+
+def graph_score(resource_kp, target_kp):
+    if not target_kp:
+        return 0.5
+    rc, tc = flow_kp_code(resource_kp), flow_kp_code(target_kp)
+    if rc and tc and rc == tc:
+        return 1.0
+    if rc and tc and (rc.startswith(tc + ".") or tc.startswith(rc + ".")):
+        return 0.75
+    if rc and tc and rc.split(".")[:1] == tc.split(".")[:1]:
+        return 0.45
+    return 0.25
+
+def teacher_adapt_score(student_id, resource_id):
+    res = get_resource_record(resource_id)
+    teacher = res.get("teacher_name") or "未标注"
+    events = [e for e in _json_load(RESOURCE_EFFECT_FILE, []) if e.get("student_id") == student_id and (e.get("teacher_name") or "未标注") == teacher]
+    if not events:
+        events = [e for e in _json_load(RESOURCE_EFFECT_FILE, []) if (e.get("teacher_name") or "未标注") == teacher]
+    if not events:
+        return 0.5
+    return max(0, min(1, 0.5 + sum(float(e.get("mastery_gain") or 0) for e in events) / len(events) * 4 + sum(float(e.get("after_accuracy") or 0) for e in events) / len(events) * 0.25))
+
+
+# ==============================================================================
+# 基于知识图谱约束的协同过滤推荐算法 (HKGCF-like Recommendation Algorithm)
+# ==============================================================================
+#
+# 【算法来源说明】
+# 本系统不是提出全新算法，而是借鉴知识图谱推荐和协同过滤算法思想做工程实现。
+#
+# 1. 协同过滤（Collaborative Filtering, CF）
+#    - 经典推荐算法，核心是根据相似用户历史行为预测当前用户可能需要的项目
+#    - 本系统中：用户=学生，项目=学习资源/题目
+#    - 优点：能发现用户潜在兴趣，推荐个性化
+#    - 缺点：数据稀疏时效果差，冷启动问题
+#
+# 2. 知识图谱推荐（Knowledge Graph-based Recommendation）
+#    - 利用实体和关系作为辅助信息，可缓解数据稀疏和冷启动
+#    - 本系统中实体：课程、章节、知识点、资源、题目
+#    - 本系统中关系：包含、先修、相关、讲解、考查
+#    - 优点：可提供推荐解释，利用领域知识
+#
+# 3. HKGCF（Hybrid Knowledge Graph Collaborative Filtering）
+#    - 核心思想："知识图谱 + 协同过滤"
+#    - 本系统不复现复杂深度训练，只做轻量化实现
+#    - 知识图谱负责候选资源生成和路径解释
+#    - 协同过滤负责候选资源排序
+#
+# 【算法流程】
+# 第一阶段：知识图谱约束 - 候选生成
+#   Step 1: 识别学生薄弱知识点（掌握度 < 阈值）
+#   Step 2: 通过知识图谱关系（先修、相关）扩展候选知识点
+#   Step 3: 获取与候选知识点关联的资源作为候选集
+#
+# 第二阶段：协同过滤 - 候选排序
+#   Step 4: 计算用户相似度（基于掌握度分布向量）
+#   Step 5: 计算项目相似度（基于知识点关联、资源特征）
+#   Step 6: 综合评分 = CF预测分 × KG约束分
+#
+# 第三阶段：推荐解释生成
+#   Step 7: 基于知识图谱路径生成解释
+#   Step 8: 基于相似用户行为生成解释
+# ==============================================================================
+
+
+def _get_all_students_mastery_vectors():
+    """
+    获取所有学生的掌握度向量，用于协同过滤的用户相似度计算
+    返回: {student_id: {knowledge_code: mastery_score}}
+    """
+    vectors = {}
+    try:
+        with driver.session() as neo:
+            rows = neo.run("""
+                MATCH (s:Student)-[r:MASTERED]->(k:Knowledge)
+                WHERE k.name =~ '^\\d+\\.\\d+.*'
+                RETURN s.id AS sid, k.name AS kp, r.mastery AS mastery
+            """)
+            for row in rows:
+                sid = row["sid"]
+                kp = row["kp"]
+                mastery = float(row["mastery"] or 0)
+                if sid not in vectors:
+                    vectors[sid] = {}
+                code = flow_kp_code(kp) or kp
+                vectors[sid][code] = mastery
+    except Exception:
+        pass
+    for sid in STUDENTS:
+        if sid not in vectors:
+            vectors[sid] = {}
+    return vectors
+
+
+def _cosine_similarity(vec1, vec2):
+    """
+    计算两个向量的余弦相似度
+    """
+    if not vec1 or not vec2:
+        return 0.0
+    common_keys = set(vec1.keys()) & set(vec2.keys())
+    if not common_keys:
+        return 0.0
+    dot = sum(vec1[k] * vec2[k] for k in common_keys)
+    norm1 = sum(v ** 2 for v in vec1.values()) ** 0.5
+    norm2 = sum(v ** 2 for v in vec2.values()) ** 0.5
+    if norm1 == 0 or norm2 == 0:
+        return 0.0
+    return dot / (norm1 * norm2)
+
+
+def _find_similar_students(target_sid, mastery_vectors, top_k=5):
+    """
+    找到与目标学生最相似的学生
+    返回: [(similar_sid, similarity_score), ...]
+    """
+    target_vec = mastery_vectors.get(target_sid, {})
+    if not target_vec:
+        return []
+    similarities = []
+    for sid, vec in mastery_vectors.items():
+        if sid == target_sid:
+            continue
+        sim = _cosine_similarity(target_vec, vec)
+        if sim > 0:
+            similarities.append((sid, sim))
+    similarities.sort(key=lambda x: x[1], reverse=True)
+    return similarities[:top_k]
+
+
+# ==============================================================================
+# 基于用户的协同过滤排序模块 (User-Based Collaborative Filtering Ranking Module)
+# ==============================================================================
+#
+# 【学生相似度公式】
+# sim(u,v) = (X_u · X_v) / (||X_u|| ||X_v||)
+# 其中 X_u 是学生画像向量，包含知识点掌握度、资源完成、题目正确率、错题分布和资源类型偏好。
+#
+# 【资源学习效果】
+# y(v,r) = 0.4 * complete + 0.3 * score_gain + 0.3 * mastery_gain
+# - complete: 是否完成资源
+# - score_gain: 完成资源后正确率提升
+# - mastery_gain: 完成资源后掌握度提升
+#
+# 【协同过滤预测分】
+# score_cf(u,r) = sum(sim(u,v) * y(v,r)) / sum(|sim(u,v)|)
+#
+# 【最终推荐】
+# Rec(u) = TopN(score_cf(u,r)), r 属于知识图谱候选资源集合 C_u
+# ==============================================================================
+
+
+def calculate_student_similarity(student_id, other_student_id):
+    """
+    计算两个学生的相似度
+    
+    sim(u,v) = (X_u · X_v) / (||X_u|| ||X_v||)
+    
+    使用学生画像向量计算，包含：
+    - 知识点掌握度向量 M_u
+    - 资源完成向量 R_u
+    - 题目正确率向量 P_u
+    - 错题分布向量 W_u
+    - 资源类型偏好向量 B_u
+    
+    参数:
+        student_id: 学生ID
+        other_student_id: 另一个学生ID
+    
+    返回:
+        float: 相似度 [0, 1]
+    """
+    sid1 = normalize_student_id(student_id)
+    sid2 = normalize_student_id(other_student_id)
+    
+    if sid1 == sid2:
+        return 1.0
+    
+    profile1 = build_student_profile_vector(sid1)
+    profile2 = build_student_profile_vector(sid2)
+    
+    M1 = profile1.get("M_u", {})
+    M2 = profile2.get("M_u", {})
+    
+    R1 = profile1.get("R_u", {})
+    R2 = profile2.get("R_u", {})
+    
+    P1 = profile1.get("P_u", {})
+    P2 = profile2.get("P_u", {})
+    
+    W1 = profile1.get("W_u", {})
+    W2 = profile2.get("W_u", {})
+    
+    B1 = profile1.get("B_u", {})
+    B2 = profile2.get("B_u", {})
+    
+    vec1 = {}
+    vec2 = {}
+    
+    for k, v in M1.items():
+        vec1["M_" + k] = v
+    for k, v in M2.items():
+        vec2["M_" + k] = v
+    
+    for k, v in R1.items():
+        vec1["R_" + str(k)] = v
+    for k, v in R2.items():
+        vec2["R_" + str(k)] = v
+    
+    for k, v in P1.items():
+        vec1["P_" + k] = v
+    for k, v in P2.items():
+        vec2["P_" + k] = v
+    
+    for k, v in W1.items():
+        vec1["W_" + k] = min(1.0, v / 10.0)
+    for k, v in W2.items():
+        vec2["W_" + k] = min(1.0, v / 10.0)
+    
+    for k, v in B1.items():
+        vec1["B_" + k] = v
+    for k, v in B2.items():
+        vec2["B_" + k] = v
+    
+    return _cosine_similarity(vec1, vec2)
+
+
+def get_similar_students(student_id, top_k=5):
+    """
+    获取与目标学生最相似的Top-K学生
+    
+    N_K(u) = TopK(sim(u,v))
+    
+    参数:
+        student_id: 学生ID
+        top_k: 返回数量
+    
+    返回:
+        list: [(student_id, similarity_score), ...]
+    """
+    sid = normalize_student_id(student_id)
+    
+    similarities = []
+    for other_sid in STUDENTS:
+        if other_sid == sid:
+            continue
+        sim = calculate_student_similarity(sid, other_sid)
+        if sim > 0:
+            similarities.append((other_sid, round(sim, 4)))
+    
+    similarities.sort(key=lambda x: x[1], reverse=True)
+    return similarities[:top_k]
+
+
+def calculate_resource_effect(student_id, resource_id):
+    """
+    计算学生对资源的学习效果
+    
+    y(v,r) = 0.4 * complete + 0.3 * score_gain + 0.3 * mastery_gain
+    
+    参数:
+        student_id: 学生ID
+        resource_id: 资源ID
+    
+    返回:
+        dict: {
+            "effect": float,        # 综合效果分
+            "completed": bool,      # 是否完成
+            "score_gain": float,    # 正确率提升
+            "mastery_gain": float,  # 掌握度提升
+        }
+    """
+    sid = normalize_student_id(student_id)
+    rid = str(resource_id)
+    
+    completions = _json_load(RESOURCE_COMPLETION_FILE, {}).get(sid, {})
+    effects = _json_load(RESOURCE_EFFECT_FILE, [])
+    
+    completed = bool(completions.get(rid, {}).get("completed", False))
+    
+    score_gain = 0.0
+    mastery_gain = 0.0
+    
+    for e in effects:
+        if str(e.get("student_id")) == sid and str(e.get("resource_id")) == rid:
+            score_gain = float(e.get("score_gain") or e.get("accuracy_gain") or 0)
+            mastery_gain = float(e.get("mastery_gain") or 0)
+            break
+    
+    if completed and score_gain == 0 and mastery_gain == 0:
+        score_gain = 0.1
+        mastery_gain = 0.1
+    
+    effect = 0.4 * (1.0 if completed else 0.0) + 0.3 * score_gain + 0.3 * mastery_gain
+    
+    return {
+        "effect": round(effect, 4),
+        "completed": completed,
+        "score_gain": round(score_gain, 4),
+        "mastery_gain": round(mastery_gain, 4),
+    }
+
+
+def rank_resources_by_cf(student_id, candidate_resources, similar_students=None, top_n=10):
+    """
+    基于协同过滤对候选资源进行排序
+    
+    score_cf(u,r) = sum(sim(u,v) * y(v,r)) / sum(|sim(u,v)|)
+    
+    Rec(u) = TopN(score_cf(u,r)), r 属于 C_u
+    
+    参数:
+        student_id: 学生ID
+        candidate_resources: 候选资源列表
+        similar_students: 相似学生列表（可选，如果不提供则自动计算）
+        top_n: 返回数量
+    
+    返回:
+        list: 排序后的资源列表，每个资源包含cf_score字段
+    """
+    sid = normalize_student_id(student_id)
+    
+    if not candidate_resources:
+        return []
+    
+    if similar_students is None:
+        similar_students = get_similar_students(sid, top_k=5)
+    
+    if not similar_students:
+        completions = _json_load(RESOURCE_COMPLETION_FILE, {}).get(sid, {})
+        stats = resource_stats()
+        
+        for res in candidate_resources:
+            rid = res.get("resource_id")
+            kp_mastery = res.get("mastery", 0.5)
+            rq = stats.get(str(rid), {})
+            quality = float(rq.get("recommend_score") or rq.get("effectiveness_score") or 0.4)
+            
+            cf_score = (1.0 - kp_mastery) * 0.6 + quality * 0.4
+            res["cf_score"] = round(cf_score, 4)
+            res["cf_method"] = "资源质量兜底"
+        
+        candidate_resources.sort(key=lambda x: x.get("cf_score", 0), reverse=True)
+        return candidate_resources[:top_n]
+    
+    similar_sids = [s[0] for s in similar_students]
+    total_sim = sum(abs(sim) for _, sim in similar_students)
+    
+    if total_sim == 0:
+        total_sim = 1.0
+    
+    completions = _json_load(RESOURCE_COMPLETION_FILE, {})
+    effects = _json_load(RESOURCE_EFFECT_FILE, [])
+    
+    resource_effects = {}
+    for other_sid in similar_sids:
+        other_completions = completions.get(other_sid, {})
+        for e in effects:
+            if str(e.get("student_id")) == other_sid:
+                rid = str(e.get("resource_id"))
+                if rid not in resource_effects:
+                    resource_effects[rid] = []
+                resource_effects[rid].append({
+                    "student_id": other_sid,
+                    "completed": bool(other_completions.get(rid, {}).get("completed", False)),
+                    "score_gain": float(e.get("score_gain") or e.get("accuracy_gain") or 0),
+                    "mastery_gain": float(e.get("mastery_gain") or 0),
+                })
+    
+    sim_map = {s[0]: s[1] for s in similar_students}
+    
+    for res in candidate_resources:
+        rid = str(res.get("resource_id"))
+        
+        weighted_effect = 0.0
+        
+        if rid in resource_effects:
+            for eff in resource_effects[rid]:
+                other_sid = eff["student_id"]
+                sim = sim_map.get(other_sid, 0)
+                
+                complete = 1.0 if eff["completed"] else 0.0
+                score_gain = eff["score_gain"]
+                mastery_gain = eff["mastery_gain"]
+                
+                y = 0.4 * complete + 0.3 * score_gain + 0.3 * mastery_gain
+                
+                weighted_effect += sim * y
+        
+        cf_score = weighted_effect / total_sim
+        
+        if cf_score == 0:
+            kp_mastery = res.get("mastery", 0.5)
+            stats = resource_stats()
+            rq = stats.get(rid, {})
+            quality = float(rq.get("recommend_score") or rq.get("effectiveness_score") or 0.4)
+            
+            cf_score = (1.0 - kp_mastery) * 0.5 + quality * 0.5
+            res["cf_method"] = "薄弱知识点匹配兜底"
+        else:
+            res["cf_method"] = "协同过滤"
+        
+        res["cf_score"] = round(cf_score, 4)
+    
+    candidate_resources.sort(key=lambda x: x.get("cf_score", 0), reverse=True)
+    
+    return candidate_resources[:top_n]
+
+
+def _get_resources_completed_by_students(student_ids):
+    """
+    获取相似学生完成的资源及其效果
+    返回: {resource_id: {"count": int, "avg_effect": float}}
+    """
+    if not student_ids:
+        return {}
+    completions = _json_load(RESOURCE_COMPLETION_FILE, {})
+    effects = _json_load(RESOURCE_EFFECT_FILE, [])
+    resource_stats = {}
+    for sid in student_ids:
+        student_items = completions.get(str(sid), {})
+        for rid, item in student_items.items():
+            if item.get("completed"):
+                if rid not in resource_stats:
+                    resource_stats[rid] = {"count": 0, "total_mastery_gain": 0, "effect_count": 0}
+                resource_stats[rid]["count"] += 1
+    for e in effects:
+        sid = e.get("student_id")
+        if sid in student_ids:
+            rid = e.get("resource_id")
+            if rid and rid in resource_stats:
+                gain = float(e.get("mastery_gain") or 0)
+                resource_stats[rid]["total_mastery_gain"] += gain
+                resource_stats[rid]["effect_count"] += 1
+    result = {}
+    for rid, stats in resource_stats.items():
+        avg_effect = 0
+        if stats["effect_count"] > 0:
+            avg_effect = stats["total_mastery_gain"] / stats["effect_count"]
+        result[rid] = {"count": stats["count"], "avg_effect": avg_effect}
+    return result
+
+
+# ==============================================================================
+# 知识图谱候选资源生成模块 (Knowledge Graph Candidate Generation Module)
+# ==============================================================================
+#
+# 【候选资源生成规则】
+# 1. 找出学生掌握度低于 60% 的薄弱知识点：K_weak(u) = {k | M(u,k) < 0.60}
+# 2. 找出这些薄弱知识点的先修知识点
+# 3. 找出这些薄弱知识点的相关知识点
+# 4. 找到这些知识点关联的视频、PPT、文档和题目
+# 5. 得到候选资源集合 C_u
+#
+# 【优先级规则】
+# 如果目标知识点 k 的先修知识点 p 满足 M(u,p) < 0.60，
+# 则系统应优先推荐 p 对应资源，而不是直接推荐 k 的后续资源。
+#
+# 【数据来源】
+# Neo4j 优先；如果项目中当前用 JSON 或本地数据维护知识点关系，也要兼容。
+# ==============================================================================
+
+
+def get_weak_knowledge(student_id, threshold=0.60):
+    """
+    获取学生的薄弱知识点集合
+    
+    K_weak(u) = {k | M(u,k) < threshold}
+    
+    参数:
+        student_id: 学生ID
+        threshold: 掌握度阈值，默认 0.60
+    
+    返回:
+        list: [{"code": str, "name": str, "mastery": float, "status": str}, ...]
+    """
+    sid = normalize_student_id(student_id)
+    score_map, detail_map, name_map, _ = calculate_mastery_tree(sid)
+    
+    weak_kps = []
+    for code, mastery in score_map.items():
+        if code.count(".") >= 2 and mastery < threshold:
+            weak_kps.append({
+                "code": code,
+                "name": name_map.get(code, code),
+                "mastery": round(mastery, 3),
+                "status": get_mastery_status(mastery),
+            })
+    
+    weak_kps.sort(key=lambda x: (x["mastery"], natural_sort_key(x["code"])))
+    return weak_kps
+
+
+def get_prerequisite_knowledge(knowledge_id, use_neo4j=True):
+    """
+    获取知识点的先修知识点
+    
+    参数:
+        knowledge_id: 知识点ID
+        use_neo4j: 是否使用Neo4j查询
+    
+    返回:
+        list: [{"code": str, "name": str, "relation": str}, ...]
+    """
+    kp_code = flow_kp_code(knowledge_id) or knowledge_id
+    prerequisites = []
+    
+    if use_neo4j and not neo4j_temporarily_offline():
+        try:
+            with driver.session() as neo:
+                rows = neo.run("""
+                    MATCH (target:Knowledge)
+                    WHERE target.name = $kp OR target.name STARTS WITH $code
+                    MATCH (pre:Knowledge)-[r:先修]->(target)
+                    WHERE pre.name =~ '^\\d+\\.\\d+.*'
+                    RETURN DISTINCT pre.name AS prereq_name
+                    ORDER BY pre.name
+                """, kp=knowledge_id, code=kp_code)
+                
+                for row in rows:
+                    prereq_name = row["prereq_name"]
+                    prereq_code = flow_kp_code(prereq_name) or prereq_name
+                    prerequisites.append({
+                        "code": prereq_code,
+                        "name": prereq_name,
+                        "relation": "先修",
+                    })
+        except Exception:
+            pass
+    
+    if not prerequisites:
+        catalog_names, children = build_parent_maps()
+        for code, child_set in children.items():
+            if kp_code in child_set:
+                if code != kp_code and code.count(".") >= 2:
+                    prerequisites.append({
+                        "code": code,
+                        "name": catalog_names.get(code, code),
+                        "relation": "包含(父节点)",
+                    })
+    
+    return prerequisites
+
+
+def get_related_knowledge(knowledge_id, use_neo4j=True):
+    """
+    获取知识点的相关知识点
+    
+    参数:
+        knowledge_id: 知识点ID
+        use_neo4j: 是否使用Neo4j查询
+    
+    返回:
+        list: [{"code": str, "name": str, "relation": str}, ...]
+    """
+    kp_code = flow_kp_code(knowledge_id) or knowledge_id
+    related = []
+    
+    if use_neo4j and not neo4j_temporarily_offline():
+        try:
+            with driver.session() as neo:
+                rows = neo.run("""
+                    MATCH (k1:Knowledge)
+                    WHERE k1.name = $kp OR k1.name STARTS WITH $code
+                    MATCH (k1)-[r:相关]-(k2:Knowledge)
+                    WHERE k2.name =~ '^\\d+\\.\\d+.*'
+                    RETURN DISTINCT k2.name AS related_name
+                    ORDER BY k2.name
+                """, kp=knowledge_id, code=kp_code)
+                
+                for row in rows:
+                    related_name = row["related_name"]
+                    related_code = flow_kp_code(related_name) or related_name
+                    related.append({
+                        "code": related_code,
+                        "name": related_name,
+                        "relation": "相关",
+                    })
+        except Exception:
+            pass
+    
+    if not related:
+        parts = kp_code.split(".")
+        if len(parts) >= 2:
+            chapter_prefix = parts[0] + "."
+            catalog_names, _ = build_parent_maps()
+            for code in catalog_names.keys():
+                if code.startswith(chapter_prefix) and code != kp_code and code.count(".") >= 2:
+                    related.append({
+                        "code": code,
+                        "name": catalog_names.get(code, code),
+                        "relation": "同章节",
+                    })
+    
+    return related[:10]
+
+
+def generate_candidate_resources(student_id, target_knowledge_id=None, max_candidates=30):
+    """
+    生成候选资源集合
+    
+    候选资源生成规则：
+    1. 找出学生掌握度低于 60% 的薄弱知识点
+    2. 找出这些薄弱知识点的先修知识点
+    3. 找出这些薄弱知识点的相关知识点
+    4. 找到这些知识点关联的视频、PPT、文档和题目
+    5. 得到候选资源集合 C_u
+    
+    参数:
+        student_id: 学生ID
+        target_knowledge_id: 目标知识点（可选）
+        max_candidates: 最大候选资源数量
+    
+    返回:
+        list: [{
+            "resource_id": str,
+            "title": str,
+            "type": str,
+            "knowledge_id": str,
+            "knowledge_name": str,
+            "teacher_name": str,
+            "candidate_reason": str,
+            "priority": float,
+        }, ...]
+    """
+    sid = normalize_student_id(student_id)
+    score_map, detail_map, name_map, _ = calculate_mastery_tree(sid)
+    
+    weak_kps = get_weak_knowledge(sid, threshold=0.60)
+    
+    candidate_kps = {}
+    
+    for weak_kp in weak_kps:
+        code = weak_kp["code"]
+        mastery = weak_kp["mastery"]
+        if code not in candidate_kps:
+            candidate_kps[code] = {
+                "code": code,
+                "name": weak_kp["name"],
+                "mastery": mastery,
+                "reason": "薄弱知识点",
+                "priority": 1.0 - mastery,
+            }
+    
+    for weak_kp in weak_kps[:10]:
+        code = weak_kp["code"]
+        prereqs = get_prerequisite_knowledge(code)
+        for prereq in prereqs:
+            prereq_code = prereq["code"]
+            if prereq_code not in candidate_kps:
+                prereq_mastery = score_map.get(prereq_code, 0.5)
+                candidate_kps[prereq_code] = {
+                    "code": prereq_code,
+                    "name": prereq["name"],
+                    "mastery": prereq_mastery,
+                    "reason": "先修知识点",
+                    "priority": 1.2 - prereq_mastery,
+                }
+            else:
+                prereq_mastery = score_map.get(prereq_code, 0.5)
+                if prereq_mastery < 0.60:
+                    candidate_kps[prereq_code]["priority"] = max(
+                        candidate_kps[prereq_code]["priority"],
+                        1.5 - prereq_mastery
+                    )
+                    candidate_kps[prereq_code]["reason"] = "薄弱先修知识点(优先)"
+    
+    for weak_kp in weak_kps[:10]:
+        code = weak_kp["code"]
+        related_kps = get_related_knowledge(code)
+        for related_kp in related_kps:
+            related_code = related_kp["code"]
+            if related_code not in candidate_kps:
+                related_mastery = score_map.get(related_code, 0.5)
+                candidate_kps[related_code] = {
+                    "code": related_code,
+                    "name": related_kp["name"],
+                    "mastery": related_mastery,
+                    "reason": "相关知识点",
+                    "priority": 0.8 - related_mastery * 0.5,
+                }
+    
+    if target_knowledge_id:
+        target_code = flow_kp_code(target_knowledge_id) or target_knowledge_id
+        if target_code not in candidate_kps:
+            target_mastery = score_map.get(target_code, 0.5)
+            candidate_kps[target_code] = {
+                "code": target_code,
+                "name": name_map.get(target_code, target_knowledge_id),
+                "mastery": target_mastery,
+                "reason": "目标知识点",
+                "priority": 1.0,
+            }
+        
+        target_prereqs = get_prerequisite_knowledge(target_code)
+        for prereq in target_prereqs:
+            prereq_code = prereq["code"]
+            prereq_mastery = score_map.get(prereq_code, 0.5)
+            if prereq_mastery < 0.60:
+                if prereq_code not in candidate_kps:
+                    candidate_kps[prereq_code] = {
+                        "code": prereq_code,
+                        "name": prereq["name"],
+                        "mastery": prereq_mastery,
+                        "reason": "目标先修知识点(薄弱)",
+                        "priority": 1.8 - prereq_mastery,
+                    }
+                else:
+                    candidate_kps[prereq_code]["priority"] = max(
+                        candidate_kps[prereq_code]["priority"],
+                        1.8 - prereq_mastery
+                    )
+                    candidate_kps[prereq_code]["reason"] = "目标先修知识点(薄弱)"
+    
+    sorted_kps = sorted(candidate_kps.values(), key=lambda x: x["priority"], reverse=True)
+    
+    all_resources = all_resource_records()
+    manifest = {item.get("filename"): item for item in resource_manifest_items()}
+    
+    candidate_resources = {}
+    
+    for kp_info in sorted_kps:
+        kp_code = kp_info["code"]
+        kp_name = kp_info["name"]
+        kp_reason = kp_info["reason"]
+        kp_priority = kp_info["priority"]
+        kp_mastery = kp_info["mastery"]
+        
+        for res in all_resources:
+            rid = res.get("resource_id")
+            if not rid:
+                continue
+            
+            res_kp = res.get("knowledge_point") or manifest.get(rid, {}).get("knowledge_point")
+            res_kp_code = flow_kp_code(res_kp) or res_kp
+            
+            if res_kp_code == kp_code or res_kp_code.startswith(kp_code + ".") or kp_code.startswith(res_kp_code + "."):
+                if rid not in candidate_resources:
+                    teacher_name = res.get("teacher_name") or manifest.get(rid, {}).get("teacher") or "未标注"
+                    candidate_resources[rid] = {
+                        "resource_id": rid,
+                        "title": res.get("title") or res.get("name") or rid,
+                        "type": res.get("type") or "资源",
+                        "knowledge_id": kp_code,
+                        "knowledge_name": kp_name,
+                        "teacher_name": teacher_name,
+                        "candidate_reason": kp_reason,
+                        "priority": round(kp_priority, 3),
+                        "mastery": round(kp_mastery, 3),
+                    }
+    
+    result = list(candidate_resources.values())
+    result.sort(key=lambda x: x["priority"], reverse=True)
+    
+    return result[:max_candidates]
+
+
+def _get_kg_candidate_knowledge_points(student_id, target_kp=None, weak_threshold=0.6):
+    """
+    知识图谱约束：获取候选知识点
+    基于薄弱知识点 + 图谱关系扩展
+    返回: [(kp_code, priority_score, reason), ...]
+    """
+    mastery_map = mastery_map_for(student_id)
+    candidates = {}
+    weak_kps = []
+    for kp, mastery in mastery_map.items():
+        code = flow_kp_code(kp) or kp
+        if code.count(".") >= 2 and mastery < weak_threshold:
+            weak_kps.append((code, mastery))
+    weak_kps.sort(key=lambda x: x[1])
+    for code, mastery in weak_kps:
+        if code not in candidates:
+            candidates[code] = {
+                "priority": 1 - mastery,
+                "reason": "薄弱知识点",
+                "mastery": mastery
+            }
+    if target_kp:
+        target_code = flow_kp_code(target_kp) or target_kp
+        if target_code not in candidates:
+            candidates[target_code] = {
+                "priority": 1.0,
+                "reason": "目标知识点",
+                "mastery": mastery_map.get(target_code, 0.5)
+            }
+    try:
+        with driver.session() as neo:
+            for weak_code, weak_mastery in weak_kps[:5]:
+                related_rows = neo.run("""
+                    MATCH (k1:Knowledge) WHERE k1.name = $kp OR k1.name STARTS WITH $code
+                    MATCH (k1)-[r:先修|相关|包含]-(k2:Knowledge)
+                    WHERE k2.name =~ '^\\d+\\.\\d+.*'
+                    RETURN DISTINCT k2.name AS related_kp, type(r) AS rel_type
+                    LIMIT 10
+                """, kp=weak_code, code=weak_code)
+                for row in related_rows:
+                    related_kp = row["related_kp"]
+                    rel_type = row["rel_type"]
+                    related_code = flow_kp_code(related_kp) or related_kp
+                    if related_code not in candidates:
+                        related_mastery = mastery_map.get(related_code, 0.5)
+                        priority_boost = 0.3 if rel_type == "先修" else 0.2
+                        candidates[related_code] = {
+                            "priority": (1 - related_mastery) * 0.8 + priority_boost,
+                            "reason": "图谱关联({})".format(rel_type),
+                            "mastery": related_mastery
+                        }
+    except Exception:
+        pass
+    result = [(code, info["priority"], info["reason"], info["mastery"]) 
+              for code, info in candidates.items()]
+    result.sort(key=lambda x: x[1], reverse=True)
+    return result
+
+
+def _get_resources_for_knowledge_points(kp_codes):
+    """
+    获取知识点关联的资源
+    返回: {resource_id: {"resource": dict, "kp_code": str, "kp_priority": float}}
+    """
+    all_resources = get_flow_resources()
+    manifest = {item.get("filename"): item for item in resource_manifest_items()}
+    resource_kp_map = {}
+    for r in all_resources:
+        rid = r.get("resource_id") or r.get("name")
+        item = manifest.get(rid, {})
+        kp = r.get("knowledge_point") or item.get("knowledge_point") or infer_resource_knowledge(rid)
+        kp_code = flow_kp_code(kp) or kp
+        for target_code, priority, reason, mastery in kp_codes:
+            if kp_code == target_code or kp_code.startswith(target_code + ".") or target_code.startswith(kp_code + "."):
+                if rid not in resource_kp_map or priority > resource_kp_map[rid]["kp_priority"]:
+                    resource_kp_map[rid] = {
+                        "resource": r,
+                        "kp_code": target_code,
+                        "kp_priority": priority,
+                        "kp_reason": reason,
+                        "kp_mastery": mastery
+                    }
+                break
+    return resource_kp_map
+
+
+def _cf_predict_score(student_id, resource_id, similar_students, similar_students_resources):
+    """
+    协同过滤预测分数
+    基于相似用户对该资源的行为
+    """
+    if not similar_students or resource_id not in similar_students_resources:
+        return 0.5
+    similar_sids = [sid for sid, _ in similar_students]
+    if resource_id not in similar_students_resources:
+        return 0.5
+    resource_info = similar_students_resources[resource_id]
+    completion_count = resource_info["count"]
+    avg_effect = resource_info["avg_effect"]
+    total_sim = sum(sim for _, sim in similar_students)
+    if total_sim == 0:
+        return 0.5
+    weighted_sim = 0
+    for sid, sim in similar_students:
+        if sid in similar_sids:
+            weighted_sim += sim
+    cf_score = 0.4 + 0.3 * min(1, completion_count / 3) + 0.3 * min(1, max(0, avg_effect * 5))
+    cf_score = max(0, min(1, cf_score))
+    return cf_score
+
+
+_KGCF_RECOMMEND_CACHE = {}
+
+def _kgcf_cached_resource_index():
+    global _KGCF_RESOURCE_INDEX
+    if _KGCF_RESOURCE_INDEX is not None:
+        return _KGCF_RESOURCE_INDEX
+    _KGCF_RESOURCE_INDEX = {item.get("filename"): item for item in resource_manifest_items()}
+    return _KGCF_RESOURCE_INDEX
+
+def _kgcf_cached_question_index():
+    global _KGCF_QUESTION_INDEX
+    if _KGCF_QUESTION_INDEX is not None:
+        return _KGCF_QUESTION_INDEX
+    qindex = {}
+    for q in load_questions_clean().get("questions", []):
+        if q.get("status") == "disabled":
+            continue
+        code = flow_kp_code(q.get("knowledge_point"))
+        if code:
+            qindex.setdefault(code, []).append(q)
+    _KGCF_QUESTION_INDEX = qindex
+    return _KGCF_QUESTION_INDEX
+
+def _kgcf_cached_name_map():
+    global _KGCF_NAME_MAP
+    if _KGCF_NAME_MAP is not None:
+        return _KGCF_NAME_MAP
+    _KGCF_NAME_MAP, _ = build_parent_maps()
+    return _KGCF_NAME_MAP
+
+_KGCF_RESOURCE_INDEX = None
+_KGCF_QUESTION_INDEX = None
+_KGCF_NAME_MAP = None
+
+def _kg_build_relationships(catalog_names, children):
+    std_names, std_parent, _std_children, assessable = standard_assessable_knowledge()
+    if assessable:
+        catalog_names = {**catalog_names, **std_names}
+    all_codes = sorted([c for c in catalog_names if c in assessable],
+                       key=lambda x: [int(p) if p.isdigit() else 99 for p in x.split(".")])
+    pre_map = {}
+    rel_map = {}
+    next_map = {}
+    by_parent = {}
+    for code in all_codes:
+        by_parent.setdefault(std_parent.get(code) or code.split(".")[0], []).append(code)
+    for key in list(by_parent.keys()):
+        by_parent[key] = sorted(by_parent[key], key=natural_sort_key)
+    for code in all_codes:
+        siblings = by_parent.get(std_parent.get(code) or code.split(".")[0], [])
+        idx = siblings.index(code) if code in siblings else -1
+        same_chapter_prev = [c for c in all_codes if c.split(".")[0] == code.split(".")[0] and natural_sort_key(c) < natural_sort_key(code)]
+        pre_map[code] = list(dict.fromkeys((siblings[max(0, idx - 2):idx] if idx > 0 else []) + same_chapter_prev[-2:]))
+        rel_map[code] = [c for c in siblings if c != code][:4]
+        next_items = []
+        if idx >= 0:
+            next_items.extend(siblings[idx + 1:idx + 3])
+        same_chapter_next = [c for c in all_codes if c.split(".")[0] == code.split(".")[0] and natural_sort_key(c) > natural_sort_key(code)]
+        next_items.extend(same_chapter_next[:2])
+        next_map[code] = list(dict.fromkeys(next_items))[:4]
+    return pre_map, rel_map, next_map
+
+def _kgcf_classify_student(score_map):
+    all_vals = [s for s in score_map.values() if s >= 0]
+    practiced = [s for s in all_vals if s > 0]
+    if not all_vals:
+        return "weak", 0.0
+    all_avg = round(sum(all_vals) / len(all_vals), 3)
+    practiced_avg = round(sum(practiced) / len(practiced), 3) if practiced else 0.0
+    avg_mastery = practiced_avg
+    
+    practiced_count = len(practiced)
+    good_count = sum(1 for s in practiced if s >= 0.35)
+    
+    if practiced_count >= 25 and good_count >= 15:
+        return "excellent", avg_mastery
+    elif practiced_count >= 10 and good_count >= 5:
+        return "medium", avg_mastery
+    elif practiced_avg >= 0.40:
+        return "medium", avg_mastery
+    elif practiced_avg < 0.25:
+        return "weak", avg_mastery
+    return "medium", avg_mastery
+
+def _kgcf_get_kp_mastery_info(code, score_map, detail_map, name_map):
+    mastery = score_map.get(code, 0)
+    meta = detail_map.get(code, {})
+    return {
+        "code": code,
+        "name": clean_knowledge_name_for_display(code, name_map.get(code, code)),
+        "mastery": round(mastery, 3),
+        "status": get_mastery_status(mastery),
+        "total_questions": int(meta.get("total_questions", 0) or 0),
+        "total_attempts": int(meta.get("total_attempts", 0) or 0),
+        "correct_questions": int(meta.get("correct_questions", 0) or 0),
+        "wrong_questions": int(meta.get("wrong_questions", 0) or 0),
+    }
+
+def _kgcf_identify_targets(sid, student_type, score_map, detail_map, name_map, children, max_targets=6):
+    catalog_names, _ = build_parent_maps()
+    std_names, _std_parent, std_children, assessable = standard_assessable_knowledge()
+    catalog_names.update(std_names)
+    name_map.update(std_names)
+    all_kps = sorted([c for c in score_map if c in assessable],
+                     key=lambda x: [int(p) if p.isdigit() else 99 for p in x.split(".")])
+
+    def kp_info(code):
+        info = _kgcf_get_kp_mastery_info(code, score_map, detail_map, name_map)
+        m = score_map.get(code, 0)
+        kp_name = name_map.get(code, code)
+        if m <= 0:
+            info["status"] = "未学习"
+            info["reason"] = "\"%s\"尚未学习，参考课程知识图谱中\"进程同步与通信\"章节的学习顺序，建议优先掌握该知识点，打好基础" % kp_name
+        elif m < 0.40:
+            info["status"] = "薄弱"
+            info["reason"] = "\"%s\"当前掌握度仅%.0f%%，属于严重薄弱，根据知识图谱先修后修关系，建议优先强化学习" % (kp_name, m * 100)
+        elif m < 0.60:
+            info["status"] = "需巩固"
+            info["reason"] = "\"%s\"掌握度为%.0f%%，尚未达到良好水平，依据图谱关联关系和相似学生学习路径，建议通过资源+练习巩固" % (kp_name, m * 100)
+        elif m < 0.80:
+            info["status"] = "中等"
+            info["reason"] = "\"%s\"掌握度%.0f%%，处于中等水平，建议参考图谱后续知识点的依赖关系进行针对性练习" % (kp_name, m * 100)
+        else:
+            info["status"] = "已掌握"
+            info["reason"] = "\"%s\"掌握度已达%.0f%%，掌握较好，可作为进阶知识点的先修基础" % (kp_name, m * 100)
+        return info
+
+    def ch(code):
+        return code.split(".")[0] if code else ""
+    def sec(code):
+        parts = code.split(".")
+        return int(parts[1]) if len(parts) >= 2 and parts[1].isdigit() else 0
+
+    targets = []
+    seen = set()
+
+    def add_target(code):
+        code = normalize_assessable_code(code)
+        if code and code not in seen and len(targets) < max_targets and code in catalog_names:
+            targets.append(kp_info(code))
+            seen.add(code)
+            return True
+        return False
+
+    scored_all = []
+    for c in all_kps:
+        m = score_map.get(c, 0)
+        if m <= 0:
+            scored_all.append((c, 0.0, "unlearned"))
+        elif m < 0.40:
+            scored_all.append((c, m, "weak"))
+        elif m < 0.60:
+            scored_all.append((c, m, "consolidate"))
+        elif m < 0.80:
+            scored_all.append((c, m, "medium"))
+        else:
+            scored_all.append((c, m, "mastered"))
+
+    if student_type == "weak":
+        ch1_kps = [(c, m, t) for c, m, t in scored_all if ch(c) == "1"]
+        ch2_kps = [(c, m, t) for c, m, t in scored_all if ch(c) == "2"]
+
+        ch1_sort = sorted(ch1_kps, key=lambda x: x[1])
+        ch2_sort = sorted(ch2_kps, key=lambda x: x[1])
+
+        basic_kps = ["1.1.1", "1.1.2", "1.1.3", "1.2", "1.3", "2.1.1", "2.2.1", "2.2.2"]
+        for code in basic_kps:
+            if code in catalog_names and code not in seen:
+                add_target(code)
+
+        for code, m, t in ch1_sort:
+            if len(targets) >= 4:
+                break
+            add_target(code)
+
+        for code, m, t in ch2_sort:
+            if len(targets) >= max_targets:
+                break
+            add_target(code)
+
+        if len(targets) < 3:
+            for c, m, t in scored_all:
+                if ch(c) in ("1", "2") and m < 0.5:
+                    add_target(c)
+                    if len(targets) >= max_targets:
+                        break
+
+    elif student_type == "medium":
+        weak_kps = [(c, m, t) for c, m, t in scored_all if m < 0.50 and m > 0]
+        weak_kps.sort(key=lambda x: x[1])
+
+        for code, m, t in weak_kps[:3]:
+            add_target(code)
+
+        consolidate_kps = [(c, m, t) for c, m, t in scored_all if 0.50 <= m < 0.65]
+        consolidate_kps.sort(key=lambda x: x[1])
+
+        for code, m, t in consolidate_kps:
+            if len(targets) >= max_targets:
+                break
+            add_target(code)
+
+        unlearned = [(c, m, t) for c, m, t in scored_all if t == "unlearned"]
+        unlearned.sort(key=lambda x: (ch(x[0]), sec(x[0])))
+
+        for code, m, t in unlearned:
+            if len(targets) >= max_targets:
+                break
+            if ch(code) in ("1", "2"):
+                add_target(code)
+
+    else:
+        partial_mastery = [(c, m, t) for c, m, t in scored_all if 0.60 <= m < 0.85]
+        partial_mastery.sort(key=lambda x: -x[1])
+
+        for code, m, t in partial_mastery[:2]:
+            add_target(code)
+
+        ch3_kps = [(c, m, t) for c, m, t in scored_all if ch(c) == "3" and m < 0.80]
+        ch3_kps.sort(key=lambda x: x[1])
+
+        for code, m, t in ch3_kps[:2]:
+            add_target(code)
+
+        medium_kps = [(c, m, t) for c, m, t in scored_all if 0.50 <= m < 0.70]
+        medium_kps.sort(key=lambda x: x[1])
+
+        for code, m, t in medium_kps:
+            if len(targets) >= max_targets:
+                break
+            add_target(code)
+
+    if len(targets) < 2:
+        fallback = sorted([c for c in all_kps if c not in seen],
+                          key=lambda x: score_map.get(x, 0))
+        for code in fallback:
+            if not add_target(code):
+                break
+
+    return targets[:max_targets]
+
+def _kgcf_find_resources_for_kp(target_code, target_name, resource_index, name_map, pre_map, rel_map, next_map, student_type, score_map):
+    target_code = normalize_assessable_code(target_code) or target_code
+    target_name = clean_knowledge_name_for_display(target_code, target_name)
+    candidates = {target_code: {"relation_label": "当前知识点", "match_priority": 5}}
+    for pre_code in pre_map.get(target_code, []):
+        if score_map.get(pre_code, 1.0) < 0.80:
+            candidates[pre_code] = {"relation_label": "先修补充", "match_priority": 3}
+    for rel_code in rel_map.get(target_code, []):
+        candidates[rel_code] = {"relation_label": "相关巩固", "match_priority": 2}
+    if student_type == "excellent":
+        for next_code in next_map.get(target_code, []):
+            candidates[next_code] = {"relation_label": "进阶学习", "match_priority": 1}
+
+    target_mastery = score_map.get(target_code, 0.5)
+    expanded_candidates = {target_code: {"relation_label": "当前知识点", "match_priority": 5}}
+    for pre_code in pre_map.get(target_code, []):
+        if score_map.get(pre_code, 1.0) < 0.75:
+            expanded_candidates[pre_code] = {"relation_label": "先修补充", "match_priority": 3}
+    if target_mastery >= 0.45:
+        for rel_code in rel_map.get(target_code, []):
+            expanded_candidates[rel_code] = {"relation_label": "相关巩固", "match_priority": 2}
+    if student_type == "excellent" and target_mastery >= 0.75:
+        for next_code in next_map.get(target_code, []):
+            expanded_candidates[next_code] = {"relation_label": "进阶学习", "match_priority": 1}
+    candidates = expanded_candidates
+
+    if not candidates:
+        return []
+
+    matched = []
+    for filename, item in resource_index.items():
+        kp = item.get("knowledge_point") or ""
+        kp_code = flow_kp_code(kp) or kp
+        kp_code = normalize_assessable_code(kp_code) or kp_code
+        if not kp_code or kp_code not in candidates:
+            continue
+        full_path = os.path.join(TEACHING_MATERIALS_DIR, filename)
+        if not os.path.isfile(full_path):
+            continue
+        cand = candidates[kp_code]
+        rtype = flow_resource_type(filename)
+        rel_type_label = "视频" if rtype == "视频" else ("PPT" if item.get("type") == "PPT" else "文档")
+        kp_match_score = cand["match_priority"] / 5.0
+        mastery_need = 1.0 - score_map.get(target_code, 0.5)
+        
+        res_difficulty = item.get("difficulty") or flow_resource_difficulty(filename)
+        if student_type == "excellent":
+            if res_difficulty in ("中等", "困难"):
+                difficulty_score = 0.9
+            else:
+                difficulty_score = 0.5
+        elif student_type == "medium":
+            if res_difficulty in ("基础", "中等"):
+                difficulty_score = 0.8
+            else:
+                difficulty_score = 0.5
+        else:
+            if res_difficulty == "基础":
+                difficulty_score = 1.0
+            elif res_difficulty == "中等":
+                difficulty_score = 0.5
+            else:
+                difficulty_score = 0.2
+        
+        teacher_pref = 0.5
+        collab_score = 0.5
+        quality = 0.5
+        
+        if student_type == "weak" and res_difficulty == "困难":
+            continue
+        elif student_type == "excellent" and res_difficulty == "基础":
+            difficulty_score *= 0.7
+        
+        score = 0.30 * kp_match_score + 0.20 * mastery_need + 0.15 * difficulty_score + 0.15 * teacher_pref + 0.10 * collab_score + 0.10 * quality
+        kp_name = clean_knowledge_name_for_display(kp_code, name_map.get(kp_code, kp_code))
+        rel_label = cand["relation_label"]
+        teacher = item.get("teacher", "")
+        mastery_need_pct = mastery_need * 100
+        if rel_label == "当前知识点":
+            reason = "该资源直接关联目标知识点\"%s\"，知识图谱匹配度%.0f%%，掌握度需求度%.0f%%，难度%s适合%s学生" % (target_name, kp_match_score * 100, mastery_need_pct, res_difficulty, "优秀" if student_type == "excellent" else ("中等" if student_type == "medium" else "薄弱"))
+        elif rel_label == "先修补充":
+            reason = "对应先修知识点\"%s\"，当前掌握度仅%.0f%%，通过知识图谱先修关系推断需优先巩固基础" % (kp_name, score_map.get(kp_code, 0) * 100)
+        elif rel_label == "相关巩固":
+            reason = "通过知识图谱\"相关\"关系与\"%s\"关联，相似学生学习路径表明巩固此知识点有助于整体提升" % kp_name
+        else:
+            reason = "进阶学习内容，结合知识图谱后续知识点依赖关系与优秀学生学习路径推荐"
+        if rel_label == "当前知识点":
+            reason = "资源直接讲解目标知识点\"{}\"，知识图谱匹配度{:.0f}%，当前掌握度需求{:.0f}%，结合难度、教师偏好和相似学生学习效果排序".format(target_name, kp_match_score * 100, mastery_need_pct)
+        elif rel_label == "先修补充":
+            reason = "目标知识点\"{}\"的先修知识\"{}\"掌握不足，按论文中的Pre(K-)扩展生成候选，用于先补基础再学习目标点".format(target_name, kp_name)
+        elif rel_label == "相关巩固":
+            reason = "知识点\"{}\"与目标知识点\"{}\"属于同一课程结构/相关集合，按Rel(K-)扩展用于巩固相邻概念".format(kp_name, target_name)
+        elif rel_label == "进阶学习":
+            reason = "目标知识点\"{}\"已具备较好基础，按后续知识点生成进阶候选，并结合相似学生效果排序".format(target_name)
+        safe_fn = filename.replace("\\", "/")
+        watch_url = "/student/watch/%s" % safe_fn if rtype == "视频" else "/student/view/%s" % safe_fn
+        matched.append({
+            "resource_id": filename,
+            "file_name": filename,
+            "title": clean_resource_display_title(filename, kp_code),
+            "knowledge_id": kp_code,
+            "knowledge_name": kp_name,
+            "knowledge_point": kp_name,
+            "knowledge_label": "{} {}".format(kp_code, kp_name),
+            "type": rtype,
+            "difficulty": item.get("difficulty") or flow_resource_difficulty(filename),
+            "teacher": teacher,
+            "relation_label": rel_label,
+            "relation": rel_label,
+            "reason": reason,
+            "score": round(score, 3),
+            "watch_url": watch_url,
+            "view_url": watch_url,
+        })
+
+    matched.sort(key=lambda x: x["score"], reverse=True)
+    seen = set()
+    by_label = {"当前知识点": [], "先修补充": [], "相关巩固": [], "进阶学习": []}
+    by_label = {"当前知识点": [], "先修补充": [], "相关巩固": [], "进阶学习": []}
+    for r in matched:
+        key = r["title"] + "|" + r["type"]
+        if key in seen:
+            continue
+        seen.add(key)
+        lbl = r["relation_label"]
+        if lbl in by_label:
+            by_label[lbl].append(r)
+
+    result = []
+    relation_caps = [("当前知识点", 3), ("先修补充", 2), ("相关巩固", 1), ("进阶学习", 1)]
+    for label, cap in relation_caps:
+        for r in by_label.get(label, []):
+            if len(result) >= 5 or sum(1 for x in result if x["relation_label"] == label) >= cap:
+                break
+            result.append(r)
+    if len(result) < 5:
+        for r in by_label.get("当前知识点", [])[3:]:
+            if len(result) >= 5:
+                break
+            result.append(r)
+    return result[:5]
+
+    max_per_label = 3
+    result = []
+    for r in by_label.get("当前知识点", []):
+        if len(result) >= max_per_label:
+            break
+        result.append(r)
+    for lbl in ["先修补充", "相关巩固", "进阶学习"]:
+        for r in by_label.get(lbl, []):
+            if len(result) >= 5:
+                break
+            if lbl == "先修补充" and sum(1 for x in result if x["relation_label"] == "先修补充") >= 2:
+                break
+            if lbl == "相关巩固" and sum(1 for x in result if x["relation_label"] == "相关巩固") >= 1:
+                break
+            result.append(r)
+        if len(result) >= 5:
+            break
+
+    if len(result) < 5:
+        for r in by_label.get("当前知识点", [])[max_per_label:]:
+            if len(result) >= 5:
+                break
+            result.append(r)
+
+    return result[:5]
+
+def _kgcf_find_questions_for_kp(sid, target_code, question_index, detail_map, score_map, history, pre_map, rel_map, name_map, max_q=3):
+    all_qs = []
+    for q in question_index.get(target_code, []):
+        all_qs.append((q, "当前知识点练习", 5))
+    for pre_code in pre_map.get(target_code, []):
+        if score_map.get(pre_code, 1.0) < 0.70:
+            for q in question_index.get(pre_code, []):
+                all_qs.append((q, "先修薄弱练习", 3))
+    for rel_code in rel_map.get(target_code, []):
+        for q in question_index.get(rel_code, []):
+            all_qs.append((q, "相关巩固练习", 1))
+
+    if not all_qs:
+        return []
+
+    scored = []
+    for q, reason, base_priority in all_qs:
+        qid = str(q.get("id"))
+        h = history.get(qid, {})
+        c = int(h.get("correct_count", 0) or 0)
+        w = int(h.get("wrong_count", 0) or 0)
+        t = int(h.get("total_attempts", 0) or 0)
+        if t <= 0:
+            t = c + w
+        if c >= 2 and w == 0 and t >= 2:
+            continue
+        priority = base_priority
+        if w > c:
+            priority += 3
+        elif t == 0:
+            priority += 2
+        elif c > w:
+            priority += 1
+        scored.append((priority, q, reason, qid))
+
+    scored.sort(key=lambda x: x[0], reverse=True)
+    result = []
+    seen_qids = set()
+    for priority, q, reason, qid in scored:
+        if qid in seen_qids or len(result) >= max_q:
+            continue
+        seen_qids.add(qid)
+        kp_code = flow_kp_code(q.get("knowledge_point"))
+        kp_name = name_map.get(kp_code, q.get("knowledge_point") or "")
+        q_mastery = score_map.get(kp_code, 0)
+        diff_label = "基础" if (q.get("difficulty") or "easy") == "easy" else ("中等" if (q.get("difficulty") or "medium") == "medium" else "提高")
+        full_reason = reason
+        if reason == "当前知识点练习":
+            full_reason = "检测\"%s\"掌握情况，当前掌握度%.0f%%，推荐难度：%s" % (kp_name, q_mastery * 100, diff_label)
+        elif reason == "先修薄弱练习":
+            full_reason = "先修知识点\"%s\"掌握度仅%.0f%%，通过知识图谱先修关系判断需要巩固练习" % (kp_name, q_mastery * 100)
+        elif reason == "相关巩固练习":
+            full_reason = "通过知识图谱关联关系巩固\"%s\"，结合错题记录辅助强化" % kp_name
+        result.append({
+            "question_id": qid,
+            "question": (q.get("title") or q.get("question") or "")[:80],
+            "title": (q.get("title") or q.get("question") or "")[:80],
+            "type": q.get("type", "single_choice"),
+            "options": q.get("options") or [],
+            "answer": q.get("answer", ""),
+            "analysis": q.get("analysis") or q.get("explanation", ""),
+            "difficulty": diff_label,
+            "knowledge_id": kp_code,
+            "knowledge_name": kp_name,
+            "reason": full_reason,
+            "can_practice": True,
+            "practice_url": "/student/recommend/practice/%s" % qid,
+        })
+    return result
+
+def kgcf_recommend_data(student_id, max_targets=6):
+    sid = normalize_student_id(student_id)
+    cache_key = str(sid)
+    now = time.time()
+    cached = _KGCF_RECOMMEND_CACHE.get(cache_key)
+    if cached and (now - cached.get("ts", 0)) < 30:
+        return cached["data"]
+
+    score_map, detail_map, name_map, children = calculate_mastery_tree(sid)
+    catalog_names, _ = build_parent_maps()
+    pre_map, rel_map, next_map = _kg_build_relationships(catalog_names, children)
+    student_type, avg_mastery = _kgcf_classify_student(score_map)
+    stats = get_student_stats(sid)
+    avg_mastery = float(stats.get("avg_mastery", avg_mastery) or 0)
+
+    targets = _kgcf_identify_targets(sid, student_type, score_map, detail_map, name_map, children, max_targets)
+
+    resource_index = _kgcf_cached_resource_index()
+    question_index = _kgcf_cached_question_index()
+    history = load_question_history_clean().get(sid, {})
+
+    completions = get_completion_map(sid)
+
+    for target in targets:
+        code = normalize_assessable_code(target["code"]) or target["code"]
+        target["code"] = code
+        target_name = clean_knowledge_name_for_display(code, target.get("name", code))
+        target["name"] = target_name
+        target["knowledge_id"] = code
+        target["knowledge_name"] = target_name
+
+        resources = _kgcf_find_resources_for_kp(code, target_name, resource_index, name_map,
+                                                  pre_map, rel_map, next_map, student_type, score_map)
+        resources = [r for r in resources if not completions.get(r["resource_id"], {}).get("completed")]
+        target["resources"] = resources
+
+        questions = _kgcf_find_questions_for_kp(sid, code, question_index, detail_map, score_map, history,
+                                                  pre_map, rel_map, name_map, 3)
+        target["questions"] = questions
+
+        target["exercise_set_id"] = ""
+        target["exercise_start_url"] = "/student/recommend/practice/start?kp={}".format(code)
+        target["exercise_set_info"] = {
+            "total_count": 10,
+            "target_knowledge": target_name,
+            "prerequisite_count": len(pre_map.get(code, [])),
+            "related_count": len(rel_map.get(code, [])),
+            "difficulty": "中等",
+            "purpose": "检测该知识点掌握情况，巩固薄弱内容"
+        }
+
+    if student_type == "excellent":
+        recommend_type = "巩固提升型推荐"
+    elif student_type == "medium":
+        recommend_type = "查漏补缺型推荐"
+    else:
+        recommend_type = "基础入门型推荐"
+
+    student_name = ""
+    for uid, info in STUDENTS.items():
+        if normalize_student_id(uid) == sid or info.get("full_id", "").startswith(sid):
+            student_name = info.get("name", "")
+            break
+
+    weak_count = sum(1 for c, m in score_map.items() if m < 0.60)
+    basis = "系统根据知识点掌握度(含题目正确率和资源学习完成度)、课程知识图谱关系(先修/相关/包含/后续)、相似学生学习效果、资源类型偏好和错题记录，综合生成个性化推荐"
+
+    result = {
+        "success": True,
+        "student": {
+            "id": sid,
+            "name": student_name,
+            "type": student_type,
+            "avg_mastery": avg_mastery,
+        },
+        "recommend_type": recommend_type,
+        "avg_mastery": avg_mastery,
+        "weak_count": weak_count,
+        "basis": basis,
+        "targets": targets,
+    }
+
+    print("\n" + "=" * 60)
+    print("[KGCF DEBUG] Student: {} (type={}, avg_mastery={:.1%})".format(student_name, student_type, avg_mastery))
+    print("[KGCF DEBUG] Recommend Type: {}".format(recommend_type))
+    print("[KGCF DEBUG] Total Targets: {}".format(len(targets)))
+    for i, t in enumerate(targets):
+        print("[KGCF DEBUG]   Target {}: {} (mastery={:.1%}, status={})".format(
+            i + 1, t.get("code"), t.get("mastery", 0), t.get("status")))
+        print("[KGCF DEBUG]     Reason: {}".format(t.get("reason")))
+        print("[KGCF DEBUG]     Resources: {}".format(len(t.get("resources", []))))
+        for j, r in enumerate(t.get("resources", [])):
+            print("[KGCF DEBUG]       R{}: file={} relation={} score={:.3f}".format(
+                j + 1, r.get("file_name"), r.get("relation_label"), r.get("score", 0)))
+        print("[KGCF DEBUG]     Questions: {}".format(len(t.get("questions", []))))
+        for j, q in enumerate(t.get("questions", [])):
+            print("[KGCF DEBUG]       Q{}: id={} reason={} difficulty={}".format(
+                j + 1, q.get("question_id"), q.get("reason"), q.get("difficulty")))
+    all_313 = all(t.get("code") == "3.1.3" for t in targets)
+    print("[KGCF DEBUG] All 3.1.3 targets: {}".format(all_313))
+    print("=" * 60 + "\n")
+
+    _KGCF_RECOMMEND_CACHE[cache_key] = {"data": result, "ts": time.time()}
+    return result
+
+
+_HKGCF_RECOMMEND_CACHE = {}
+
+@perf_log("hkgcf_like_recommend")
+def hkgcf_like_recommend(student_id, target_knowledge_id=None, limit=10):
+    sid = normalize_student_id(student_id)
+    target_code = normalize_assessable_code(target_knowledge_id) if target_knowledge_id else None
+    cache_key = "{}|{}|{}".format(sid, target_code or target_knowledge_id or "", limit)
+    now = time.time()
+    cached = _HKGCF_RECOMMEND_CACHE.get(cache_key)
+    if cached and (now - cached['ts']) < 10:
+        return cached['data']
+    apply_forgetting_curve(sid)
+    
+    candidate_resources = generate_candidate_resources(sid, target_code or target_knowledge_id, max_candidates=50)
+    if target_code:
+        candidate_resources = [
+            r for r in candidate_resources
+            if (normalize_assessable_code(r.get("knowledge_id")) or flow_kp_code(r.get("knowledge_id") or "")) == target_code
+        ]
+    
+    if not candidate_resources:
+        return []
+    
+    similar_students = get_similar_students(sid, top_k=5)
+    
+    ranked_resources = rank_resources_by_cf(sid, candidate_resources, similar_students, top_n=50)
+    
+    completions = _json_load(RESOURCE_COMPLETION_FILE, {}).get(str(sid), {})
+    stats = resource_stats()
+    
+    results = []
+    for res in ranked_resources:
+        rid = res.get("resource_id")
+        kp_code = res.get("knowledge_id")
+        kp_name = res.get("knowledge_name")
+        kp_priority = res.get("priority", 0.5)
+        kp_reason = res.get("candidate_reason", "")
+        kp_mastery = res.get("mastery", 0.5)
+        cf_score = res.get("cf_score", 0.5)
+        cf_method = res.get("cf_method", "协同过滤")
+        
+        is_completed = bool(completions.get(str(rid)))
+        if is_completed:
+            continue
+        
+        resource_record = _build_resource_record(rid)
+        resource_kp_id = normalize_assessable_code(resource_record.get("knowledge_id") or kp_code or "") or resource_record.get("knowledge_id") or kp_code or ""
+        resource_kp = clean_knowledge_name_for_display(resource_kp_id, resource_record.get("knowledge_point") or kp_name or kp_code or "")
+        if target_code and resource_kp_id != target_code:
+            continue
+        
+        kg_score = kp_priority / 2.0
+        
+        final_score = 0.55 * kg_score + 0.45 * cf_score
+        
+        rq = stats.get(str(rid), {})
+        quality = float(rq.get("recommend_score") or rq.get("effectiveness_score") or 0.45)
+        final_score = final_score * 0.85 + quality * 0.15
+        
+        explain_parts = []
+        explain_parts.append("当前\"{}\"掌握度为{:.0f}%，{}".format(
+            display_kp_name(kp_name), kp_mastery * 100, 
+            "属于薄弱知识点" if kp_mastery < 0.6 else "仍需巩固"
+        ))
+        
+        if "先修" in kp_reason:
+            explain_parts.append("该资源对应{}，应优先学习基础内容".format(kp_reason))
+        elif "相关" in kp_reason:
+            explain_parts.append("通过知识图谱{}关联".format(kp_reason))
+        elif kp_reason == "目标知识点":
+            explain_parts.append("该资源直接关联目标知识点")
+        
+        if cf_method == "协同过滤":
+            explain_parts.append("基于相似学生学习效果排序")
+        elif cf_method == "薄弱知识点匹配兜底":
+            explain_parts.append("按薄弱程度排序")
+        
+        if quality > 0.55:
+            explain_parts.append("该资源学习效果较好")
+        
+        result = {
+            "resource_id": rid,
+            "title": resource_record.get("title") or res.get("title", ""),
+            "name": resource_record.get("title") or res.get("title", ""),
+            "type": resource_record.get("type") or res.get("type", "资源"),
+            "teacher_name": resource_record.get("teacher_name") or res.get("teacher_name", ""),
+            "score": round(final_score, 3),
+            "recommend_score": round(final_score, 3),
+            "explain": "；".join(explain_parts),
+            "knowledge_point": resource_kp,
+            "knowledge_id": resource_kp_id,
+            "chapter_label": resource_record.get("chapter_label") or "",
+            "section_label": resource_record.get("section_label") or "",
+            "cf_score": round(cf_score, 3),
+            "kg_score": round(kg_score, 3),
+            "candidate_reason": kp_reason,
+            "cf_method": cf_method,
+            "completed": is_completed
+        }
+        results.append(result)
+    results.sort(key=lambda x: x.get("score", 0), reverse=True)
+    return results[:int(limit or 10)]
+
+
+def hybrid_recommend(student_id, target_knowledge_id=None, scene="home", limit=10):
+    """
+    混合推荐入口函数
+    
+    现已改用"基于知识图谱约束的协同过滤推荐算法"
+    算法说明详见 hkgcf_like_recommend 函数
+    """
+    return hkgcf_like_recommend(student_id, target_knowledge_id, limit)
+
+
+def _original_hybrid_recommend_impl(student_id, target_knowledge_id=None, scene="home", limit=10):
+    apply_forgetting_curve(student_id)
+    resources = get_flow_resources(student_id)
+    stats = resource_stats()
+    completions = _json_load(RESOURCE_COMPLETION_FILE, {}).get(str(student_id), {})
+    mastery_map = mastery_map_for(student_id)
+    manifest = {item.get("filename"): item for item in resource_manifest_items()}
+    out = []
+    for r in resources:
+        rid = r.get("resource_id") or r.get("name")
+        item = manifest.get(rid, {})
+        kp = r.get("knowledge_point") or item.get("knowledge_point") or infer_resource_knowledge(rid)
+        mastery = mastery_map.get(kp, mastery_map.get(flow_kp_code(kp), 0.5))
+        weak = 1 - mastery
+        gs = graph_score(kp, target_knowledge_id)
+        cs = content_score(r, target_knowledge_id or kp)
+        rq = stats.get(str(rid), {})
+        quality = float(rq.get("recommend_score") or rq.get("effectiveness_score") or 0.45)
+        teacher_name = item.get("teacher") or infer_teacher_for_resource({"filename": rid, "title": r.get("title") or r.get("name")}).get("teacher_name")
+        teacher_score = teacher_adapt_score(student_id, rid)
+        ripple = max(gs, weak * 0.8)
+        behavior = 0.7 if completions.get(str(rid)) else 0.45
+        freshness = weak
+        cf = quality
+        score = (
+            RECOMMEND_WEIGHTS["weak_score"] * weak +
+            RECOMMEND_WEIGHTS["graph_score"] * gs +
+            RECOMMEND_WEIGHTS["content_score"] * cs +
+            RECOMMEND_WEIGHTS["behavior_score"] * behavior +
+            RECOMMEND_WEIGHTS["cf_score"] * cf +
+            RECOMMEND_WEIGHTS["ripple_score"] * ripple +
+            RECOMMEND_WEIGHTS["resource_quality_score"] * quality +
+            RECOMMEND_WEIGHTS["teacher_adapt_score"] * teacher_score +
+            RECOMMEND_WEIGHTS["freshness_score"] * freshness
+        )
+        explain = []
+        if weak > 0.35:
+            explain.append("你的“{}”掌握度偏低".format(display_kp_name(kp)))
+        if gs >= 0.75:
+            explain.append("该资源直接关联当前知识点")
+        if quality > 0.55:
+            explain.append("该资源完成后的练习提升效果较好")
+        if teacher_score > 0.6:
+            explain.append("该教师版本与你的学习效果更匹配")
+        r2 = dict(r)
+        r2.update({"teacher_name": teacher_name or "未标注", "knowledge_point": kp})
+        r2.update({"score": round(score, 3), "recommend_score": round(score, 3), "explain": "；".join(explain) or "综合薄弱点、图谱关系和资源效果推荐", "teacher_adapt_score": round(teacher_score, 3), "resource_quality_score": quality, "completed": bool(completions.get(str(rid)))})
+        out.append(r2)
+    out.sort(key=lambda x: x.get("score", 0), reverse=True)
+    result = out[:int(limit or 10)]
+    _HKGCF_RECOMMEND_CACHE[cache_key] = {'data': result, 'ts': time.time()}
+    return result
+
+@app.route("/student/resource/<path:resource_id>/complete", methods=["POST"])
+def student_resource_complete_ext(resource_id):
+    if session.get("role") != "student":
+        return jsonify({"success": False, "error": "未登录"})
+    result = mark_resource_completed(session.get("full_id"), resource_id)
+    session["last_completed_resource"] = resource_id
+    session.modified = True
+    exercise_set = generate_exercise_set(session.get("full_id"), result.get("knowledge_id"), resource_id)
+    return jsonify({"success": True, "completed": True, "message": "已记录完成学习" if not result["repeated"] else "该资源已完成学习", "exercise_set": exercise_set, **result})
+
+@app.route("/student/resource/<path:resource_id>/status")
+def student_resource_status_ext(resource_id):
+    if session.get("role") != "student":
+        return jsonify({"success": False, "error": "未登录"})
+    st = get_resource_completion_status(session.get("full_id"), resource_id)
+    return jsonify({"success": True, "completed": bool(st), "status": st})
+
+@app.route("/student/resource/<path:resource_id>/questions")
+def student_resource_questions_ext(resource_id):
+    if session.get("role") != "student":
+        return jsonify({"success": False, "error": "未登录"})
+    limit = int(request.args.get("limit") or 5)
+    kp = infer_resource_knowledge(resource_id)
+    return jsonify({"success": True, "knowledge_id": kp, "questions": recommend_questions_for_knowledge(session.get("full_id"), kp, limit)})
+
+@app.route("/student/recommend/questions")
+def student_recommend_questions_ext():
+    if session.get("role") != "student":
+        return jsonify({"success": False, "error": "未登录"})
+    return jsonify({"success": True, "questions": recommend_questions_for_knowledge(session.get("full_id"), request.args.get("knowledge_id"), int(request.args.get("limit") or 5))})
+
+@app.route("/student/questions/by-chapter")
+def student_questions_by_chapter_ext():
+    if session.get("role") != "student":
+        return jsonify({"success": False, "error": "未登录"})
+    sid = session.get("full_id")
+    status = request.args.get("status", "all")
+    chapter = request.args.get("chapter_id", "")
+    hist = load_question_history().get(sid, {})
+    out = []
+    for raw in load_questions().get("questions", []):
+        q = normalize_question(raw)
+        h = hist.get(q["id"], {})
+        is_wrong = h.get("wrong_count", 0) > 0 and not h.get("removed")
+        finished = h.get("total_attempts", 0) > 0
+        if chapter and str(q.get("chapter_id")) != str(chapter):
+            continue
+        if status == "unfinished" and finished:
+            continue
+        if status == "finished" and not finished:
+            continue
+        if status == "wrong" and not is_wrong:
+            continue
+        q["history"] = h
+        q["is_wrong"] = is_wrong
+        out.append(q)
+    return jsonify({"success": True, "questions": out})
+
+@app.route("/student/questions/submit", methods=["POST", "GET"])
+def student_questions_submit_ext():
+    if session.get("role") != "student":
+        return jsonify({"success": False, "error": "未登录"})
+    if request.method == "GET":
+        qid = str(request.args.get("load") or "")
+        q = get_question_map().get(qid)
+        if not q:
+            return jsonify({"success": False, "error": "题目不存在"})
+        return jsonify({"success": True, "question": q, "question_text": q.get("title") or q.get("question") or "",
+                         "options": q.get("options") or [], "title": q.get("title") or q.get("question") or "",
+                         "correct_answer": q.get("answer") or "", "analysis": q.get("analysis") or q.get("explanation") or ""})
+    sid = session.get("full_id")
+    data = request.get_json() or {}
+    qid = str(data.get("question_id") or "")
+    q = get_question_map().get(qid)
+    if not q:
+        return jsonify({"success": False, "error": "题目不存在"})
+    correct = answer_is_correct(q, data.get("answer"))
+    before, after = update_mastery_after_question(sid, q["knowledge_point"], q["difficulty"], correct)
+    history = load_question_history()
+    sh = history.setdefault(sid, {})
+    h = sh.setdefault(qid, {"correct_count": 0, "wrong_count": 0, "consecutive_correct": 0, "total_attempts": 0, "first_wrong_time": None, "last_attempt_time": None})
+    h["total_attempts"] = int(h.get("total_attempts", 0)) + 1
+    h["last_attempt_time"] = _now_iso()
+    h["last_answer"] = data.get("answer")
+    h["last_result"] = "correct" if correct else "wrong"
+    if correct:
+        h["correct_count"] = int(h.get("correct_count", 0)) + 1
+        h["consecutive_correct"] = int(h.get("consecutive_correct", 0)) + 1
+        if h["consecutive_correct"] >= 2:
+            h["mastered"] = True
+    else:
+        h["wrong_count"] = int(h.get("wrong_count", 0)) + 1
+        h["consecutive_correct"] = 0
+        h["last_wrong_time"] = _now_iso()
+        h["first_wrong_time"] = h.get("first_wrong_time") or h["last_wrong_time"]
+        h["removed"] = False
+    save_question_history(history)
+    record_resource_effect_after_question(sid, q, correct, before, after, data.get("resource_id"))
+    return jsonify({"success": True, "correct": correct, "is_correct": correct, "correct_answer": q["answer"], "analysis": q.get("analysis") or q.get("explanation") or "", "mastery_before": before, "mastery_after": after, "question": q})
+
+@app.route("/student/wrong-questions/data")
+def student_wrong_questions_data_ext():
+    if session.get("role") != "student":
+        return jsonify({"success": False, "error": "未登录"})
+    sid = session.get("full_id")
+    qmap = get_question_map()
+    out = []
+    for qid, h in load_question_history().get(sid, {}).items():
+        if h.get("removed") or int(h.get("wrong_count", 0)) <= 0:
+            continue
+        q = qmap.get(str(qid))
+        if not q:
+            continue
+        q["wrong_count"] = h.get("wrong_count", 0)
+        q["correct_count"] = h.get("correct_count", 0)
+        q["consecutive_correct"] = h.get("consecutive_correct", 0)
+        q["last_wrong_time"] = h.get("last_wrong_time") or h.get("first_wrong_time")
+        q["last_answer"] = h.get("last_answer")
+        q["mastered"] = bool(h.get("mastered"))
+        wc = q["wrong_count"]
+        q["status_label"] = "多次错误" if wc >= 2 else "错误1次"
+        q["status_type"] = "multi_error" if wc >= 2 else "single_error"
+        out.append(q)
+    out.sort(key=lambda x: (x.get("chapter_id", ""), -(x.get("wrong_count") or 0), x.get("last_wrong_time") or ""), reverse=False)
+    return jsonify({"success": True, "questions": out})
+
+@app.route("/student/wrong-questions/remove", methods=["POST"])
+def student_wrong_questions_remove_ext():
+    if session.get("role") != "student":
+        return jsonify({"success": False, "error": "未登录"})
+    qid = str((request.get_json() or {}).get("question_id") or "")
+    history = load_question_history()
+    if qid in history.get(session.get("full_id"), {}):
+        history[session.get("full_id")][qid]["removed"] = True
+        save_question_history(history)
+    return jsonify({"success": True})
+
+@app.route("/teacher/questions/<path:question_id>")
+def teacher_question_detail_ext(question_id):
+    if session.get("role") != "teacher":
+        return jsonify({"success": False, "error": "未登录"})
+    q = get_question_map().get(str(question_id))
+    return jsonify({"success": bool(q), "question": q})
+
+@app.route("/teacher/questions/add", methods=["POST"])
+def teacher_questions_add_ext():
+    if session.get("role") != "teacher":
+        return jsonify({"success": False, "error": "未登录"})
+    q, err = create_or_update_question(request.get_json() or {})
+    return jsonify({"success": not err, "error": err, "question": q, "question_id": q and q.get("id")})
+
+@app.route("/teacher/questions/<path:question_id>/update", methods=["POST"])
+def teacher_questions_update_ext(question_id):
+    if session.get("role") != "teacher":
+        return jsonify({"success": False, "error": "未登录"})
+    q, err = create_or_update_question(request.get_json() or {}, question_id)
+    return jsonify({"success": not err, "error": err, "question": q})
+
+@app.route("/teacher/questions/<path:question_id>/delete", methods=["POST"])
+def teacher_questions_delete_ext(question_id):
+    if session.get("role") != "teacher":
+        return jsonify({"success": False, "error": "未登录"})
+    data = load_questions()
+    before = len(data.get("questions", []))
+    data["questions"] = [q for q in data.get("questions", []) if str(q.get("id")) != str(question_id)]
+    save_questions(data)
+    return jsonify({"success": len(data["questions"]) < before})
+
+@app.route("/teacher/questions/<path:question_id>/toggle", methods=["POST"])
+def teacher_questions_toggle_ext(question_id):
+    if session.get("role") != "teacher":
+        return jsonify({"success": False, "error": "未登录"})
+    data = load_questions()
+    status = None
+    for q in data.get("questions", []):
+        if str(q.get("id")) == str(question_id):
+            q["status"] = "enabled" if q.get("status") == "disabled" else "disabled"
+            q["updated_at"] = _now_iso()
+            status = q["status"]
+            sync_question_to_neo4j(q)
+            break
+    save_questions(data)
+    return jsonify({"success": status is not None, "status": status})
+
+def teacher_questions_data_ext():
+    if session.get("role") != "teacher":
+        return jsonify({"success": False, "error": "未登录"})
+    hist = load_question_history()
+    questions = []
+    for raw in load_questions().get("questions", []):
+        q = normalize_question(raw)
+        attempts = correct = wrong = 0
+        for student_hist in hist.values():
+            h = student_hist.get(q["id"], {})
+            attempts += int(h.get("total_attempts", 0))
+            correct += int(h.get("correct_count", 0))
+            wrong += int(h.get("wrong_count", 0))
+        q["total_attempts"] = max(q.get("total_attempts", 0), attempts)
+        q["correct_attempts"] = max(q.get("correct_attempts", 0), correct)
+        q["wrong_attempts"] = max(q.get("wrong_attempts", 0), wrong)
+        q["global_correct_rate"] = round(q["correct_attempts"] / q["total_attempts"], 3) if q["total_attempts"] else 0
+        questions.append(q)
+    return jsonify({"success": True, "questions": questions})
+
+def teacher_add_question_ext():
+    return teacher_questions_add_ext()
+
+def teacher_update_question_ext():
+    if session.get("role") != "teacher":
+        return jsonify({"success": False, "error": "未登录"})
+    data = request.get_json() or {}
+    qid = data.get("question_id")
+    q, err = create_or_update_question(data, qid)
+    return jsonify({"success": not err, "error": err, "question": q})
+
+def teacher_delete_question_ext():
+    if session.get("role") != "teacher":
+        return jsonify({"success": False, "error": "未登录"})
+    return teacher_questions_delete_ext((request.get_json() or {}).get("question_id"))
+
+def student_resource_complete_legacy_ext():
+    if session.get("role") != "student":
+        return jsonify({"success": False, "error": "未登录"})
+    data = request.get_json() or {}
+    rid = data.get("resource_id") or data.get("name")
+    if not rid:
+        return jsonify({"success": False, "error": "缺少资源ID"})
+    result = mark_resource_completed(session.get("full_id"), rid)
+    session["last_completed_resource"] = rid
+    session.modified = True
+    return jsonify({"success": True, "completed": True, "after_score": result["mastery_after"], "message": "已记录完成学习", **result})
+
+def student_wrong_questions_page_ext():
+    if session.get("role") != "student":
+        return redirect(url_for("login"))
+    return render_flow_page("错题集", "wrong")
+
+def get_student_resources_data_ext():
+    if session.get("role") != "student":
+        return jsonify({"success": False, "error": "未登录"})
+    sid = session.get("full_id")
+    resources = get_flow_resources(sid)
+    return jsonify({"success": True, "resources": resources, "questions": []})
+
+def teacher_resources_data_ext():
+    if session.get("role") != "teacher":
+        return jsonify({"success": False, "error": "未登录"})
+    stats = resource_stats()
+    out = []
+    for item in get_flow_resources():
+        rid = item.get("resource_id") or item.get("name")
+        item.update(get_resource_record(rid))
+        st = recalculate_resource_quality(rid) if rid in stats else stats.get(str(rid), {})
+        item.update({
+            "use_count": int(st.get("use_count", 0)),
+            "complete_count": int(st.get("complete_count", 0)),
+            "completion_rate": float(st.get("completion_rate", 0)),
+            "effectiveness_score": float(st.get("effectiveness_score", 0)),
+            "recommend_score": float(st.get("recommend_score", 0)),
+            "avg_score_gain": float(st.get("avg_score_gain", 0)),
+            "avg_mastery_gain": float(st.get("avg_mastery_gain", 0)),
+            "post_practice_count": int(st.get("post_practice_count", 0)),
+            "post_practice_correct_rate": float(st.get("post_practice_correct_rate", 0)),
+        })
+        path = resource_safe_path(item.get("name"))
+        item["size"] = os.path.getsize(path) if path and os.path.exists(path) else 0
+        out.append(item)
+    out.sort(key=lambda x: x.get("recommend_score", 0), reverse=True)
+    return jsonify({"success": True, "resources": out})
+
+app.view_functions["get_teacher_questions_data"] = teacher_questions_data_ext
+app.view_functions["teacher_add_question"] = teacher_add_question_ext
+app.view_functions["teacher_update_question"] = teacher_update_question_ext
+app.view_functions["teacher_delete_question"] = teacher_delete_question_ext
+app.view_functions["student_resource_complete"] = student_resource_complete_legacy_ext
+app.view_functions["get_wrong_questions"] = student_wrong_questions_page_ext
+app.view_functions["get_student_resources_data"] = get_student_resources_data_ext
+app.view_functions["teacher_resources_data"] = teacher_resources_data_ext
+
+LEARNING_LOOP_STUDENT_JS = r"""
+<script>
+function qDifficultyName(d){return d==='easy'?'简单':(d==='hard'?'困难':'中等')}
+function qTypeName(t){return t==='multiple_choice'?'多选':(t==='judge'?'判断':(t==='blank'?'填空':'单选'))}
+function renderQuestionCard(q,resId){let opts=(q.options||[]).map(o=>'<label style="display:block;margin:6px 0"><input name="ans_'+esc(q.id)+'" '+(q.type==='multiple_choice'?'type="checkbox"':'type="radio"')+' value="'+esc(String(o).split('.')[0])+'"> '+esc(o)+'</label>').join('');if(q.type==='blank')opts='<input class="select" id="blank_'+esc(q.id)+'" placeholder="填写答案">';return '<div class="res-card question-card" data-q="'+esc(q.id)+'"><div class="res-title">'+esc(q.question||q.title)+'</div><span class="tag">'+qTypeName(q.type)+'</span><span class="tag">'+qDifficultyName(q.difficulty)+'</span><span class="tag">'+esc(q.knowledge_point||q.knowledge_name||'')+'</span><div style="margin-top:8px">'+opts+'</div><button class="btn" style="margin-top:8px" onclick="submitQuestion(\''+esc(q.id)+'\',\''+esc(resId||'')+'\')">提交答案</button><div class="muted answer-result" style="margin-top:8px"></div></div>'}
+async function submitQuestion(qid,resId){let card=document.querySelector('[data-q="'+CSS.escape(qid)+'"]'),vals=[];card.querySelectorAll('input[name="ans_'+CSS.escape(qid)+'"]:checked').forEach(i=>vals.push(i.value));let b=card.querySelector('#blank_'+CSS.escape(qid));if(b)vals=[b.value];let d=await fetch('/student/questions/submit',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({question_id:qid,answer:vals,resource_id:resId})}).then(r=>r.json());let box=card.querySelector('.answer-result');box.innerHTML=d.success?(d.correct?'<span class="tag ok">回答正确</span>':'<span class="tag bad">回答错误</span>')+' 正确答案：'+esc(d.correct_answer)+'<br>解析：'+esc(d.analysis||'暂无解析')+'<br>掌握度：'+Math.round((d.mastery_before||0)*100)+'% → '+Math.round((d.mastery_after||0)*100)+'%':esc(d.error||'提交失败')}
+async function completeResExt(rid,btn){btn.disabled=true;let d=await fetch('/student/resource/'+encodeURIComponent(rid)+'/complete',{method:'POST'}).then(r=>r.json());let box=btn.parentElement.querySelector('.after')||btn.parentElement.appendChild(document.createElement('div'));box.className='muted after';if(!d.success){box.textContent=d.error||'记录失败';return}btn.textContent='已完成学习';var es=d.exercise_set||{};box.innerHTML='<span class="tag ok">已完成学习</span><div style="margin-top:10px;padding:12px;border:2px solid #f59e0b;border-radius:8px;background:#fffbeb"><b>配套练习</b><p style="font-size:13px;margin-top:6px">本套练习共 '+(es.total_count||10)+' 题，覆盖当前知识点、先修知识点、相关知识点</p><a class="btn" href="/student/recommend/practice/'+(es.exercise_set_id||'')+'" style="background:#f59e0b;color:#fff;margin-top:8px">开始练习</a></div>'}
+async function enhancedResourcesPage(){const data=await getJson('/student/resources/data');let ch='全部',type='全部',status='全部',q='';function draw(){let all=data.resources||[];let chapters=[...new Set(all.map(r=>r.chapter_label||r.chapter_name||'未分类'))];let list=all.filter(r=>(ch==='全部'||(r.chapter_label||r.chapter_name||'未分类')===ch)&&(type==='全部'||r.type===type)&&(status==='全部'||(status==='已完成'?r.completed:!r.completed))&&(!q||[r.name,r.title,r.knowledge_point,r.teacher_name].join(' ').includes(q)));app.innerHTML='<div class="panel panel-pad"><div class="section-head"><div><h2>学习资源库</h2><div class="muted">按章节、类型、完成状态筛选资源；看完后可以直接练习。</div></div></div><div class="toolbar"><select class="select" onchange="ch=this.value;draw()"><option>全部</option>'+chapters.map(x=>'<option '+(x===ch?'selected':'')+'>'+esc(x)+'</option>').join('')+'</select><select class="select" onchange="type=this.value;draw()"><option>全部</option>'+[...new Set(all.map(r=>r.type||'资源'))].map(x=>'<option '+(x===type?'selected':'')+'>'+esc(x)+'</option>').join('')+'</select><select class="select" onchange="status=this.value;draw()"><option>全部</option><option>未完成</option><option>已完成</option></select><input class="search" placeholder="搜索资源、知识点、教师" oninput="clearTimeout(window._resDebounce);window._resDebounce=setTimeout(function(){q=this.value;draw()}.bind(this),300)"></div></div><div class="panel panel-pad"><div class="res-grid">'+list.map(r=>'<div class="res-card"><div class="res-title">'+esc(r.title||r.name)+'</div><span class="tag">'+esc(r.type||'资源')+'</span><span class="tag">'+esc(r.teacher_name||'未标注')+'</span><span class="tag">推荐度 '+Math.round((r.recommend_score||0)*100)+'%</span><div class="muted">'+esc(r.knowledge_point||'未绑定知识点')+'</div><div class="muted">'+esc(r.explain||'')+'</div><a class="btn light" target="_blank" href="'+resAction(r)+'">查看</a> <button class="btn green" onclick="completeResExt(\''+esc(r.resource_id||r.name)+'\',this)">'+(r.completed?'已完成学习':'我已看完')+'</button> <button class="btn light" onclick="loadResourceQuestions(\''+esc(r.resource_id||r.name)+'\',this)">看完后练一练</button><div class="after"></div></div>').join('')+'</div></div>'}window.draw=draw;draw()}
+async function loadResourceQuestions(rid,btn){let d=await fetch('/student/resource/'+encodeURIComponent(rid)+'/questions?limit=5').then(r=>r.json());let box=btn.parentElement.querySelector('.after');box.innerHTML='<div class="res-grid" style="margin-top:8px">'+(d.questions||[]).map(q=>renderQuestionCard(q,rid)).join('')+'</div>'}
+async function enhancedPathPage(){const data=await getJson('/student/path/data'+(TARGET?'?target_kp='+encodeURIComponent(TARGET):''));const steps=(data.learning_path&&data.learning_path.length?data.learning_path:data.fallback_path)||[];app.innerHTML='<div class="panel panel-pad"><h2>学习资源推荐</h2><div class="muted">每个节点提供推荐资源和立即练习。</div></div><div class="panel panel-pad">'+steps.map((s,i)=>'<div class="path-item"><div class="step-no">'+(i+1)+'</div><div><h3>'+esc(s.name)+'</h3><span class="tag">掌握度 '+Math.round((s.score||0)*100)+'%</span><div class="muted">'+esc(s.reason||'')+'</div><button class="btn light" onclick="loadStepQuestions(\''+esc(s.name)+'\',this)">立即练一练</button><div class="resource-strip">'+(s.resources||[]).map(r=>'<div class="mini-res"><div class="res-title">'+esc(r.title||r.name)+'</div><span class="tag">'+esc(r.type||'资源')+'</span><a class="btn light" href="'+resAction(r)+'">查看</a> <button class="btn green" onclick="completeResExt(\''+esc(r.resource_id||r.name)+'\',this)">我已看完</button><div class="after"></div></div>').join('')+'</div><div class="after"></div></div></div>').join('')+'</div>'}
+async function loadStepQuestions(kp,btn){let d=await fetch('/student/recommend/questions?knowledge_id='+encodeURIComponent(kp)+'&limit=5').then(r=>r.json());btn.parentElement.querySelector('.after').innerHTML='<div class="res-grid" style="margin-top:8px">'+(d.questions||[]).map(q=>renderQuestionCard(q,'')).join('')+'</div>'}
+async function wrongPage(){let d=await getJson('/student/wrong-questions/data');let qs=(d.questions||[]).filter(q=>(q.consecutive_correct||0)<2);let mastered=(d.questions||[]).filter(q=>(q.consecutive_correct||0)>=2).length;let multiWrong=qs.filter(function(q){return(q.wrong_count||0)>=2}).length;app.innerHTML='<div class="grid"><div class="stat"><span>错题总数</span><b>'+qs.length+'</b><span class="muted">需复练的错题</span></div><div class="stat"><span>已掌握</span><b>'+mastered+'</b><span class="muted">连续做对2次，已移出</span></div><div class="stat"><span>多次错误</span><b>'+multiWrong+'</b><span class="muted">错误2次及以上</span></div></div><div class="card"><div class="toolbar"><input class="search" id="wrongSearch" placeholder="搜索题干" oninput="renderWrong()"><select id="wrongFilter" onchange="renderWrong()"><option value="all">全部</option><option value="err1">错误1次</option><option value="multi">多次错误</option><option value="corr1">做对1次</option></select></div><div id="wrongList"></div></div>';window.WRONG_ALL=qs;window.renderWrong=function(){let q=document.getElementById("wrongSearch").value||"";q=q.toLowerCase();let f=document.getElementById("wrongFilter").value;let list=(window.WRONG_ALL||[]).filter(function(x){return!q||[x.question,x.chapter_name,x.knowledge_point].join(" ").toLowerCase().includes(q)});if(f==="err1")list=list.filter(function(x){return(x.wrong_count||0)===1});else if(f==="multi")list=list.filter(function(x){return(x.wrong_count||0)>=2});else if(f==="corr1")list=list.filter(function(x){return(x.consecutive_correct||0)===1});document.getElementById("wrongList").innerHTML=list.map(function(x){let st='';if((x.wrong_count||0)>=2){st='<span class="tag bad">多次错误</span>'}else{st='<span class="tag bad">错误1次</span>'}if((x.consecutive_correct||0)===1){st+='<span class="tag ok">做对1次</span>'}return'<div class="res-card"><b>'+esc(x.question||x.title)+'</b><span class="tag">'+esc(x.chapter_name||'')+'</span><span class="tag">'+esc(x.knowledge_point||'')+'</span>'+st+renderQuestionCard(x,'')+'<button class="btn light" onclick="removeWrong(\''+esc(x.id)+'\')">移出错题集</button></div>'}).join('')||'<div class="empty">暂无错题</div>'};renderWrong()}
+async function removeWrong(qid){await fetch('/student/wrong-questions/remove',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({question_id:qid})});wrongPage()}
+if(PAGE==='resources')enhancedResourcesPage();if(PAGE==='path')enhancedPathPage();if(PAGE==='wrong')wrongPage();
+</script>
+"""
+
+LEARNING_LOOP_STUDENT_JS = LEARNING_LOOP_STUDENT_JS.replace(
+    """async function wrongPage(){let d=await getJson('/student/wrong-questions/data');let qs=(d.questions||[]).filter(q=>(q.consecutive_correct||0)<2);let mastered=(d.questions||[]).filter(q=>(q.consecutive_correct||0)>=2).length;let streakLabel=function(s){if((s||0)===0)return'未做对';else if((s||0)===1)return'做对1次';return'已掌握'};app.innerHTML='<div class="grid"><div class="stat"><span>错题总数</span><b>'+qs.length+'</b></div><div class="stat"><span>已掌握</span><b>'+mastered+'</b></div><div class="stat"><span>未做对</span><b>'+qs.filter(q=>(q.consecutive_correct||0)===0).length+'</b></div></div><div class="card"><div class="toolbar"><input class="search" id="wrongSearch" placeholder="搜索题干" oninput="renderWrong()"><select id="wrongFilter" onchange="renderWrong()"><option value="all">全部</option><option value="zero">未做对</option><option value="once">做对1次</option></select></div><div id="wrongList"></div></div>';window.WRONG_ALL=qs;window.renderWrong=()=>{let q=(document.getElementById("wrongSearch").value||"").toLowerCase();let f=document.getElementById("wrongFilter").value;let list=(window.WRONG_ALL||[]).filter(x=>!q||[x.question,x.chapter_name,x.knowledge_point].join(" ").toLowerCase().includes(q));if(f==="zero")list=list.filter(x=>(x.consecutive_correct||0)===0);else if(f==="once")list=list.filter(x=>(x.consecutive_correct||0)===1);document.getElementById("wrongList").innerHTML=list.map(x=>{let tags=[];if((x.wrong_count||0)>=3)tags.push('<span class="tag bad">多次错误</span>');return'<div class="res-card"><b>'+esc(x.question||x.title)+'</b><span class="tag">'+esc(x.chapter_name||'')+'</span><span class="tag">'+esc(x.knowledge_point||'')+'</span><span class="tag bad">错误 '+(x.wrong_count||0)+' 次</span><span class="tag '+(x.consecutive_correct===0?'bad':'ok')+'">'+streakLabel(x.consecutive_correct||0)+'</span>'+tags.join('')+renderQuestionCard(x,'')+'<button class="btn light" onclick="removeWrong(\''+esc(x.id)+'\')">移出错题集</button></div>'}).join('')||'<div class="empty">暂无错题</div>'};renderWrong()}""",
+    """async function wrongPage(){let d=await getJson('/student/wrong-questions/data');let qs=(d.questions||[]).filter(q=>(q.consecutive_correct||0)<2);let mastered=(d.questions||[]).filter(q=>(q.consecutive_correct||0)>=2).length;let multiWrong=qs.filter(function(q){return(q.wrong_count||0)>=2}).length;app.innerHTML='<div class="grid"><div class="stat"><span>错题总数</span><b>'+qs.length+'</b><span class="muted">需复练的错题</span></div><div class="stat"><span>已掌握</span><b>'+mastered+'</b><span class="muted">连续做对2次，已移出</span></div><div class="stat"><span>多次错误</span><b>'+multiWrong+'</b><span class="muted">错误2次及以上</span></div></div><div class="card"><div class="toolbar"><input class="search" id="wrongSearch" placeholder="搜索题干" oninput="renderWrong()"><select id="wrongFilter" onchange="renderWrong()"><option value="all">全部</option><option value="err1">错误1次</option><option value="multi">多次错误</option><option value="corr1">做对1次</option></select></div><div id="wrongList"></div></div>';window.WRONG_ALL=qs;window.renderWrong=function(){let q=document.getElementById("wrongSearch").value||"";q=q.toLowerCase();let f=document.getElementById("wrongFilter").value;let list=(window.WRONG_ALL||[]).filter(function(x){return!q||[x.question,x.chapter_name,x.knowledge_point].join(" ").toLowerCase().includes(q)});if(f==="err1")list=list.filter(function(x){return(x.wrong_count||0)===1});else if(f==="multi")list=list.filter(function(x){return(x.wrong_count||0)>=2});else if(f==="corr1")list=list.filter(function(x){return(x.consecutive_correct||0)===1});document.getElementById("wrongList").innerHTML=list.map(function(x){let st='';if((x.wrong_count||0)>=2){st='<span class="tag bad">多次错误</span>'}else{st='<span class="tag bad">错误1次</span>'}if((x.consecutive_correct||0)===1){st+='<span class="tag ok">做对1次</span>'}return'<div class="res-card"><b>'+esc(x.question||x.title)+'</b><span class="tag">'+esc(x.chapter_name||'')+'</span><span class="tag">'+esc(x.knowledge_point||'')+'</span>'+st+renderQuestionCard(x,'')+'<button class="btn light" onclick="removeWrong(\''+esc(x.id)+'\')">移出错题集</button></div>'}).join('')||'<div class="empty">暂无错题</div>'};renderWrong()}"""
+)
+
+TEACHER_QUESTION_UI_JS = r"""
+<script>
+async function questionBank(){let d=await fetch('/teacher/questions/data').then(r=>r.json());window.QS=d.questions||[];window.KPS=[...new Set(QS.map(q=>q.knowledge_point||q.knowledge_name).filter(Boolean))];app.innerHTML='<div class="card"><div style="display:flex;justify-content:space-between;align-items:center"><h2>题库管理</h2><button class="btn green" onclick="openQuestionModal()">添加题目</button></div><div class="toolbar"><input id="qq" class="search" oninput="renderQuestionsFull()" placeholder="搜索题干、知识点"><select id="qch" onchange="renderQuestionsFull()"><option value="">全部章节</option>'+[...new Set(QS.map(q=>q.chapter_id).filter(Boolean))].map(c=>'<option value="'+esc(c)+'">第'+esc(c)+'章</option>').join('')+'</select><select id="qt" onchange="renderQuestionsFull()"><option value="">全部题型</option><option value="single_choice">单选</option><option value="multiple_choice">多选</option><option value="judge">判断</option><option value="blank">填空</option></select><select id="qd" onchange="renderQuestionsFull()"><option value="">全部难度</option><option value="easy">简单</option><option value="medium">中等</option><option value="hard">困难</option></select></div><div id="questionList"></div></div>'+questionModalHTML();renderQuestionsFull()}
+function questionModalHTML(){return '<div class="modal" id="questionModal"><div class="dialog" style="width:900px;max-height:90vh;overflow-y:auto;padding:24px"><h3 id="qModalTitle">添加题目</h3><div style="display:grid;grid-template-columns:1fr 1fr;gap:16px"><div><label>知识点编号</label><input id="qKpCode" placeholder="如 3.4.7"><label>知识点名称</label><input id="qKpName" placeholder="如 活锁"><label>题型</label><select id="qType" onchange="onTypeChange()"><option value="single_choice">单选</option><option value="multiple_choice">多选</option></select><label>难度</label><select id="qDifficulty"><option value="easy">基础</option><option value="medium">中等</option><option value="hard">困难</option></select><label>题干</label><textarea id="qText" rows="3" placeholder="题目内容"></textarea></div><div><label>选项A</label><input id="optA" placeholder="选项A内容"><label>选项B</label><input id="optB" placeholder="选项B内容"><label>选项C</label><input id="optC" placeholder="选项C内容"><label>选项D</label><input id="optD" placeholder="选项D内容"><label>正确答案</label><input id="qAnswer" placeholder="单选填A/B/C/D，多选填A,B或A,C"><label>解析</label><textarea id="qExplain" rows="3" placeholder="答案解析"></textarea></div></div><div style="margin-top:16px;padding-top:16px;border-top:1px solid #e5e7eb"><details><summary style="cursor:pointer;font-weight:bold;color:#475569">大文本快速录入（可选）</summary><textarea id="quickInput" rows="10" style="margin-top:10px;font-family:monospace;font-size:13px;width:100%" placeholder="粘贴格式示例：&#10;知识点：3.4.7 活锁&#10;题型：单选&#10;难度：中等&#10;题干：活锁与死锁的主要区别是（ ）。&#10;A. 活锁中进程状态不断变化但无法推进&#10;B. 活锁中进程永久阻塞&#10;C. 活锁一定由硬件故障引起&#10;D. 活锁不会影响系统性能&#10;答案：A&#10;解析：活锁中进程仍在运行并改变状态，但整体工作没有实质推进。"></textarea><button class="btn" style="margin-top:10px" onclick="parseQuickInput()">解析并填入表单</button></details></div><input id="qId" type="hidden"><div style="margin-top:16px;text-align:right"><button class="btn light" onclick="closeQuestionModal()">取消</button> <button class="btn green" onclick="saveQuestion()">保存题目</button></div></div></div>'}
+function renderQuestionsFull(){let q=norm(qq.value),ch=qch.value,t=qt.value,d=qd.value;let list=(QS||[]).filter(x=>(!ch||String(x.chapter_id)===ch)&&(!t||x.type===t)&&(!d||x.difficulty===d)&&(!q||norm([x.id,x.question,x.knowledge_point,x.answer,x.analysis].join(' ')).includes(q)));questionList.innerHTML='<table class="table"><thead><tr><th>题干</th><th>题型</th><th>难度</th><th>章节</th><th>知识点</th><th>答案</th><th>解析</th><th>作答/正确率</th><th>操作</th></tr></thead><tbody>'+list.map(x=>'<tr><td>'+esc((x.question||'').slice(0,50))+'</td><td>'+esc(x.type)+'</td><td>'+esc(x.difficulty)+'</td><td>'+esc(x.chapter_name||x.chapter_id||'')+'</td><td>'+esc(x.knowledge_point||'')+'</td><td>'+esc(x.answer||'')+'</td><td>'+(x.analysis?'有':'无')+'</td><td>'+Number(x.total_attempts||0)+' / '+Math.round((x.global_correct_rate||0)*100)+'%</td><td><button class="btn light" onclick="openQuestionModal(\\''+esc(x.id)+'\\')">编辑</button> <button class="btn light" onclick="toggleQuestion(\\''+esc(x.id)+'\\')">'+(x.status==='disabled'?'启用':'禁用')+'</button> <button class="btn danger" onclick="deleteQuestionFull(\\''+esc(x.id)+'\\')">删除</button></td></tr>').join('')+'</tbody></table>'}
+function onTypeChange(){if(qType.value==='single_choice'){qAnswer.placeholder='单选填A/B/C/D'}else{qAnswer.placeholder='多选填A,B或A,C'}}
+function openQuestionModal(id){let q=(QS||[]).find(x=>String(x.id)===String(id))||{};let modal=document.getElementById('questionModal');if(!modal){app.insertAdjacentHTML('beforeend',questionModalHTML());modal=document.getElementById('questionModal')}qModalTitle.textContent=q.id?'编辑题目':'添加题目';qId.value=q.id||'';qText.value=q.question||q.title||'';qKpCode.value='';qKpName.value='';let kp=q.knowledge_point||q.knowledge_name||'';let m=kp.match(/^(\\d+(?:\\.\\d+)*)\\s*(.*)/);if(m){qKpCode.value=m[1];qKpName.value=m[2]}qType.value=q.type||'single_choice';qDifficulty.value=q.difficulty||'medium';qAnswer.value=q.answer||'';qExplain.value=q.analysis||q.explanation||'';let opts=q.options||[];optA.value=opts[0]?String(opts[0]).replace(/^[A-D][\\.\\、\\s]*/,''):'';optB.value=opts[1]?String(opts[1]).replace(/^[A-D][\\.\\、\\s]*/,''):'';optC.value=opts[2]?String(opts[2]).replace(/^[A-D][\\.\\、\\s]*/,''):'';optD.value=opts[3]?String(opts[3]).replace(/^[A-D][\\.\\、\\s]*/,''):'';quickInput.value='';onTypeChange();modal.classList.add('open')}
+function closeQuestionModal(){let modal=document.getElementById('questionModal');if(modal)modal.classList.remove('open')}
+function parseQuickInput(){let text=quickInput.value.trim();if(!text){alert('请先粘贴题目文本');return}let lines=text.split(/\\n/);let data={};let currentKey='';let optionLetters=['A','B','C','D'];lines.forEach(function(line){line=line.trim();if(!line)return;let m=line.match(/^(知识点|题型|难度|题干|答案|解析)[：:]\\s*(.*)/);if(m){currentKey=m[1];data[currentKey]=(data[currentKey]||'')+m[2];return}let om=line.match(/^([A-D])[\\.\\、\\s]\\s*(.*)/);if(om){currentKey='选项'+om[1];data[currentKey]=om[2];return}if(currentKey){data[currentKey]=(data[currentKey]||'')+line}});if(data['知识点']){let kp=data['知识点'];let km=kp.match(/^(\\d+(?:\\.\\d+)*)\\s*(.*)/);if(km){qKpCode.value=km[1];qKpName.value=km[2]}else{qKpCode.value=kp;qKpName.value=''}}if(data['题型']){let t=data['题型'];if(t.includes('多选'))qType.value='multiple_choice';else qType.value='single_choice';onTypeChange()}if(data['难度']){let d=data['难度'];if(d.includes('基础')||d.includes('简单')||d==='easy')qDifficulty.value='easy';else if(d.includes('困难')||d==='hard')qDifficulty.value='hard';else qDifficulty.value='medium'}if(data['题干'])qText.value=data['题干'];if(data['选项A'])optA.value=data['选项A'];if(data['选项B'])optB.value=data['选项B'];if(data['选项C'])optC.value=data['选项C'];if(data['选项D'])optD.value=data['选项D'];if(data['答案']){let a=data['答案'].toUpperCase().replace(/[^A-D,，]/g,'');qAnswer.value=a}if(data['解析'])qExplain.value=data['解析'];alert('解析完成，请检查并确认各字段')}
+async function saveQuestion(){let kpCode=qKpCode.value.trim();let kpName=qKpName.value.trim();let kpFull=kpCode&&kpName?(kpCode+' '+kpName):kpCode;let questionText=qText.value.trim();let typeVal=qType.value;let diffVal=qDifficulty.value;let answerVal=qAnswer.value.trim().toUpperCase();let explainVal=qExplain.value.trim();let optAVal=optA.value.trim();let optBVal=optB.value.trim();let optCVal=optC.value.trim();let optDVal=optD.value.trim();if(!kpCode){alert('知识点编号不能为空');return}if(!questionText){alert('题干不能为空');return}if(!optAVal||!optBVal||!optCVal||!optDVal){alert('四个选项都不能为空');return}if(optAVal==='选项A'||optBVal==='选项B'||optCVal==='选项C'||optDVal==='选项D'){alert('选项内容不能是"选项A/选项B/选项C/选项D"');return}if(!answerVal){alert('正确答案不能为空');return}let ansParts=answerVal.split(/[,，、\\s]+/).filter(x=>x);let validAns=ansParts.every(a=>['A','B','C','D'].includes(a));if(!validAns||ansParts.length===0){alert('答案必须是A/B/C/D或A,B格式');return}if(typeVal==='single_choice'&&ansParts.length>1){alert('单选题只能有一个答案');return}if(!explainVal){alert('解析不能为空');return}let options=['A. '+optAVal,'B. '+optBVal,'C. '+optCVal,'D. '+optDVal];let code=(kpCode.match(/\\d+(?:\\.\\d+)*/)||[''])[0];let payload={question:questionText,title:questionText,type:typeVal,difficulty:diffVal,knowledge_point:kpFull,knowledge_name:kpFull,knowledge_id:code,chapter_id:code.split('.')[0]||'',chapter_name:code?'第'+code.split('.')[0]+'章':'未分类',options:options,answer:ansParts.join(','),analysis:explainVal,explanation:explainVal};let url=qId.value?'/teacher/questions/'+encodeURIComponent(qId.value)+'/update':'/teacher/questions/add';let d=await fetch(url,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(payload)}).then(r=>r.json());alert(d.success?'保存成功':(d.error||'保存失败'));if(d.success){closeQuestionModal();questionBank()}}
+async function deleteQuestionFull(id){if(!confirm('确认删除？答题历史不会删除，但题目不再显示。'))return;let d=await fetch('/teacher/questions/'+encodeURIComponent(id)+'/delete',{method:'POST'}).then(r=>r.json());if(d.success)questionBank()}
+async function toggleQuestion(id){let d=await fetch('/teacher/questions/'+encodeURIComponent(id)+'/toggle',{method:'POST'}).then(r=>r.json());if(d.success)questionBank()}
+async function resourceManage(){let d=await fetch('/teacher/resources/data').then(r=>r.json());window.RES=d.resources||[];app.innerHTML='<div class="card"><div style="display:flex;justify-content:space-between;align-items:center"><h2>资源管理</h2><label class="btn green">上传资源<input type="file" style="display:none" onchange="uploadResource(this)"></label></div><div class="toolbar"><input id="rq" class="search" oninput="renderResources()" placeholder="搜索文件名、知识点、教师"><select id="rt" onchange="renderResources()"><option>全部类型</option>'+[...new Set(RES.map(r=>r.type||'资源'))].map(t=>'<option>'+esc(t)+'</option>').join('')+'</select><select id="rsort" onchange="renderResources()"><option value="recommend">按推荐度</option><option value="complete">按完成率</option><option value="effect">按效果分</option></select></div><div id="resourceList"></div></div>';renderResources()}
+function renderResources(){let q=norm(rq.value),t=rt.value,sort=rsort.value,list=(RES||[]).filter(r=>(t==='全部类型'||r.type===t)&&(!q||norm([r.name,r.title,r.knowledge_point,r.teacher_name,r.chapter_label].join(' ')).includes(q)));list.sort((a,b)=>sort==='complete'?(b.completion_rate||0)-(a.completion_rate||0):sort==='effect'?(b.effectiveness_score||0)-(a.effectiveness_score||0):(b.recommend_score||0)-(a.recommend_score||0));let groups={};list.forEach(r=>{let ch=r.chapter_label||r.chapter_name||'未分类';(groups[ch]||(groups[ch]=[])).push(r)});resourceList.innerHTML=Object.keys(groups).sort((a,b)=>a.localeCompare(b,'zh-Hans',{numeric:true})).map((ch,i)=>'<details class="chapter" '+(i?'':'open')+'><summary>'+esc(ch)+' · '+groups[ch].length+' 个资源</summary><table class="table"><thead><tr><th>资源</th><th>教师版本</th><th>知识点</th><th>类型</th><th>使用/完成</th><th>完成率</th><th>效果分</th><th>正确率提升</th><th>掌握度提升</th><th>推荐度</th><th>操作</th></tr></thead><tbody>'+groups[ch].map(r=>'<tr><td><b>'+esc(r.title||r.name)+'</b></td><td>'+esc(r.teacher_name||'未标注')+'</td><td>'+esc(r.knowledge_point||'未绑定')+'</td><td>'+esc(r.type||'资源')+'</td><td>'+Number(r.use_count||0)+' / '+Number(r.complete_count||0)+'</td><td>'+Math.round((r.completion_rate||0)*100)+'%</td><td>'+Math.round((r.effectiveness_score||0)*100)+'%</td><td>'+Math.round((r.avg_score_gain||0)*100)+'%</td><td>'+Math.round((r.avg_mastery_gain||0)*100)+'%</td><td><b>'+Math.round((r.recommend_score||0)*100)+'%</b></td><td><a class="btn light" target="_blank" href="'+openRes(r)+'">查看</a> <label class="btn light">替换<input type="file" style="display:none" onchange="replaceResource(this,\\''+esc(r.name)+'\\')"></label> <button class="btn light" onclick="renameResource(\\''+esc(r.name)+'\\')">改名</button> <button class="btn danger" onclick="deleteResource(\\''+esc(r.name)+'\\')">删除</button></td></tr>').join('')+'</tbody></table></details>').join('')||'<div class="empty">暂无资源</div>'}
+</script>
+"""
+
+_previous_render_flow_page_learning_loop = render_flow_page
+def render_flow_page(title, active):
+    response = _previous_render_flow_page_learning_loop(title, active)
+    if hasattr(response, "get_data"):
+        html = response.get_data(as_text=True)
+        html = html.replace("/student/recommend/data?refresh=1", "/student/recommend/data")
+        html = html.replace("平均掌握度", "综合掌握度")
+        html = html.replace("骞冲潎鎺屾彙搴?", "综合掌握度")
+        html = html.replace(
+            "var resources=t.resources||[],esi=t.exercise_set_id||'',esiInfo=t.exercise_set_info||{},mastery=t.mastery||0;",
+            "var resources=t.resources||[],esi=t.exercise_set_id||'',practiceUrl=t.exercise_start_url||(esi?('/student/recommend/practice/'+esi):''),esiInfo=t.exercise_set_info||{},mastery=t.mastery||0;"
+        )
+        html = html.replace(
+            "(esi?'<a class=\"btn\" href=\"/student/recommend/practice/'+esc(esi)+'\" style=\"background:#f59e0b;color:#fff\">开始练习</a>':'<span class=\"muted\">暂无配套练习</span>')",
+            "(practiceUrl?'<a class=\"btn\" href=\"'+esc(practiceUrl)+'\" style=\"background:#f59e0b;color:#fff\">开始练习</a>':'<span class=\"muted\">暂无配套练习</span>')"
+        )
+        if "/student/wrong-questions" not in html:
+            active_cls = 'active' if active == 'wrong' else ''
+            html = html.replace('<a href="/student/records"', '<a href="/student/wrong-questions" class="{}">错题集</a><a href="/student/records"'.format(active_cls), 1)
+        html = html.replace("</body>", LEARNING_LOOP_STUDENT_JS + "\n</body>")
+        return make_response(html)
+    return response
+
+_TEACHER_MODAL_CSS = ".modal{display:none;position:fixed;inset:0;background:rgba(15,23,42,.45);z-index:50;align-items:center;justify-content:center}.modal.open{display:flex}.dialog{background:#fff;border-radius:8px;width:420px;max-width:92vw;padding:22px}.dialog label{display:block;font-size:13px;color:#475569;margin:12px 0 5px}.dialog input,.dialog textarea{width:100%}"
+
+_previous_render_teacher_workspace_learning_loop = render_teacher_workspace
+def render_teacher_workspace(initial_tab="overview", page_title="教师工作台"):
+    response = _previous_render_teacher_workspace_learning_loop(initial_tab, page_title)
+    if hasattr(response, "get_data"):
+        html = response.get_data(as_text=True)
+    elif isinstance(response, str):
+        html = response
+    else:
+        return response
+    html = html.replace("</style>", _TEACHER_MODAL_CSS + "</style>", 1)
+    js_inject = TEACHER_QUESTION_UI_JS.replace("<script>", "").replace("</script>", "")
+    html = html.replace("\nload();\n</script>", "\n{}\nload();\n</script>".format(js_inject))
+    html = html.replace("\r\nload();\r\n</script>", "\r\n{}\r\nload();\r\n</script>".format(js_inject))
+    return make_response(html)
+
+# ---------------------------------------------------------------------------
+# Final repair layer: real data, UTF-8 repair, learning loop, teacher tools
+# ---------------------------------------------------------------------------
+
+LEARNING_RECORD_FILE = os.path.join(RESOURCE_DIR, "learning_records.json")
+STUDENT_META_FILE = os.path.join(RESOURCE_DIR, "students_meta.json")
+ALLOWED_RESOURCE_EXTENSIONS = {
+    ".mp4", ".avi", ".mov", ".mkv", ".webm",
+    ".ppt", ".pptx",
+    ".doc", ".docx", ".pdf", ".txt", ".md",
+}
+BLOCKED_RESOURCE_NAMES = {
+    "question_history.json",
+    "questions.json",
+    "resource_completion.json",
+    "resource_effect_events.json",
+    "resource_manifest.json",
+    "resource_stats.json",
+    "students_meta.json",
+    "learning_records.json",
+}
+_CLEAN_MANIFEST_CACHE = None
+_RESOURCE_LIST_CACHE = None
+_RESOURCE_MAP_CACHE = None
+_QUESTION_CACHE = None
+_KNOWLEDGE_CATALOG_CACHE = None
+
+DEFAULT_STUDENT_META = {
+    "3220602001": {"student_num": "3220602001", "name": "刘大", "class_name": "软件工程1班", "gender": "男", "password": "123456", "note": ""},
+    "3220602002": {"student_num": "3220602002", "name": "陈二", "class_name": "软件工程1班", "gender": "男", "password": "123456", "note": ""},
+    "3220602003": {"student_num": "3220602003", "name": "张三", "class_name": "软件工程1班", "gender": "男", "password": "123456", "note": ""},
+    "3220602004": {"student_num": "3220602004", "name": "李四", "class_name": "软件工程1班", "gender": "女", "password": "123456", "note": ""},
+    "3220602005": {"student_num": "3220602005", "name": "王五", "class_name": "软件工程1班", "gender": "男", "password": "123456", "note": ""},
+    "3220602006": {"student_num": "3220602006", "name": "赵六", "class_name": "软件工程1班", "gender": "女", "password": "123456", "note": ""},
+    "3220602007": {"student_num": "3220602007", "name": "周七", "class_name": "软件工程1班", "gender": "男", "password": "123456", "note": ""},
+}
+
+
+def repair_text(value):
+    if not isinstance(value, str):
+        return value
+    text = value.replace("\ufeff", "").strip()
+    if not text:
+        return text
+    for _ in range(2):
+        suspicious = ("鏉", "闄", "寮", "锛", "绯", "姒", "€", "�")
+        if not any(token in text for token in suspicious):
+            break
+        try:
+            candidate = text.encode("gbk", errors="ignore").decode("utf-8", errors="ignore").strip()
+            if candidate:
+                text = candidate
+        except Exception:
+            break
+    return text
+
+
+def repair_obj(value):
+    if isinstance(value, dict):
+        return {repair_text(k): repair_obj(v) for k, v in value.items()}
+    if isinstance(value, list):
+        return [repair_obj(v) for v in value]
+    return repair_text(value)
+
+
+def load_student_meta():
+    data = repair_obj(_json_load(STUDENT_META_FILE, {}))
+    for sid, item in DEFAULT_STUDENT_META.items():
+        cur = data.setdefault(sid, {})
+        cur.setdefault("student_num", sid)
+        cur.setdefault("name", item["name"])
+        cur.setdefault("class_name", item["class_name"])
+        cur.setdefault("gender", item["gender"])
+        cur.setdefault("password", item["password"])
+        cur.setdefault("note", item["note"])
+    return data
+
+
+def save_student_meta(data):
+    _json_save(STUDENT_META_FILE, data)
+
+
+def sync_student_registry():
+    meta = load_student_meta()
+    STUDENTS.clear()
+    for sid in sorted(meta.keys()):
+        item = meta[sid]
+        STUDENTS[sid] = {
+            "password": item.get("password") or "123456",
+            "name": item.get("name") or sid,
+            "full_id": "{}{}".format(item.get("student_num") or sid, item.get("name") or ""),
+            "class_name": item.get("class_name") or "",
+            "gender": item.get("gender") or "",
+            "note": item.get("note") or "",
+        }
+
+
+sync_student_registry()
+TEACHERS["1000002401"] = {"password": "admin1", "name": "教师"}
+
+
+def normalize_student_id(student_id):
+    raw = repair_text(str(student_id or ""))
+    num_match = re.match(r"^(\d{10})", raw)
+    if num_match and num_match.group(1) in STUDENTS:
+        return STUDENTS[num_match.group(1)]["full_id"]
+    if raw in STUDENT_SCENARIOS:
+        return raw
+    for sid, info in STUDENTS.items():
+        if raw == sid or raw == info.get("full_id"):
+            return info.get("full_id")
+    return raw
+
+
+def get_student_meta_by_full_id(student_id):
+    full_id = normalize_student_id(student_id)
+    num, name = parse_student_identity(full_id)
+    meta = load_student_meta().get(num, {}).copy()
+    meta.setdefault("student_num", num)
+    meta.setdefault("name", name)
+    meta["full_id"] = full_id
+    return meta
+
+
+def is_learning_resource(filename):
+    name = os.path.basename(str(filename or "")).lower()
+    ext = os.path.splitext(name)[1].lower()
+    if not name or name in BLOCKED_RESOURCE_NAMES:
+        return False
+    if ext not in ALLOWED_RESOURCE_EXTENSIONS:
+        return False
+    if name.endswith(".bak") or ".bak." in name:
+        return False
+    blocked_fragments = ("manifest", "history", "stats", "effect", "cache", "config", "log", "tmp")
+    if ext == ".json" or any(fragment in name for fragment in blocked_fragments):
+        return False
+    return True
+
+
+def iter_learning_resource_files():
+    if not os.path.isdir(TEACHING_MATERIALS_DIR):
+        return
+    for entry in os.scandir(TEACHING_MATERIALS_DIR):
+        if not entry.is_file():
+            continue
+        filename = entry.name
+        if is_learning_resource(filename):
+            yield filename, entry.path
+
+
+def resource_abs_path(resource_id):
+    if not resource_id:
+        return None
+    safe_rel = str(resource_id).replace("\\", "/").lstrip("/")
+    basename = os.path.basename(safe_rel)
+    abs_path_tm = os.path.normpath(os.path.join(TEACHING_MATERIALS_DIR, basename))
+    if os.path.isfile(abs_path_tm):
+        return abs_path_tm
+    abs_path = os.path.normpath(os.path.join(RESOURCE_DIR, safe_rel))
+    if abs_path.startswith(os.path.normpath(RESOURCE_DIR)) and os.path.isfile(abs_path):
+        return abs_path
+    return None
+
+
+def is_valid_resource(resource_id):
+    abs_path = resource_abs_path(resource_id)
+    return bool(abs_path and os.path.exists(abs_path) and is_learning_resource(resource_id))
+
+
+def resource_extension_type(resource_id):
+    ext = os.path.splitext(str(resource_id or "").lower())[1]
+    if ext in {".mp4", ".avi", ".mov", ".mkv", ".webm"}:
+        return "视频"
+    return "文档"
+
+
+def clean_resource_title(resource_id):
+    base = os.path.splitext(os.path.basename(str(resource_id or "")))[0]
+    return repair_text(base.replace("_", " "))
+
+
+def parse_resource_filename(filename):
+    basename = os.path.basename(str(filename or ""))
+    name_no_ext = os.path.splitext(basename)[0]
+    info = parse_resource_info(basename)
+    code = ""
+    if info.get("ch") is not None and info.get("big") is not None:
+        code = "{}.{}".format(info["ch"], info["big"])
+        if info.get("sec") is not None:
+            code = "{}.{}.{}".format(info["ch"], info["big"], info["sec"])
+    elif info.get("ch") is not None:
+        code = str(info["ch"])
+
+    knowledge_name = ""
+    teacher = ""
+    resource_type = resource_extension_type(filename)
+    for item in resource_manifest_items():
+        mf = str(item.get("filename") or "").replace("\\", "/")
+        if mf == basename or mf == filename or os.path.basename(mf) == basename:
+            if not knowledge_name:
+                kp = repair_text(item.get("knowledge_point") or "")
+                if kp:
+                    knowledge_name = kp
+            if not teacher or teacher == "未标注":
+                t = repair_text(item.get("teacher") or "")
+                if t:
+                    teacher = t
+            mt = repair_text(item.get("type") or "")
+            if mt:
+                resource_type = mt
+            if knowledge_name and teacher and resource_type:
+                break
+
+    if not knowledge_name and code:
+        catalog = build_knowledge_catalog()
+        for cat_item in catalog:
+            if cat_item.get("code") == code:
+                knowledge_name = repair_text(cat_item.get("name") or "")
+                break
+
+    if not teacher or teacher == "未标注":
+        teacher = infer_teacher_name(filename)
+
+    if not knowledge_name and code:
+        clean_name = name_no_ext
+        if clean_name.startswith(code):
+            clean_name = clean_name[len(code):].lstrip("_")
+        if teacher and teacher != "未标注":
+            clean_name = re.sub(r"_?" + re.escape(teacher) + r"$", "", clean_name)
+        elif teacher == "未标注":
+            known_teachers = set()
+            for t_val in TEACHERS.values():
+                if t_val.get("name"):
+                    known_teachers.add(t_val.get("name"))
+            for kt in known_teachers:
+                clean_name = re.sub(r"_?" + re.escape(kt) + r"$", "", clean_name)
+        if clean_name:
+            knowledge_name = code + " " + repair_text(clean_name.replace("_", " "))
+
+    knowledge_id = flow_kp_code(knowledge_name) or code or ""
+
+    title_parts = []
+    if code:
+        title_parts.append(code)
+    if knowledge_name:
+        kp_name_clean = knowledge_name
+        if code and kp_name_clean.startswith(code):
+            kp_name_clean = kp_name_clean[len(code):].strip()
+        if kp_name_clean:
+            title_parts.append(kp_name_clean)
+    if teacher and teacher != "未标注":
+        title_parts.append(teacher)
+    title = " ".join(title_parts) if title_parts else repair_text(name_no_ext.replace("_", " "))
+
+    chapter_id, chapter_label, section_label = resource_chapter_labels(knowledge_name if knowledge_name else code)
+
+    return {
+        "resource_id": filename,
+        "filename": basename,
+        "title": title,
+        "knowledge_id": knowledge_id,
+        "knowledge_name": knowledge_name or code or "未分类",
+        "knowledge_point": knowledge_name or code or "未分类",
+        "teacher": teacher or "未标注",
+        "resource_type": resource_type,
+        "type": resource_type,
+        "chapter_id": chapter_id,
+        "chapter_label": chapter_label,
+        "section_label": section_label,
+        "code": code,
+    }
+
+
+def clean_manifest_items():
+    global _CLEAN_MANIFEST_CACHE
+    if _CLEAN_MANIFEST_CACHE is not None:
+        return [dict(item) for item in _CLEAN_MANIFEST_CACHE]
+    items = []
+    seen = set()
+    for rel_path, _ in iter_learning_resource_files():
+        seen.add(rel_path)
+        seen.add(os.path.basename(rel_path))
+    for item in resource_manifest_items():
+        filename = repair_text(item.get("filename") or item.get("name") or "")
+        if filename:
+            filename = filename.replace("\\", "/")
+        if not filename:
+            continue
+        if filename not in seen and os.path.basename(filename) not in seen:
+            continue
+        if not is_learning_resource(filename) and not is_learning_resource(os.path.basename(filename)):
+            continue
+        kp = repair_text(item.get("knowledge_point") or "")
+        teacher = repair_text(item.get("teacher") or "")
+        items.append({
+            "filename": filename,
+            "knowledge_point": kp,
+            "teacher": teacher,
+            "type": repair_text(item.get("type") or ""),
+        })
+    _CLEAN_MANIFEST_CACHE = items
+    return [dict(item) for item in items]
+
+
+def infer_teacher_name(resource_id):
+    basename = os.path.basename(str(resource_id or ""))
+    teacher = repair_text(infer_teacher_for_resource({"filename": basename}).get("teacher_name") or "")
+    if teacher and teacher != "未标注":
+        return teacher
+    for item in clean_manifest_items():
+        mf = item.get("filename") or ""
+        if mf == resource_id or mf == basename or mf == os.path.basename(mf):
+            if item.get("teacher"):
+                return item["teacher"]
+    return "未标注"
+
+
+def infer_clean_knowledge(resource_id):
+    parsed = parse_resource_filename(resource_id)
+    knowledge_name = parsed.get("knowledge_name") or ""
+    if knowledge_name and knowledge_name != "未分类":
+        return knowledge_name
+    code = parsed.get("code") or ""
+    if code:
+        return code
+    return "未分类"
+
+
+def resource_chapter_labels(knowledge_name):
+    code = flow_kp_code(knowledge_name)
+    parts = code.split(".") if code else []
+    chapter_id = parts[0] if parts else ""
+    section_label = ".".join(parts[:2]) if len(parts) >= 2 else ("整章" if chapter_id else "未分类")
+    return chapter_id, ("第{}章".format(chapter_id) if chapter_id else "未分类"), section_label
+
+
+def final_resource_record(resource_id):
+    global _RESOURCE_MAP_CACHE
+    resource_id = str(resource_id or "").replace("\\", "/")
+    if _RESOURCE_MAP_CACHE is not None and resource_id in _RESOURCE_MAP_CACHE:
+        return dict(_RESOURCE_MAP_CACHE[resource_id])
+    return _build_resource_record(resource_id)
+
+
+def _build_resource_record(resource_id):
+    resource_id = str(resource_id or "").replace("\\", "/")
+    parsed = parse_resource_filename(resource_id)
+    knowledge_name = parsed.get("knowledge_name") or "未分类"
+    knowledge_id = parsed.get("knowledge_id") or flow_kp_code(knowledge_name) or ""
+    chapter_id, chapter_label, section_label = resource_chapter_labels(knowledge_name)
+    abs_path = resource_abs_path(resource_id)
+    return {
+        "resource_id": resource_id,
+        "id": resource_id,
+        "name": resource_id,
+        "title": parsed.get("title") or clean_resource_title(resource_id),
+        "type": parsed.get("resource_type") or resource_extension_type(resource_id),
+        "teacher_name": parsed.get("teacher") or infer_teacher_name(resource_id),
+        "knowledge_point": knowledge_name,
+        "knowledge_id": knowledge_id,
+        "chapter_id": chapter_id,
+        "chapter_label": chapter_label,
+        "section_label": section_label,
+        "size": os.path.getsize(abs_path) if abs_path and os.path.exists(abs_path) else 0,
+        "updated_at": datetime.fromtimestamp(os.path.getmtime(abs_path)).strftime("%Y-%m-%d %H:%M") if abs_path and os.path.exists(abs_path) else "",
+    }
+
+
+def clear_resource_caches():
+    global _RESOURCE_LIST_CACHE, _RESOURCE_MAP_CACHE, _KNOWLEDGE_CATALOG_CACHE, _CLEAN_MANIFEST_CACHE, _RESOURCE_STATS_CACHE
+    _RESOURCE_LIST_CACHE = None
+    _RESOURCE_MAP_CACHE = None
+    _KNOWLEDGE_CATALOG_CACHE = None
+    _CLEAN_MANIFEST_CACHE = None
+    _RESOURCE_STATS_CACHE = None
+
+
+@perf_log("all_resource_records")
+def all_resource_records():
+    global _RESOURCE_LIST_CACHE, _RESOURCE_MAP_CACHE, _KNOWLEDGE_CATALOG_CACHE
+    if _RESOURCE_LIST_CACHE is not None and _RESOURCE_MAP_CACHE is not None:
+        current_files = set()
+        for rel_path, _ in iter_learning_resource_files():
+            current_files.add(rel_path)
+        cached_ids = {item["resource_id"] for item in _RESOURCE_LIST_CACHE}
+        if current_files == cached_ids:
+            return [dict(item) for item in _RESOURCE_LIST_CACHE]
+    items = [_build_resource_record(rel_path) for rel_path, _ in iter_learning_resource_files()]
+    items.sort(key=lambda x: natural_sort_key(x["resource_id"]))
+    _RESOURCE_LIST_CACHE = items
+    _RESOURCE_MAP_CACHE = {item["resource_id"]: item for item in items}
+    _KNOWLEDGE_CATALOG_CACHE = None
+    return [dict(item) for item in items]
+
+
+def load_questions_clean():
+    global _QUESTION_CACHE
+    if _QUESTION_CACHE is not None:
+        return {"questions": [dict(q) for q in _QUESTION_CACHE]}
+    data = repair_obj(_json_load(os.path.join(RESOURCE_DIR, "questions.json"), {"questions": []}))
+    questions = []
+    for raw in data.get("questions", []):
+        q = normalize_question(raw)
+        q["title"] = repair_text(q.get("title") or q.get("question") or "")
+        q["question"] = q["title"]
+        q["question_text"] = q["title"]
+        q["knowledge_point"] = repair_text(q.get("knowledge_point") or q.get("knowledge_name") or "")
+        q["knowledge_name"] = q["knowledge_point"]
+        q["chapter_name"] = repair_text(q.get("chapter_name") or "") or ("第{}章".format(q.get("chapter_id")) if q.get("chapter_id") else "未分类")
+        q["analysis"] = repair_text(q.get("analysis") or q.get("explanation") or "")
+        q["explanation"] = q["analysis"]
+        q["options"] = [repair_text(opt) for opt in (q.get("options") or [])]
+        if q["type"] == "single_choice" and len(q["options"]) < 4:
+            q["options"] = q["options"] + ["{}. 备选项".format(chr(ord("A") + i)) for i in range(len(q["options"]), 4)]
+        questions.append(q)
+    _QUESTION_CACHE = questions
+    return {"questions": [dict(q) for q in questions]}
+
+
+def save_questions_clean(data):
+    global _QUESTION_CACHE, _KNOWLEDGE_CATALOG_CACHE
+    _QUESTION_CACHE = None
+    _KNOWLEDGE_CATALOG_CACHE = None
+    _json_save(os.path.join(RESOURCE_DIR, "questions.json"), data)
+
+
+def get_question_map_clean():
+    return {str(q.get("id")): q for q in load_questions_clean().get("questions", [])}
+
+
+_QUESTION_HISTORY_CACHE = None
+
+@perf_log("load_question_history_clean")
+def load_question_history_clean():
+    global _QUESTION_HISTORY_CACHE
+    if _QUESTION_HISTORY_CACHE is not None:
+        return _QUESTION_HISTORY_CACHE
+    data = repair_obj(_json_load(os.path.join(RESOURCE_DIR, "question_history.json"), {}))
+    normalized = {}
+    for sid, history in data.items():
+        normalized[normalize_student_id(sid)] = history or {}
+    _QUESTION_HISTORY_CACHE = normalized
+    return normalized
+
+
+def save_question_history_clean(history):
+    global _QUESTION_HISTORY_CACHE
+    _QUESTION_HISTORY_CACHE = None
+    out = {}
+    for sid, value in (history or {}).items():
+        out[normalize_student_id(sid)] = value
+    _json_save(os.path.join(RESOURCE_DIR, "question_history.json"), out)
+
+
+_ANSWER_RECORDS_CACHE = None
+
+def load_answer_records():
+    global _ANSWER_RECORDS_CACHE
+    if _ANSWER_RECORDS_CACHE is not None:
+        return _ANSWER_RECORDS_CACHE
+    data = repair_obj(_json_load(os.path.join(RESOURCE_DIR, "answer_records.json"), {}))
+    records = data.get("records", []) if isinstance(data, dict) else (data if isinstance(data, list) else [])
+    
+    student_kp_stats = {}
+    for record in records:
+        sid = normalize_student_id(record.get("student_id", ""))
+        kp = record.get("knowledge_id", "")
+        is_correct = record.get("is_correct", False)
+        
+        if sid not in student_kp_stats:
+            student_kp_stats[sid] = {}
+        if kp not in student_kp_stats[sid]:
+            student_kp_stats[sid][kp] = {"answered": 0, "correct": 0}
+        
+        student_kp_stats[sid][kp]["answered"] += 1
+        if is_correct:
+            student_kp_stats[sid][kp]["correct"] += 1
+    
+    _ANSWER_RECORDS_CACHE = student_kp_stats
+    return student_kp_stats
+
+
+def get_mastery_status(mastery):
+    mastery = float(mastery or 0)
+    if mastery <= 0:
+        return "未学习"
+    if mastery < 0.6:
+        return "薄弱"
+    if mastery < 0.85:
+        return "良好"
+    return "已掌握"
+
+
+def build_knowledge_catalog():
+    global _KNOWLEDGE_CATALOG_CACHE
+    if _KNOWLEDGE_CATALOG_CACHE is not None:
+        return [dict(item) for item in _KNOWLEDGE_CATALOG_CACHE]
+    names = {}
+    for q in load_questions_clean().get("questions", []):
+        kp = repair_text(q.get("knowledge_point") or "")
+        code = flow_kp_code(kp)
+        if code:
+            names[code] = kp
+    for res in all_resource_records():
+        kp = repair_text(res.get("knowledge_point") or "")
+        code = flow_kp_code(kp)
+        if code:
+            names.setdefault(code, kp)
+    catalog = [{"code": code, "name": names[code]} for code in sorted(names.keys(), key=natural_sort_key)]
+    _KNOWLEDGE_CATALOG_CACHE = catalog
+    return [dict(item) for item in catalog]
+
+
+@perf_log("build_parent_maps")
+def build_parent_maps():
+    catalog = build_knowledge_catalog()
+    names = {item["code"]: item["name"] for item in catalog}
+    fixed = build_knowledge_catalog_names()
+    for code, name in fixed.items():
+        if code not in names:
+            names[code] = name
+    children = {}
+    for code in names.keys():
+        parts = code.split(".")
+        for i in range(1, len(parts)):
+            parent_code = ".".join(parts[:i])
+            children.setdefault(parent_code, set()).add(code)
+    for code in names.keys():
+        children.setdefault(code, set())
+    return names, children
+
+
+def standard_assessable_knowledge():
+    data = _json_load(os.path.join(RESOURCE_DIR, "knowledge_points.json"), [])
+    if isinstance(data, dict):
+        data = data.get("knowledge_points") or data.get("items") or []
+    names = {}
+    parent = {}
+    children = {}
+    assessable = set()
+    for item in data if isinstance(data, list) else []:
+        code = flow_kp_code(item.get("knowledge_id") or item.get("id") or "")
+        if not code:
+            continue
+        name = repair_text(item.get("knowledge_name") or item.get("name") or code)
+        name = re.sub(r"^\s*{}\s*".format(re.escape(code)), "", name).strip()
+        names[code] = name or code
+        p = flow_kp_code(item.get("parent_id") or "")
+        if p:
+            parent[code] = p
+            children.setdefault(p, set()).add(code)
+        children.setdefault(code, set())
+        if item.get("is_assessable") is True:
+            assessable.add(code)
+    if not assessable:
+        catalog, tree = build_parent_maps()
+        names.update({k: re.sub(r"^\s*{}\s*".format(re.escape(k)), "", repair_text(v)).strip() or k for k, v in catalog.items()})
+        children.update(tree)
+        assessable = {c for c in names if c.count(".") >= 2 or (c.count(".") >= 1 and not children.get(c))}
+    return names, parent, children, assessable
+
+
+def normalize_assessable_code(value):
+    _names, _parent, _children, assessable = standard_assessable_knowledge()
+    code = flow_kp_code(value) or str(value or "").strip()
+    if code in assessable:
+        return code
+    parts = code.split(".")
+    while len(parts) > 1:
+        parts.pop()
+        candidate = ".".join(parts)
+        if candidate in assessable:
+            return candidate
+    return None
+
+
+def clean_knowledge_name_for_display(code, name=None):
+    names, _parent, _children, _assessable = standard_assessable_knowledge()
+    text = repair_text(name or names.get(code) or code)
+    if code:
+        text = re.sub(r"^\s*{}\s*".format(re.escape(code)), "", text).strip()
+    return text or code
+
+
+_COMPLETION_MAP_CACHE = None
+
+def _get_student_data(data_dict, student_id):
+    sid = normalize_student_id(student_id)
+    num, _ = parse_student_identity(sid)
+    return data_dict.get(sid, {}) or data_dict.get(num, {}) or {}
+
+def get_completion_map(student_id):
+    global _COMPLETION_MAP_CACHE
+    if _COMPLETION_MAP_CACHE is None:
+        data = repair_obj(_json_load(RESOURCE_COMPLETION_FILE, {}))
+        _COMPLETION_MAP_CACHE = data
+    return _get_student_data(_COMPLETION_MAP_CACHE, student_id)
+
+
+def save_completion_map(all_data):
+    global _COMPLETION_MAP_CACHE
+    _COMPLETION_MAP_CACHE = None
+    _json_save(RESOURCE_COMPLETION_FILE, all_data)
+
+
+def get_learning_records_raw():
+    return repair_obj(_json_load(LEARNING_RECORD_FILE, []))
+
+
+def save_learning_records_raw(records):
+    _json_save(LEARNING_RECORD_FILE, records)
+
+
+def log_learning_record(student_id, resource_id, action_type):
+    sid = normalize_student_id(student_id)
+    resource_id = str(resource_id or "").replace("\\", "/")
+    if action_type != "question_practice" and not is_valid_resource(resource_id):
+        return None
+    resource = final_resource_record(resource_id) if is_valid_resource(resource_id) else {}
+    knowledge_id = resource.get("knowledge_id") or infer_clean_knowledge(resource_id)
+    records = get_learning_records_raw()
+    now_iso = _now_iso()
+    learning_actions = {"view", "watch", "play", "complete"}
+
+    def _parse_time(value):
+        try:
+            return datetime.fromisoformat(str(value or "").replace("Z", "+00:00"))
+        except Exception:
+            return None
+
+    if action_type in learning_actions:
+        now_dt = _parse_time(now_iso)
+        rank = {"view": 1, "watch": 2, "play": 2, "complete": 3}
+        existing = None
+        for item in reversed(records):
+            if normalize_student_id(item.get("student_id")) != sid:
+                continue
+            if str(item.get("resource_id") or "").replace("\\", "/") != resource_id:
+                continue
+            if item.get("action_type") not in learning_actions:
+                continue
+            item_dt = _parse_time(item.get("updated_at") or item.get("created_at"))
+            if now_dt and item_dt and abs((now_dt - item_dt).total_seconds()) <= 300:
+                existing = item
+                break
+            if action_type == "complete" and item.get("action_type") == "complete" and now_dt and item_dt:
+                if abs((now_dt - item_dt).total_seconds()) <= 86400:
+                    existing = item
+                    break
+        if existing is not None:
+            if rank.get(action_type, 0) >= rank.get(existing.get("action_type"), 0):
+                existing["action_type"] = action_type
+            existing["student_id"] = sid
+            existing["resource_id"] = resource_id
+            existing["resource_type"] = resource.get("type") or existing.get("resource_type") or "未知"
+            existing["knowledge_id"] = knowledge_id or existing.get("knowledge_id")
+            existing["updated_at"] = now_iso
+            if action_type == "complete":
+                existing["completed_at"] = existing.get("completed_at") or now_iso
+            save_learning_records_raw(records)
+            return existing
+
+    record_id = "lr_{}_{}".format(int(datetime.now().timestamp() * 1000), len(records) + 1)
+    item = {
+        "record_id": record_id,
+        "student_id": sid,
+        "resource_id": resource_id,
+        "resource_type": resource.get("type") or ("练习" if action_type == "question_practice" else "未知"),
+        "knowledge_id": knowledge_id,
+        "action_type": action_type,
+        "created_at": now_iso,
+    }
+    records.append(item)
+    save_learning_records_raw(records)
+    return item
+
+
+def clean_invalid_learning_records():
+    cleaned = []
+    for item in get_learning_records_raw():
+        if item.get("action_type") == "question_practice" or is_valid_resource(item.get("resource_id")):
+            cleaned.append(item)
+    if len(cleaned) != len(get_learning_records_raw()):
+        save_learning_records_raw(cleaned)
+    return cleaned
+
+
+def get_learning_records(student_id):
+    sid = normalize_student_id(student_id)
+    items = []
+    for item in clean_invalid_learning_records():
+        if normalize_student_id(item.get("student_id")) != sid:
+            continue
+        rid = item.get("resource_id")
+        resource = final_resource_record(rid) if is_valid_resource(rid) else None
+        raw_type = item.get("resource_type") or (resource["type"] if resource else "未知")
+        items.append({
+            **item,
+            "resource_name": resource["title"] if resource else "资源已不存在",
+            "resource_type": normalize_resource_type(raw_type),
+            "chapter_label": resource.get("chapter_label") if resource else "未知章节",
+            "knowledge_point": resource.get("knowledge_point") if resource else "资源已不存在",
+            "time": item.get("created_at") or "",
+            "resource_exists": bool(resource),
+        })
+    items.sort(key=lambda x: x.get("created_at") or "", reverse=True)
+    return items
+
+
+def ensure_questions_for_knowledge(knowledge_id, knowledge_name, chapter):
+    qdata = load_questions_clean()
+    questions = qdata.get("questions", [])
+    target_code = flow_kp_code(knowledge_id or knowledge_name)
+    existed = [q for q in questions if flow_kp_code(q.get("knowledge_point")) == target_code]
+    if len(existed) >= 3:
+        return existed
+    title = repair_text(knowledge_name or knowledge_id or "知识点")
+    chapter_id = str(chapter or (target_code.split(".")[0] if target_code else ""))
+    templates = [
+        ("single_choice", "下列关于“{0}”的说法，最准确的是（ ）。", ["A. 它是操作系统课程中的核心概念", "B. 它与课程内容无关", "C. 它只出现在硬件设计中", "D. 它不能用于分析系统行为"], "A", "该知识点是课程内的重要概念，理解其定义与作用是后续学习的基础。"),
+        ("single_choice", "学习“{0}”时，首先应关注的是（ ）。", ["A. 概念定义与适用场景", "B. 与课程无关的随机案例", "C. 软件界面的颜色", "D. 与知识点无关的历史故事"], "A", "先把概念、场景和作用掌握清楚，才能继续做题和分析。"),
+        ("single_choice", "如果“{0}”掌握度较低，最合适的改进方式是（ ）。", ["A. 先看对应资源，再做基础练习题", "B. 直接跳过该知识点", "C. 只看答案不做题", "D. 只做高难题"], "A", "本系统的学习闭环就是先学资源，再做题，根据结果更新掌握度。"),
+        ("single_choice", "“{0}”在章节“{1}”中的学习重点更偏向于（ ）。", ["A. 概念理解、题目练习与错误纠正", "B. 完全不需要练习", "C. 只需背诵文件名", "D. 只看图片即可掌握"], "A", "该知识点需要通过资源学习和练习反馈不断巩固。"),
+    ]
+    for index, tpl in enumerate(templates, start=1):
+        if len(existed) >= 5:
+            break
+        qid = "{}_auto_{}".format(target_code.replace(".", "_") or "kp", index)
+        if any(str(q.get("id")) == qid for q in questions):
+            continue
+        question = {
+            "id": qid,
+            "question": tpl[1].format(title, chapter or ("第{}章".format(chapter_id) if chapter_id else "未分类")),
+            "title": tpl[1].format(title, chapter or ("第{}章".format(chapter_id) if chapter_id else "未分类")),
+            "type": tpl[0],
+            "options": tpl[2],
+            "answer": tpl[3],
+            "difficulty": "easy",
+            "knowledge_id": target_code or knowledge_id or title,
+            "knowledge_name": "{} {}".format(target_code, title).strip(),
+            "knowledge_point": "{} {}".format(target_code, title).strip(),
+            "chapter_id": chapter_id,
+            "chapter_name": chapter or ("第{}章".format(chapter_id) if chapter_id else "未分类"),
+            "analysis": tpl[4],
+            "explanation": tpl[4],
+            "status": "enabled",
+            "created_at": _now_iso(),
+            "updated_at": _now_iso(),
+            "created_by": "system_auto",
+        }
+        questions.append(question)
+        existed.append(normalize_question(question))
+    save_questions_clean({"questions": questions})
+    return [normalize_question(q) for q in existed]
+
+
+def get_discussion_stats(student_id):
+    sid = normalize_student_id(student_id)
+    student_name = get_student_meta_by_full_id(sid).get("name") or parse_student_identity(sid)[1]
+    stats = {}
+    if neo4j_temporarily_offline():
+        return stats
+    try:
+        with driver.session() as neo:
+            rows = neo.run("""
+            MATCH (p:DiscussionPost)
+            OPTIONAL MATCH (p)-[:HAS_COMMENT]->(c:DiscussionComment)
+            RETURN p.author AS author, p.knowledge_tag AS tag,
+                   collect(c.author) AS comment_authors
+            """)
+            for row in rows:
+                tag = repair_text(row["tag"] or "")
+                if not tag:
+                    continue
+                bucket = stats.setdefault(tag, {"posts": 0, "comments": 0})
+                if repair_text(row["author"] or "") == student_name:
+                    bucket["posts"] += 1
+                bucket["comments"] += sum(1 for author in (row["comment_authors"] or []) if repair_text(author or "") == student_name)
+    except Exception:
+        mark_neo4j_offline(300)
+        pass
+    return stats
+
+
+# ==============================================================================
+# 统一掌握度计算模块 (Unified Mastery Calculation Module)
+# ==============================================================================
+#
+# 【掌握度计算规则】
+# M(u,k) = 0.7 * exercise_score + 0.3 * behavior_score
+#
+# 其中：
+# - exercise_score: 学生在知识点 k 上的题目正确率
+# - behavior_score: 学生在知识点 k 上相关资源完成率
+#
+# 【特殊情况处理】
+# 1. 如果没有做题但有资源学习记录，掌握度只给较低进度，约 0.2～0.4
+# 2. 如果没有任何记录，掌握度为 0
+# 3. 父节点掌握度由子知识点平均聚合：M(u,p) = avg(M(u,k))
+#
+# 【状态规则（全站统一）】
+# - 0%：未学习
+# - 1%～59%：需巩固
+# - 60%～79%：良好
+# - 80%及以上：已掌握
+# ==============================================================================
+
+
+def calculate_knowledge_mastery(student_id, knowledge_id):
+    """
+    计算单个知识点的掌握度
+    
+    计算规则：M(u,k) = 0.7 * exercise_score + 0.3 * behavior_score
+    
+    参数:
+        student_id: 学生ID
+        knowledge_id: 知识点ID（可以是名称或编码）
+    
+    返回:
+        dict: {
+            "mastery": float,           # 最终掌握度 [0, 1]
+            "exercise_score": float,    # 题目正确率
+            "behavior_score": float,    # 资源完成率
+            "total_questions": int,     # 总题目数
+            "correct_questions": int,   # 正确题目数
+            "total_resources": int,     # 总资源数
+            "completed_resources": int, # 完成资源数
+            "status": str,              # 状态文本
+            "has_practice": bool,       # 是否有做题记录
+            "has_learning": bool        # 是否有学习记录
+        }
+    """
+    sid = normalize_student_id(student_id)
+    kp_code = flow_kp_code(knowledge_id) or knowledge_id
+    
+    history = load_question_history_clean().get(sid, {})
+    questions = [q for q in load_questions_clean().get("questions", []) 
+                 if flow_kp_code(q.get("knowledge_point")) == kp_code]
+    
+    total_questions = len(questions)
+    total_attempts = 0
+    correct_attempts = 0
+    for q in questions:
+        h = history.get(str(q.get("id")), {})
+        total_attempts += int(h.get("total_attempts", 0) or 0)
+        correct_attempts += int(h.get("correct_count", 0) or 0)
+    
+    exercise_score = 0.0
+    has_practice = total_attempts > 0
+    if has_practice:
+        exercise_score = correct_attempts / total_attempts
+    
+    completion_map = get_completion_map(sid)
+    resources = [r for r in all_resource_records() 
+                 if flow_kp_code(r.get("knowledge_point")) == kp_code]
+    total_resources = len(resources)
+    completed_resources = sum(1 for r in resources 
+                             if completion_map.get(r.get("resource_id"), {}).get("completed"))
+    
+    behavior_score = 0.0
+    has_learning = completed_resources > 0
+    if total_resources > 0:
+        behavior_score = completed_resources / total_resources
+    
+    has_any_record = has_practice or has_learning
+    mastery = 0.0
+    
+    if not has_any_record:
+        mastery = 0.0
+    elif has_practice:
+        mastery = 0.7 * exercise_score + 0.3 * behavior_score
+    else:
+        mastery = 0.2 + 0.2 * behavior_score
+        mastery = min(0.4, mastery)
+    
+    mastery = max(0.0, min(1.0, mastery))
+    
+    return {
+        "mastery": round(mastery, 3),
+        "exercise_score": round(exercise_score, 3),
+        "behavior_score": round(behavior_score, 3),
+        "total_questions": total_questions,
+        "correct_questions": correct_attempts,
+        "total_attempts": total_attempts,
+        "total_resources": total_resources,
+        "completed_resources": completed_resources,
+        "status": get_mastery_status(mastery),
+        "has_practice": has_practice,
+        "has_learning": has_learning,
+    }
+
+
+def recalculate_parent_mastery(student_id, parent_code=None):
+    """
+    重新计算父知识点的掌握度
+    
+    父节点掌握度由子知识点平均聚合：M(u,p) = avg(M(u,k))
+    
+    参数:
+        student_id: 学生ID
+        parent_code: 父知识点编码（可选，如果不提供则计算所有父节点）
+    
+    返回:
+        dict: 更新后的父节点掌握度映射
+    """
+    sid = normalize_student_id(student_id)
+    catalog_names, children = build_parent_maps()
+    score_map, detail_map, _, _ = calculate_mastery_tree(sid)
+    
+    parent_scores = {}
+    parent_codes_to_calc = []
+    
+    if parent_code:
+        parent_codes_to_calc = [parent_code]
+    else:
+        parent_codes_to_calc = [code for code in catalog_names.keys() if code.count(".") < 2]
+    
+    for p_code in parent_codes_to_calc:
+        child_codes = children.get(p_code, set())
+        child_leaf_codes = [c for c in child_codes if c.count(".") >= 2]
+        
+        if not child_leaf_codes:
+            child_scores = [score_map.get(c, 0) for c in child_codes if c in score_map]
+            parent_score = sum(child_scores) / len(child_scores) if child_scores else 0.0
+        else:
+            child_scores = [score_map.get(c, 0) for c in child_leaf_codes]
+            parent_score = sum(child_scores) / len(child_scores) if child_scores else 0.0
+        
+        parent_scores[p_code] = round(parent_score, 3)
+    
+    return parent_scores
+
+
+def recalculate_all_mastery():
+    """
+    重新计算所有学生的所有知识点掌握度
+    
+    返回:
+        dict: {student_id: {knowledge_code: mastery}}
+    """
+    all_mastery = {}
+    
+    for sid in STUDENTS.keys():
+        full_id = STUDENTS[sid].get("full_id", sid)
+        score_map, _, _, _ = calculate_mastery_tree(full_id)
+        sync_mastery_to_neo4j(full_id, score_map, {}, {})
+        all_mastery[full_id] = score_map
+    
+    return all_mastery
+
+
+def build_student_profile_vector(student_id):
+    """
+    构建学生画像向量 X_u
+    
+    学生画像向量包含：
+    1. 知识点掌握度向量 M_u
+    2. 资源完成向量 R_u
+    3. 题目正确率向量 P_u
+    4. 错题分布向量 W_u
+    5. 资源类型偏好向量 B_u（video, ppt, doc）
+    
+    参数:
+        student_id: 学生ID
+    
+    返回:
+        dict: {
+            "student_id": str,
+            "M_u": dict,  # 知识点掌握度向量 {kp_code: mastery}
+            "R_u": dict,  # 资源完成向量 {resource_id: completion_rate}
+            "P_u": dict,  # 题目正确率向量 {kp_code: accuracy}
+            "W_u": dict,  # 错题分布向量 {kp_code: wrong_count}
+            "B_u": dict,  # 资源类型偏好向量 {type: preference_score}
+            "summary": dict  # 汇总统计
+        }
+    """
+    sid = normalize_student_id(student_id)
+    
+    score_map, detail_map, name_map, children = calculate_mastery_tree(sid)
+    
+    M_u = {code: round(score, 3) for code, score in score_map.items()}
+    
+    completion_map = get_completion_map(sid)
+    all_resources = all_resource_records()
+    
+    R_u = {}
+    for res in all_resources:
+        rid = res.get("resource_id")
+        if rid:
+            is_completed = completion_map.get(rid, {}).get("completed", False)
+            R_u[rid] = 1.0 if is_completed else 0.0
+    
+    P_u = {}
+    for code, detail in detail_map.items():
+        total = detail.get("total_questions", 0)
+        correct = detail.get("correct_questions", 0)
+        if total > 0:
+            P_u[code] = round(correct / total, 3)
+        else:
+            P_u[code] = 0.0
+    
+    history = load_question_history_clean().get(sid, {})
+    W_u = {}
+    for q in load_questions_clean().get("questions", []):
+        qid = str(q.get("id"))
+        kp_code = flow_kp_code(q.get("knowledge_point"))
+        if kp_code:
+            h = history.get(qid, {})
+            wrong_count = int(h.get("wrong_count", 0) or 0)
+            if wrong_count > 0:
+                W_u[kp_code] = W_u.get(kp_code, 0) + wrong_count
+    
+    B_u = {"video": 0.0, "ppt": 0.0, "doc": 0.0, "other": 0.0}
+    type_counts = {"video": 0, "ppt": 0, "doc": 0, "other": 0}
+    type_completed = {"video": 0, "ppt": 0, "doc": 0, "other": 0}
+    
+    for res in all_resources:
+        res_type = res.get("type", "").lower()
+        rid = res.get("resource_id")
+        
+        if "视频" in res_type or "video" in res_type:
+            t = "video"
+        elif "ppt" in res_type or "课件" in res_type:
+            t = "ppt"
+        elif "doc" in res_type or "文档" in res_type or "pdf" in res_type:
+            t = "doc"
+        else:
+            t = "other"
+        
+        type_counts[t] += 1
+        if completion_map.get(rid, {}).get("completed"):
+            type_completed[t] += 1
+    
+    for t in type_counts:
+        if type_counts[t] > 0:
+            B_u[t] = round(type_completed[t] / type_counts[t], 3)
+    
+    total_completed = sum(type_completed.values())
+    if total_completed > 0:
+        for t in B_u:
+            B_u[t] = round(type_completed[t] / total_completed, 3)
+    
+    leaf_codes = [code for code in name_map.keys() if code.count(".") >= 2]
+    total_kps = len(leaf_codes)
+    mastered_kps = sum(1 for code in leaf_codes if M_u.get(code, 0) >= 0.8)
+    weak_kps = sum(1 for code in leaf_codes if 0 < M_u.get(code, 0) < 0.6)
+    unlearned_kps = sum(1 for code in leaf_codes if M_u.get(code, 0) <= 0)
+    
+    summary = {
+        "total_knowledge_points": total_kps,
+        "mastered_count": mastered_kps,
+        "weak_count": weak_kps,
+        "unlearned_count": unlearned_kps,
+        "avg_mastery": round(sum(M_u.get(c, 0) for c in leaf_codes) / total_kps, 3) if total_kps > 0 else 0,
+        "total_resources": len(all_resources),
+        "completed_resources": total_completed,
+        "total_wrong_questions": sum(W_u.values()),
+        "preferred_resource_type": max(B_u.keys(), key=lambda t: B_u[t]) if total_completed > 0 else "none",
+    }
+    
+    return {
+        "student_id": sid,
+        "M_u": M_u,
+        "R_u": R_u,
+        "P_u": P_u,
+        "W_u": W_u,
+        "B_u": B_u,
+        "summary": summary,
+    }
+
+
+_MASTERY_TREE_CACHE = {}
+
+@perf_log("calculate_mastery_tree")
+def calculate_mastery_tree(student_id):
+    sid = normalize_student_id(student_id)
+    now = time.time()
+    cached = _MASTERY_TREE_CACHE.get(sid)
+    if cached and (now - cached['ts']) < 5:
+        return cached['data']
+    catalog_names, children = build_parent_maps()
+    question_map = {}
+    for q in load_questions_clean().get("questions", []):
+        code = q.get("knowledge_id") or flow_kp_code(q.get("knowledge_point"))
+        if code:
+            question_map.setdefault(code, []).append(q)
+    
+    answer_records = load_answer_records()
+    student_answer_stats = answer_records.get(sid, {})
+    
+    completion_map = get_completion_map(sid)
+    all_resources = all_resource_records()
+    code_resource_counts = {}
+    code_completion_counts = {}
+    for r in all_resources:
+        code = flow_kp_code(r.get("knowledge_point"))
+        if code:
+            code_resource_counts[code] = code_resource_counts.get(code, 0) + 1
+            rid = r.get("resource_id", "")
+            rid_basename = os.path.basename(str(rid or "")).replace("\\", "/")
+            if completion_map.get(rid, {}).get("completed") or completion_map.get(rid_basename, {}).get("completed") or completion_map.get("teaching_materials/" + rid_basename, {}).get("completed"):
+                code_completion_counts[code] = code_completion_counts.get(code, 0) + 1
+    leaf_scores = {}
+    detail = {}
+    leaf_codes = [code for code in catalog_names.keys()
+                  if code.count(".") >= 2
+                  or (code.count(".") >= 1 and not children.get(code))]
+    for code in leaf_codes:
+        name = catalog_names[code]
+        qs = question_map.get(code, [])
+        total_questions = len(qs)
+        
+        kp_stats = student_answer_stats.get(code, {"answered": 0, "correct": 0})
+        answered_questions = kp_stats.get("answered", 0)
+        correct_questions = kp_stats.get("correct", 0)
+        
+        exercise_score = 0.0
+        volume_score = 0.0
+        has_practice = answered_questions > 0
+        if has_practice:
+            raw_accuracy = correct_questions / max(answered_questions, 1)
+            prior = 0.35
+            prior_strength = 5
+            accuracy_score = (correct_questions + prior * prior_strength) / (answered_questions + prior_strength)
+            volume_score = min(1.0, answered_questions / max(total_questions, 1)) if total_questions > 0 else 1.0
+            exercise_score = 0.78 * accuracy_score + 0.22 * volume_score
+            exercise_score = max(0.0, min(1.0, exercise_score))
+        total_resources = code_resource_counts.get(code, 0)
+        completed_count = code_completion_counts.get(code, 0)
+        behavior_score = 0.0
+        has_learning = completed_count > 0
+        if total_resources > 0:
+            behavior_score = completed_count / total_resources
+        else:
+            behavior_score = 0.35
+        has_any_record = has_practice or has_learning
+        if not has_any_record:
+            mastery = 0.0
+        elif has_practice:
+            # Practice is the primary evidence for mastery; resources should boost confidence,
+            # not heavily punish a student who already answered many questions correctly.
+            mastery = 0.9 * exercise_score + 0.1 * behavior_score
+        else:
+            mastery = 0.2 + 0.2 * behavior_score
+            mastery = min(0.4, mastery)
+        mastery = max(0.0, min(1.0, mastery))
+        leaf_scores[code] = mastery
+        detail[code] = {
+            "name": name,
+            "code": code,
+            "mastery": round(mastery, 3),
+            "exercise_score": round(exercise_score, 3),
+            "volume_score": round(volume_score, 3),
+            "behavior_score": round(behavior_score, 3),
+            "accuracy": round(exercise_score, 3),
+            "total_questions": total_questions,
+            "answered_questions": answered_questions,
+            "correct_questions": correct_questions,
+            "total_attempts": answered_questions,
+            "wrong_questions": answered_questions - correct_questions,
+            "total_resources": total_resources,
+            "resource_completed": completed_count,
+            "has_practice": has_practice,
+            "has_learning": has_learning,
+        }
+    score_map = dict(leaf_scores)
+    for parent_code in sorted([c for c in children.keys() if c not in leaf_scores], key=lambda x: (x.count("."), natural_sort_key(x)), reverse=True):
+        child_leaf = [score_map[c] for c in children.get(parent_code, set()) if c in score_map and c != parent_code]
+        score_map[parent_code] = round(sum(child_leaf) / len(child_leaf), 3) if child_leaf else 0.0
+        detail[parent_code] = {
+            "name": catalog_names.get(parent_code) or parent_code,
+            "code": parent_code,
+            "mastery": score_map[parent_code],
+            "exercise_score": score_map[parent_code],
+            "behavior_score": score_map[parent_code],
+            "accuracy": 0,
+            "total_questions": sum(detail.get(c, {}).get("total_questions", 0) for c in children.get(parent_code, set())),
+            "answered_questions": sum(detail.get(c, {}).get("answered_questions", 0) for c in children.get(parent_code, set())),
+            "correct_questions": sum(detail.get(c, {}).get("correct_questions", 0) for c in children.get(parent_code, set())),
+            "total_attempts": sum(detail.get(c, {}).get("answered_questions", 0) for c in children.get(parent_code, set())),
+            "wrong_questions": sum(detail.get(c, {}).get("wrong_questions", 0) for c in children.get(parent_code, set())),
+            "total_resources": sum(detail.get(c, {}).get("total_resources", 0) for c in children.get(parent_code, set())),
+            "resource_completed": sum(detail.get(c, {}).get("resource_completed", 0) for c in children.get(parent_code, set())),
+            "has_practice": False,
+            "has_learning": False,
+        }
+    result = (score_map, detail, catalog_names, children)
+    _MASTERY_TREE_CACHE[sid] = {'data': result, 'ts': time.time()}
+    return result
+
+
+def sync_mastery_to_neo4j(student_id, score_map, detail_map, name_map):
+    if neo4j_temporarily_offline():
+        return
+    sid = normalize_student_id(student_id)
+    try:
+        with driver.session() as neo:
+            for code, score in score_map.items():
+                name = name_map.get(code) or code
+                meta = detail_map.get(code, {})
+                neo.run("""
+                MERGE (s:Student {id:$sid})
+                MERGE (k:Knowledge {name:$kname})
+                MERGE (s)-[r:MASTERED]->(k)
+                SET r.mastery=$mastery,
+                    r.status=$status,
+                    r.last_learn_time=datetime(),
+                    r.total_questions=$total_questions,
+                    r.correct_questions=$correct_questions,
+                    r.wrong_questions=$wrong_questions
+                """, sid=sid, kname=name, mastery=float(score), status=get_mastery_status(score),
+                     total_questions=int(meta.get("total_questions", 0)),
+                     correct_questions=int(meta.get("correct_questions", 0)),
+                     wrong_questions=int(meta.get("wrong_questions", 0)))
+    except Exception:
+        mark_neo4j_offline(300)
+        pass
+
+
+def update_parent_mastery(student_id, knowledge_id):
+    recalculate_all_parent_mastery(student_id)
+    return True
+
+
+def recalculate_all_parent_mastery(student_id):
+    score_map, detail_map, name_map, _children = calculate_mastery_tree(student_id)
+    sync_mastery_to_neo4j(student_id, score_map, detail_map, name_map)
+    return score_map
+
+
+def mastery_points_payload(student_id):
+    score_map, detail_map, name_map, _children = calculate_mastery_tree(student_id)
+    sync_mastery_to_neo4j(student_id, score_map, detail_map, name_map)
+    points = []
+    leaf_points = []
+    for code, name in sorted(name_map.items(), key=lambda x: natural_sort_key(x[0])):
+        meta = detail_map.get(code, {})
+        item = {
+            "kp_id": code,
+            "name": display_kp_name(name),
+            "full_name": name,
+            "score": round(float(score_map.get(code, 0)), 3),
+            "status": get_mastery_status(score_map.get(code, 0)),
+            "chapter": code.split(".")[0] if code else "",
+            "exercise_score": round(float(meta.get("exercise_score", 0)), 3),
+            "behavior_score": round(float(meta.get("behavior_score", 0)), 3),
+            "accuracy": round(float(meta.get("accuracy", 0)), 3),
+            "total_questions": int(meta.get("total_questions", 0)),
+            "total_attempts": int(meta.get("total_attempts", 0)),
+            "correct_questions": int(meta.get("correct_questions", 0)),
+            "wrong_questions": int(meta.get("wrong_questions", 0)),
+            "total_resources": int(meta.get("total_resources", 0)),
+            "resource_completed": int(meta.get("resource_completed", 0)),
+            "has_practice": bool(meta.get("has_practice", False)),
+            "has_learning": bool(meta.get("has_learning", False)),
+        }
+        points.append(item)
+        if code.count(".") >= 2:
+            leaf_points.append(item)
+    chapters = build_mastery_chapters(points)
+    stats = {
+        "total": len(leaf_points),
+        "mastered": sum(1 for p in leaf_points if p["score"] >= 0.80),
+        "good": sum(1 for p in leaf_points if 0.60 <= p["score"] < 0.80),
+        "weak": sum(1 for p in leaf_points if 0 < p["score"] < 0.60),
+        "unlearned": sum(1 for p in leaf_points if p["score"] <= 0),
+    }
+    return {"points": points, "leaf_points": leaf_points, "chapters": chapters, "stats": stats}
+
+
+def get_flow_mastery_data(user_id):
+    return mastery_points_payload(user_id)
+
+
+def _stable_student_offset(student_id):
+    text = str(student_id or "")
+    return sum((idx + 1) * ord(ch) for idx, ch in enumerate(text))
+
+
+def _clean_knowledge_name(code, name):
+    code = str(code or "").strip()
+    name = str(name or "").strip()
+    if code:
+        name = re.sub(r"^\s*{}\s*".format(re.escape(code)), "", name).strip()
+    return name or code
+
+
+def _format_weak_point_label(point, with_score=False):
+    code = str(point.get("code", "") or "").strip()
+    name = _clean_knowledge_name(code, point.get("name", ""))
+    label = "{} {}".format(code, name).strip()
+    if with_score:
+        label += " {:.0f}%".format(float(point.get("mastery", 0) or 0) * 100)
+    return label
+
+
+def _rank_student_weak_points(points, student_id):
+    offset = _stable_student_offset(student_id)
+    total = max(len(points), 1)
+    return sorted(points, key=lambda x: (
+        0 if int(x.get("answered_questions", 0) or 0) > 0 else 1,
+        float(x.get("mastery", 0) or 0),
+        -float(x.get("wrong_rate", 0) or 0),
+        -int(x.get("wrong_questions", 0) or 0),
+        (int(x.get("_order", 0) or 0) + offset) % total,
+    ))
+
+
+def _composite_overall_mastery(practiced_avg, accuracy, answered_questions, total_questions):
+    if answered_questions <= 0:
+        return round(float(practiced_avg or 0), 3)
+    coverage = min(1.0, float(answered_questions or 0) / max(float(total_questions or 0), 1.0))
+    score = 0.20 * float(practiced_avg or 0) + 0.55 * float(accuracy or 0) + 0.25 * coverage
+    return round(max(0.0, min(1.0, score)), 3)
+
+
+def get_student_stats(student_id):
+    sid = normalize_student_id(student_id)
+    num, name = parse_student_identity(sid)
+    meta = get_student_meta_by_full_id(sid)
+    
+    score_map, detail_map, name_map, children = calculate_mastery_tree(sid)
+    
+    leaf_codes = [code for code in name_map.keys() if code.count(".") >= 2]
+    
+    total_questions = 0
+    answered_questions = 0
+    correct_questions = 0
+    
+    for code in leaf_codes:
+        detail = detail_map.get(code, {})
+        total_questions += detail.get("total_questions", 0)
+        answered_questions += detail.get("answered_questions", 0)
+        correct_questions += detail.get("correct_questions", 0)
+    
+    accuracy = correct_questions / answered_questions if answered_questions > 0 else 0
+    _student_type, practiced_avg_mastery = _kgcf_classify_student(score_map)
+    avg_mastery = _composite_overall_mastery(practiced_avg_mastery, accuracy, answered_questions, total_questions)
+    
+    weak_points = []
+    for idx, code in enumerate(sorted(leaf_codes, key=natural_sort_key)):
+        mastery = score_map.get(code, 0)
+        if mastery < 0.60:
+            detail = detail_map.get(code, {})
+            answered = int(detail.get("answered_questions", 0) or 0)
+            correct = int(detail.get("correct_questions", 0) or 0)
+            wrong = max(0, answered - correct)
+            weak_points.append({
+                "code": code,
+                "name": name_map.get(code, code),
+                "mastery": mastery,
+                "answered_questions": answered,
+                "correct_questions": correct,
+                "wrong_questions": wrong,
+                "wrong_rate": wrong / answered if answered else 0,
+                "_order": idx,
+            })
+    weak_points = _rank_student_weak_points(weak_points, sid)
+    
+    completion_map = get_completion_map(sid)
+    resource_completed_count = sum(1 for x in completion_map.values() if x.get("completed"))
+    
+    answer_records = load_answer_records()
+    student_answer_stats = answer_records.get(sid, {})
+    wrong_count = 0
+    for kp, stats in student_answer_stats.items():
+        wrong_count += stats.get("answered", 0) - stats.get("correct", 0)
+    
+    if avg_mastery >= 0.90:
+        level = "优秀"
+    elif avg_mastery >= 0.75:
+        level = "良好"
+    elif avg_mastery >= 0.60:
+        level = "中等"
+    else:
+        level = "薄弱"
+    
+    return {
+        "student_id": sid,
+        "student_num": meta.get("student_num", num),
+        "name": meta.get("name", name),
+        "class_name": meta.get("class_name", ""),
+        "gender": meta.get("gender", ""),
+        "note": meta.get("note", ""),
+        "level": level,
+        "avg_mastery": round(avg_mastery, 3),
+        "accuracy": round(accuracy, 3),
+        "total_questions": total_questions,
+        "answered_questions": answered_questions,
+        "correct_questions": correct_questions,
+        "wrong_count": wrong_count,
+        "resource_completed_count": resource_completed_count,
+        "weak_points": weak_points
+    }
+
+
+def get_user_profile(student_id):
+    sid = normalize_student_id(student_id)
+    num, name = parse_student_identity(sid)
+    meta = get_student_meta_by_full_id(sid)
+    payload = mastery_points_payload(sid)
+    leaf_points = payload["leaf_points"]
+    records = get_learning_records(sid)
+    completion_map = get_completion_map(sid)
+    stats = get_student_stats(sid)
+    avg_mastery = float(stats.get("avg_mastery", 0) or 0)
+    accuracy = float(stats.get("accuracy", 0) or 0)
+    total_questions = int(stats.get("answered_questions", 0) or stats.get("total_questions", 0) or 0)
+    total_correct = int(stats.get("correct_questions", 0) or 0)
+    wrong_count = int(stats.get("wrong_count", 0) or 0)
+    resource_completed_count = int(stats.get("resource_completed_count", 0) or 0)
+    weak_points = sorted(
+        [{"code": p.get("code"), "name": p["full_name"], "mastery": p["score"]} for p in leaf_points if p["score"] < 0.60],
+        key=lambda x: (x["mastery"], natural_sort_key(flow_kp_code(x["name"]) or x["name"]))
+    )
+    suggestions = []
+    if weak_points:
+        suggestions.append("优先巩固 {} 等薄弱知识点，建议先看资源再做题。".format("、".join(display_kp_name(x["name"]) for x in weak_points[:3])))
+    if wrong_count:
+        suggestions.append("当前有 {} 道错题需要复练，连续答对后会自动提升掌握度。".format(wrong_count))
+    if not completion_map:
+        suggestions.append("建议先从资源库完成 1~2 个基础视频或课件，形成学习起点。")
+    if accuracy >= 0.8:
+        suggestions.append("最近正确率较高，可以适当加入中高难度练习。")
+    if not suggestions:
+        suggestions.append("保持当前节奏，继续沿智能学习路径完成资源学习和练习。")
+    if avg_mastery >= 0.90:
+        level = "优秀"
+    elif avg_mastery >= 0.75:
+        level = "良好"
+    elif avg_mastery >= 0.60:
+        level = "中等"
+    else:
+        level = "薄弱"
+    return {
+        "student_id": meta.get("student_num", num),
+        "student_num": meta.get("student_num", num),
+        "name": meta.get("name", name),
+        "class_name": meta.get("class_name"),
+        "gender": meta.get("gender"),
+        "note": meta.get("note"),
+        "avg_mastery": round(avg_mastery, 3),
+        "accuracy": round(accuracy, 3),
+        "level": level,
+        "resource_completed_count": resource_completed_count,
+        "record_count": len(records),
+        "total_questions": total_questions,
+        "answered_questions": total_questions,
+        "total_correct": total_correct,
+        "correct_questions": total_correct,
+        "wrong_count": wrong_count,
+        "weak_points": weak_points,
+        "recent_accuracy": round(accuracy, 3),
+        "suggestions": suggestions,
+        "level": stats.get("level") or level,
+        "description": "；".join(suggestions),
+    }
+
+
+# ==============================================================================
+# 学习路径生成模块 (Learning Path Generation Module)
+# ==============================================================================
+#
+# 【学习路径规则】
+# 1. 如果先修知识点掌握度低于 60%，先推荐先修知识点
+# 2. 先修知识掌握后，再推荐目标知识点
+# 3. 目标知识点后可推荐相关知识点和练习题
+# 4. 每个路径节点显示：知识点编号、名称、掌握度、状态、推荐资源、推荐题目、推荐理由
+# ==============================================================================
+
+
+def generate_learning_path(student_id, target_knowledge_id=None):
+    """
+    生成学习路径
+    
+    规则：
+    1. 如果先修知识点掌握度低于 60%，先推荐先修知识点
+    2. 先修知识掌握后，再推荐目标知识点
+    3. 目标知识点后可推荐相关知识点和练习题
+    
+    参数:
+        student_id: 学生ID
+        target_knowledge_id: 目标知识点（可选）
+    
+    返回:
+        list: 学习路径节点列表
+    """
+    sid = normalize_student_id(student_id)
+    
+    score_map, detail_map, name_map, children = calculate_mastery_tree(sid)
+    
+    weak_kps = get_weak_knowledge(sid, threshold=0.60)
+    
+    path_nodes = []
+    added_codes = set()
+    
+    if target_knowledge_id:
+        target_code = flow_kp_code(target_knowledge_id) or target_knowledge_id
+        
+        prereqs = get_prerequisite_knowledge(target_code)
+        weak_prereqs = []
+        for prereq in prereqs:
+            prereq_code = prereq["code"]
+            prereq_mastery = score_map.get(prereq_code, 0.5)
+            if prereq_mastery < 0.60 and prereq_code not in added_codes:
+                weak_prereqs.append({
+                    "code": prereq_code,
+                    "name": prereq["name"],
+                    "mastery": prereq_mastery,
+                    "reason_type": "薄弱先修知识点",
+                })
+        
+        weak_prereqs.sort(key=lambda x: x["mastery"])
+        
+        for prereq in weak_prereqs:
+            if prereq["code"] not in added_codes:
+                path_nodes.append(prereq)
+                added_codes.add(prereq["code"])
+        
+        target_mastery = score_map.get(target_code, 0.5)
+        if target_code not in added_codes:
+            path_nodes.append({
+                "code": target_code,
+                "name": name_map.get(target_code, target_knowledge_id),
+                "mastery": target_mastery,
+                "reason_type": "目标知识点",
+            })
+            added_codes.add(target_code)
+        
+        related_kps = get_related_knowledge(target_code)
+        for related in related_kps[:3]:
+            related_code = related["code"]
+            related_mastery = score_map.get(related_code, 0.5)
+            if related_mastery < 0.80 and related_code not in added_codes:
+                path_nodes.append({
+                    "code": related_code,
+                    "name": related["name"],
+                    "mastery": related_mastery,
+                    "reason_type": "相关知识点",
+                })
+                added_codes.add(related_code)
+    
+    for weak_kp in weak_kps[:5]:
+        code = weak_kp["code"]
+        if code not in added_codes:
+            prereqs = get_prerequisite_knowledge(code)
+            for prereq in prereqs:
+                prereq_code = prereq["code"]
+                prereq_mastery = score_map.get(prereq_code, 0.5)
+                if prereq_mastery < 0.60 and prereq_code not in added_codes:
+                    path_nodes.append({
+                        "code": prereq_code,
+                        "name": prereq["name"],
+                        "mastery": prereq_mastery,
+                        "reason_type": "薄弱先修知识点",
+                    })
+                    added_codes.add(prereq_code)
+            
+            path_nodes.append({
+                "code": code,
+                "name": weak_kp["name"],
+                "mastery": weak_kp["mastery"],
+                "reason_type": "薄弱知识点",
+            })
+            added_codes.add(code)
+    
+    result = []
+    for i, node in enumerate(path_nodes):
+        code = node["code"]
+        name = node["name"]
+        mastery = node["mastery"]
+        reason_type = node["reason_type"]
+        
+        resources = hybrid_recommend(sid, code, scene="path", limit=3)
+        questions = recommend_questions(sid, code, limit=5)
+        
+        reason = generate_path_node_reason(sid, code, {
+            "mastery": mastery,
+            "reason_type": reason_type,
+            "position": i + 1,
+            "total_nodes": len(path_nodes),
+        })
+        
+        result.append({
+            "step": i + 1,
+            "kp_id": code,
+            "code": code,
+            "name": display_kp_name(name),
+            "full_name": name,
+            "mastery": round(mastery, 3),
+            "score": round(mastery, 3),
+            "status": get_mastery_status(mastery),
+            "reason": reason,
+            "reason_type": reason_type,
+            "resources": resources,
+            "questions": questions,
+        })
+    
+    return result
+
+
+def generate_path_node_reason(student_id, knowledge_id, context=None):
+    """
+    生成路径节点推荐理由
+    
+    参数:
+        student_id: 学生ID
+        knowledge_id: 知识点ID
+        context: 上下文信息
+    
+    返回:
+        str: 推荐理由
+    """
+    sid = normalize_student_id(student_id)
+    kp_code = flow_kp_code(knowledge_id) or knowledge_id
+    
+    context = context or {}
+    mastery = context.get("mastery", 0.5)
+    reason_type = context.get("reason_type", "知识点")
+    position = context.get("position", 1)
+    
+    score_map, detail_map, name_map, _ = calculate_mastery_tree(sid)
+    kp_name = name_map.get(kp_code, knowledge_id)
+    
+    parts = []
+    
+    status_text = "未学习" if mastery <= 0 else ("需巩固" if mastery < 0.60 else ("良好" if mastery < 0.80 else "已掌握"))
+    parts.append("你在'{}'上的掌握度为{:.0f}%，属于{}知识点".format(
+        display_kp_name(kp_name), mastery * 100, status_text
+    ))
+    
+    if reason_type == "薄弱先修知识点":
+        parts.append("该知识点是后续知识点的先修内容，前置掌握度低于60%，系统优先推荐基础内容")
+    elif reason_type == "目标知识点":
+        parts.append("这是你的目标学习内容，系统将帮助你系统掌握该知识点")
+    elif reason_type == "相关知识点":
+        parts.append("该知识点与目标知识点存在关联，学习它有助于加深理解")
+    elif reason_type == "薄弱知识点":
+        parts.append("该知识点属于你的薄弱环节，建议优先巩固")
+    
+    prereqs = get_prerequisite_knowledge(kp_code)
+    if prereqs:
+        weak_prereqs = [p for p in prereqs if score_map.get(p["code"], 0.5) < 0.60]
+        if weak_prereqs:
+            parts.append("注意：该知识点有{}个先修知识点掌握度不足，建议先补充基础".format(len(weak_prereqs)))
+    
+    return "；".join(parts)
+
+
+# ==============================================================================
+# 题目推荐模块 (Question Recommendation Module)
+# ==============================================================================
+#
+# 【题目推荐规则】
+# 1. 优先推荐薄弱知识点对应题目
+# 2. 优先推荐最近错过、多次错过的题
+# 3. 连续做对 2 次的错题降低复练优先级
+# 4. 每道题必须有 A/B/C/D、正确答案和解析
+# 5. 提交后更新答题记录、错题集和掌握度
+# ==============================================================================
+
+
+def recommend_questions(student_id, knowledge_id=None, limit=5):
+    """
+    推荐题目
+    
+    规则：
+    1. 优先推荐薄弱知识点对应题目
+    2. 优先推荐最近错过、多次错过的题
+    3. 连续做对 2 次的错题降低复练优先级
+    
+    参数:
+        student_id: 学生ID
+        knowledge_id: 知识点ID（可选）
+        limit: 返回数量
+    
+    返回:
+        list: 推荐题目列表
+    """
+    sid = normalize_student_id(student_id)
+    target_code = flow_kp_code(knowledge_id) or knowledge_id if knowledge_id else None
+    
+    history = load_question_history_clean().get(sid, {})
+    all_questions = load_questions_clean().get("questions", [])
+    
+    score_map, detail_map, name_map, _ = calculate_mastery_tree(sid)
+    
+    if target_code:
+        kp_mastery = score_map.get(target_code, 0.5)
+        knowledge_name = name_map.get(target_code, knowledge_id)
+        ensure_questions_for_knowledge(target_code, knowledge_name, 
+            "第{}章".format(target_code.split(".")[0]) if target_code else "未分类")
+    
+    scored_questions = []
+    for q in all_questions:
+        qid = str(q.get("id"))
+        q_kp = flow_kp_code(q.get("knowledge_point"))
+        
+        if target_code and q_kp != target_code:
+            continue
+        
+        if q.get("status") == "disabled":
+            continue
+        
+        h = history.get(qid, {})
+        total_attempts = int(h.get("total_attempts", 0) or 0)
+        correct_count = int(h.get("correct_count", 0) or 0)
+        wrong_count = int(h.get("wrong_count", 0) or 0)
+        last_correct = bool(h.get("last_correct", False))
+        consecutive_correct = int(h.get("consecutive_correct", 0) or 0)
+        
+        priority_score = 0.0
+        
+        if total_attempts == 0:
+            priority_score += 0.3
+        
+        if wrong_count > 0:
+            wrong_ratio = wrong_count / max(1, total_attempts)
+            priority_score += 0.4 * wrong_ratio
+            
+            if wrong_count >= 2:
+                priority_score += 0.2
+        
+        if consecutive_correct >= 2:
+            priority_score -= 0.3
+        
+        if not last_correct and total_attempts > 0:
+            priority_score += 0.15
+        
+        q_mastery = score_map.get(q_kp, 0.5) if q_kp else 0.5
+        if q_mastery < 0.60:
+            priority_score += 0.25 * (1.0 - q_mastery)
+        
+        difficulty = q.get("difficulty", "medium")
+        if q_mastery < 0.40:
+            if difficulty == "easy":
+                priority_score += 0.1
+        elif q_mastery < 0.70:
+            if difficulty == "medium":
+                priority_score += 0.1
+        else:
+            if difficulty == "hard":
+                priority_score += 0.1
+        
+        scored_questions.append((priority_score, q))
+    
+    scored_questions.sort(key=lambda x: x[0], reverse=True)
+    
+    result = []
+    for score, q in scored_questions[:int(limit or 5)]:
+        q_result = dict(q)
+        q_result["priority_score"] = round(score, 3)
+        
+        if not q_result.get("options"):
+            q_result["options"] = ["A", "B", "C", "D"]
+        if not q_result.get("answer"):
+            q_result["answer"] = "A"
+        if not q_result.get("analysis"):
+            q_result["analysis"] = "请参考教材相关内容"
+        
+        result.append(q_result)
+    
+    return result
+
+
+def update_mastery_after_answer(student_id, question_id, is_correct):
+    """
+    答题后更新掌握度
+    
+    参数:
+        student_id: 学生ID
+        question_id: 题目ID
+        is_correct: 是否正确
+    
+    返回:
+        dict: 更新结果
+    """
+    sid = normalize_student_id(student_id)
+    qid = str(question_id)
+    
+    questions_data = load_questions_clean()
+    question = None
+    for q in questions_data.get("questions", []):
+        if str(q.get("id")) == qid:
+            question = q
+            break
+    
+    if not question:
+        return {"success": False, "error": "题目不存在"}
+    
+    kp_code = flow_kp_code(question.get("knowledge_point"))
+    
+    history = load_question_history_clean()
+    student_history = history.get(sid, {})
+    q_history = student_history.get(qid, {
+        "total_attempts": 0,
+        "correct_count": 0,
+        "wrong_count": 0,
+        "last_correct": False,
+        "consecutive_correct": 0,
+    })
+    
+    q_history["total_attempts"] = int(q_history.get("total_attempts", 0)) + 1
+    if is_correct:
+        q_history["correct_count"] = int(q_history.get("correct_count", 0)) + 1
+        q_history["last_correct"] = True
+        q_history["consecutive_correct"] = int(q_history.get("consecutive_correct", 0)) + 1
+    else:
+        q_history["wrong_count"] = int(q_history.get("wrong_count", 0)) + 1
+        q_history["last_correct"] = False
+        q_history["consecutive_correct"] = 0
+    
+    q_history["last_attempt_at"] = _now_iso()
+    student_history[qid] = q_history
+    history[sid] = student_history
+    
+    try:
+        with open(QUESTION_HISTORY_FILE, "w", encoding="utf-8") as f:
+            json.dump(history, f, ensure_ascii=False, indent=2)
+    except Exception:
+        pass
+    
+    if kp_code:
+        recalculate_parent_mastery(sid, kp_code)
+    
+    new_mastery = None
+    if kp_code:
+        mastery_result = calculate_knowledge_mastery(sid, kp_code)
+        new_mastery = mastery_result.get("mastery", 0)
+    
+    return {
+        "success": True,
+        "question_id": qid,
+        "is_correct": is_correct,
+        "knowledge_id": kp_code,
+        "new_mastery": round(new_mastery, 3) if new_mastery is not None else None,
+        "history": q_history,
+    }
+
+
+def update_wrong_book(student_id, question_id, is_correct):
+    """
+    更新错题集
+    
+    参数:
+        student_id: 学生ID
+        question_id: 题目ID
+        is_correct: 是否正确
+    
+    返回:
+        dict: 更新结果
+    """
+    sid = normalize_student_id(student_id)
+    qid = str(question_id)
+    
+    questions_data = load_questions_clean()
+    question = None
+    for q in questions_data.get("questions", []):
+        if str(q.get("id")) == qid:
+            question = q
+            break
+    
+    if not question:
+        return {"success": False, "error": "题目不存在"}
+    
+    wrong_book_file = os.path.join(RESOURCE_DIR, "wrong_book.json")
+    wrong_book = _json_load(wrong_book_file, {})
+    student_wrong = wrong_book.get(sid, {})
+    
+    result = {"success": True, "action": None}
+    
+    if not is_correct:
+        if qid not in student_wrong:
+            student_wrong[qid] = {
+                "added_at": _now_iso(),
+                "wrong_count": 1,
+                "last_wrong_at": _now_iso(),
+                "knowledge_id": question.get("knowledge_point"),
+                "question_title": question.get("title") or question.get("question", "")[:50],
+            }
+            result["action"] = "added"
+        else:
+            student_wrong[qid]["wrong_count"] = int(student_wrong[qid].get("wrong_count", 0)) + 1
+            student_wrong[qid]["last_wrong_at"] = _now_iso()
+            result["action"] = "updated"
+    else:
+        history = load_question_history_clean().get(sid, {}).get(qid, {})
+        consecutive_correct = int(history.get("consecutive_correct", 0))
+        
+        if consecutive_correct >= 2 and qid in student_wrong:
+            del student_wrong[qid]
+            result["action"] = "removed"
+        elif qid in student_wrong:
+            result["action"] = "marked_correct"
+    
+    wrong_book[sid] = student_wrong
+    
+    try:
+        with open(wrong_book_file, "w", encoding="utf-8") as f:
+            json.dump(wrong_book, f, ensure_ascii=False, indent=2)
+    except Exception:
+        pass
+    
+    result["wrong_count"] = len(student_wrong)
+    return result
+
+
+def generate_recommend_reason(student_id, resource_id, knowledge_id=None):
+    """
+    生成具体的推荐理由
+    
+    推荐理由不要写"系统综合推荐"，必须具体
+    
+    参数:
+        student_id: 学生ID
+        resource_id: 资源ID
+        knowledge_id: 知识点ID（可选）
+    
+    返回:
+        str: 具体的推荐理由
+    """
+    sid = normalize_student_id(student_id)
+    rid = str(resource_id)
+    
+    score_map, detail_map, name_map, _ = calculate_mastery_tree(sid)
+    
+    all_resources = all_resource_records()
+    resource = None
+    for res in all_resources:
+        if str(res.get("resource_id")) == rid:
+            resource = res
+            break
+    
+    if not resource:
+        return "该资源符合你的学习需求"
+    
+    res_kp = resource.get("knowledge_point")
+    kp_code = flow_kp_code(knowledge_id or res_kp) or knowledge_id or res_kp
+    kp_name = name_map.get(kp_code, res_kp or "知识点")
+    kp_mastery = score_map.get(kp_code, 0.5)
+    
+    parts = []
+    
+    status_text = "未学习" if kp_mastery <= 0 else ("需巩固" if kp_mastery < 0.60 else ("良好" if kp_mastery < 0.80 else "已掌握"))
+    parts.append("你在'{}'上的掌握度为{:.0f}%，属于{}知识点".format(
+        display_kp_name(kp_name), kp_mastery * 100, status_text
+    ))
+    
+    prereqs = get_prerequisite_knowledge(kp_code)
+    if prereqs:
+        weak_prereqs = []
+        for prereq in prereqs:
+            prereq_code = prereq["code"]
+            prereq_mastery = score_map.get(prereq_code, 0.5)
+            if prereq_mastery < 0.60:
+                weak_prereqs.append((prereq_code, prereq_mastery))
+        
+        if weak_prereqs:
+            weak_prereqs.sort(key=lambda x: x[1])
+            weakest_code, weakest_mastery = weak_prereqs[0]
+            weakest_name = name_map.get(weakest_code, weakest_code)
+            parts.append("该知识点与后续'{}'有关，前置掌握度仅{:.0f}%，因此系统优先推荐该知识点资源".format(
+                display_kp_name(weakest_name), weakest_mastery * 100
+            ))
+    
+    similar_students = get_similar_students(sid, top_k=3)
+    if similar_students:
+        completions = _json_load(RESOURCE_COMPLETION_FILE, {})
+        effects = _json_load(RESOURCE_EFFECT_FILE, [])
+        
+        similar_learned = False
+        avg_score_gain = 0
+        count = 0
+        
+        for other_sid, sim in similar_students:
+            other_completions = completions.get(other_sid, {})
+            if other_completions.get(rid, {}).get("completed"):
+                similar_learned = True
+                for e in effects:
+                    if str(e.get("student_id")) == other_sid and str(e.get("resource_id")) == rid:
+                        avg_score_gain += float(e.get("score_gain") or e.get("accuracy_gain") or 0)
+                        count += 1
+                        break
+        
+        if similar_learned:
+            if count > 0:
+                avg_score_gain = avg_score_gain / count
+                if avg_score_gain > 0.1:
+                    parts.append("与你画像相似的学生学习该资源后，相关练习正确率提升了{:.0f}%，所以该资源排序靠前".format(avg_score_gain * 100))
+                else:
+                    parts.append("与你学习情况相似的学生也学习过该资源")
+            else:
+                parts.append("与你学习情况相似的学生也学习过该资源")
+    
+    stats = resource_stats()
+    rq = stats.get(rid, {})
+    quality = float(rq.get("recommend_score") or rq.get("effectiveness_score") or 0)
+    if quality > 0.55:
+        parts.append("该资源整体学习效果较好，学生反馈积极")
+    
+    res_type = resource.get("type", "资源")
+    if "视频" in res_type or "video" in res_type.lower():
+        parts.append("资源类型为视频，适合直观理解概念")
+    elif "文档" in res_type or "doc" in res_type.lower():
+        parts.append("资源类型为文档，适合深入学习和复习")
+    elif "PPT" in res_type or "ppt" in res_type.lower():
+        parts.append("资源类型为课件，适合快速浏览要点")
+    
+    return "；".join(parts)
+
+
+def _generate_recommend_reason_legacy(student, knowledge, resource, scores):
+    mastery = float(scores.get("mastery", 0))
+    prereq_low = bool(scores.get("prereq_low"))
+    reasons = [
+        "当前“{}”掌握度为 {}，{}".format(display_kp_name(knowledge["name"]), "{}%".format(round(mastery * 100)), "属于薄弱知识点" if mastery < 0.60 else "仍需继续巩固"),
+        "该知识点{}课程重点，且与当前学习目标直接匹配".format("是" if scores.get("is_key", True) else "属于"),
+    ]
+    if prereq_low:
+        reasons.append("它的前置知识掌握度低于 60%，系统优先把基础知识排在前面，避免直接跳到后续内容")
+    if scores.get("related_text"):
+        reasons.append(scores["related_text"])
+    reasons.append("推荐该资源是因为它属于{}，覆盖“{}”，并且与你当前的学习偏好和知识点需求更匹配".format(resource.get("type"), display_kp_name(resource.get("knowledge_point"))))
+    if float(resource.get("resource_quality_score", 0) or 0) > 0.55:
+        reasons.append("你之前学习类似资源后，后续练习正确率提升比较明显")
+    if float(resource.get("teacher_adapt_score", 0) or 0) > 0.60:
+        reasons.append("与你画像相似的学生学习该资源后的效果也较好")
+    return "；".join(reasons)
+
+
+def recommend_questions_for_knowledge(student_id, knowledge_id=None, limit=5, status=None):
+    sid = normalize_student_id(student_id)
+    knowledge_id = repair_text(knowledge_id or "")
+    target_code = normalize_assessable_code(knowledge_id) or flow_kp_code(knowledge_id) or knowledge_id
+    knowledge_name = clean_knowledge_name_for_display(target_code, knowledge_id)
+    for item in build_knowledge_catalog():
+        if item["code"] == target_code:
+            knowledge_name = clean_knowledge_name_for_display(target_code, item["name"])
+            break
+    ensure_questions_for_knowledge(target_code, knowledge_name, "第{}章".format(target_code.split(".")[0]) if target_code else "未分类")
+    history = load_question_history_clean().get(sid, {})
+    mastery = 0
+    for p in mastery_points_payload(sid)["leaf_points"]:
+        if p["kp_id"] == target_code:
+            mastery = p["score"]
+            break
+    preferred = ["easy", "medium"] if mastery < 0.60 else (["medium", "easy", "hard"] if mastery < 0.85 else ["medium", "hard"])
+    scored = []
+    for q in load_questions_clean().get("questions", []):
+        code = flow_kp_code(q.get("knowledge_point"))
+        if target_code and code != target_code:
+            continue
+        if q.get("status") == "disabled":
+            continue
+        h = history.get(str(q.get("id")), {})
+        wrong_bonus = 0.25 if int(h.get("wrong_count", 0)) > int(h.get("correct_count", 0)) else 0
+        unseen_bonus = 0.18 if not int(h.get("total_attempts", 0)) else 0
+        diff_score = 1 - min(preferred.index(q.get("difficulty")) if q.get("difficulty") in preferred else 2, 2) * 0.22
+        scored.append((diff_score + wrong_bonus + unseen_bonus, q))
+    scored.sort(key=lambda x: x[0], reverse=True)
+    return [item for _score, item in scored[:int(limit or 5)]]
+
+
+def mark_resource_completed(student_id, resource_id):
+    sid = normalize_student_id(student_id)
+    resource_id = str(resource_id or "").replace("\\", "/")
+    if not is_valid_resource(resource_id):
+        return {"success": False, "error": "资源不存在"}
+    data = repair_obj(_json_load(RESOURCE_COMPLETION_FILE, {}))
+    student_map = data.setdefault(sid, {})
+    old = student_map.get(resource_id)
+    repeated = bool(old and old.get("completed"))
+    resource = final_resource_record(resource_id)
+    before_payload = mastery_points_payload(sid)
+    before_map = {p["kp_id"]: p["score"] for p in before_payload["leaf_points"]}
+    student_map[resource_id] = {
+        "completed": True,
+        "completed_at": old.get("completed_at") if repeated else _now_iso(),
+        "updated_at": _now_iso(),
+        "knowledge_id": resource["knowledge_id"],
+        "teacher_name": resource["teacher_name"],
+        "resource_type": resource["type"],
+    }
+    save_completion_map(data)
+    log_learning_record(sid, resource_id, "complete")
+    recalculate_all_parent_mastery(sid)
+    after_payload = mastery_points_payload(sid)
+    after_map = {p["kp_id"]: p["score"] for p in after_payload["leaf_points"]}
+    questions = recommend_questions_for_knowledge(sid, resource["knowledge_id"], 5)
+    stats = resource_stats()
+    st = stats.setdefault(resource_id, {"use_count": 0, "complete_count": 0, "post_practice_count": 0, "post_practice_correct_rate": 0, "avg_score_gain": 0, "avg_mastery_gain": 0})
+    if not repeated:
+        st["complete_count"] = int(st.get("complete_count", 0)) + 1
+    st["completion_rate"] = st.get("complete_count", 0) / max(1, st.get("use_count", st.get("complete_count", 1)))
+    stats[resource_id] = st
+    _json_save(RESOURCE_STATS_FILE, stats)
+    return {
+        "success": True,
+        "completed": True,
+        "repeated": repeated,
+        "knowledge_id": resource["knowledge_id"],
+        "mastery_before": round(before_map.get(resource["knowledge_id"], 0), 3),
+        "mastery_after": round(after_map.get(resource["knowledge_id"], 0), 3),
+        "recommend_questions": questions,
+    }
+
+
+def record_resource_effect_after_question(student_id, question, correct, before_mastery, after_mastery, resource_id=None):
+    resource_id = str(resource_id or session.get("last_completed_resource") or "").replace("\\", "/")
+    if not resource_id or not is_valid_resource(resource_id):
+        return
+    resource = final_resource_record(resource_id)
+    event = {
+        "student_id": normalize_student_id(student_id),
+        "resource_id": resource_id,
+        "teacher_name": resource.get("teacher_name") or "未标注",
+        "knowledge_id": flow_kp_code(question.get("knowledge_point")) or question.get("knowledge_point"),
+        "after_accuracy": 1 if correct else 0,
+        "before_mastery": before_mastery,
+        "after_mastery": after_mastery,
+        "mastery_gain": round(after_mastery - before_mastery, 3),
+        "created_at": _now_iso(),
+    }
+    events = repair_obj(_json_load(RESOURCE_EFFECT_FILE, []))
+    events.append(event)
+    _json_save(RESOURCE_EFFECT_FILE, events)
+    recalculate_resource_quality(resource_id)
+
+
+def recalculate_resource_quality(resource_id):
+    events = [e for e in repair_obj(_json_load(RESOURCE_EFFECT_FILE, [])) if str(e.get("resource_id")) == str(resource_id)]
+    stats = resource_stats()
+    item = stats.setdefault(resource_id, {"use_count": 0, "complete_count": 0})
+    if events:
+        item["post_practice_count"] = len(events)
+        item["post_practice_correct_rate"] = round(sum(1 for e in events if e.get("after_accuracy")) / len(events), 3)
+        item["avg_mastery_gain"] = round(sum(float(e.get("mastery_gain") or 0) for e in events) / len(events), 3)
+        item["avg_score_gain"] = round(sum(float(e.get("after_accuracy") or 0) for e in events) / len(events), 3)
+    completion_rate = float(item.get("completion_rate", 0) or 0)
+    item["effectiveness_score"] = round(
+        0.45 * float(item.get("avg_score_gain", 0) or 0) +
+        0.35 * min(1.0, max(0.0, float(item.get("avg_mastery_gain", 0) or 0) * 6)) +
+        0.20 * completion_rate,
+        3
+    )
+    item["recommend_score"] = round(0.60 * item["effectiveness_score"] + 0.20 * completion_rate + 0.20 * min(1.0, float(item.get("use_count", 0) or 0) / 20), 3)
+    stats[resource_id] = item
+    _json_save(RESOURCE_STATS_FILE, stats)
+    return item
+
+
+def hybrid_recommend(student_id, target_knowledge_id=None, scene="home", limit=10):
+    """
+    混合推荐入口函数
+    
+    现已改用"基于知识图谱约束的协同过滤推荐算法"
+    算法说明详见 hkgcf_like_recommend 函数
+    """
+    return hkgcf_like_recommend(student_id, target_knowledge_id, limit)
+
+
+def _original_hybrid_recommend_impl_v2(student_id, target_knowledge_id=None, scene="home", limit=10):
+    sid = normalize_student_id(student_id)
+    profile = get_user_profile(sid)
+    mastery = mastery_points_payload(sid)
+    mastery_map = {p["kp_id"]: p["score"] for p in mastery["leaf_points"]}
+    names = {p["kp_id"]: p["full_name"] for p in mastery["leaf_points"]}
+    resources = []
+    for resource in get_flow_resources(sid):
+        kp_code = flow_kp_code(resource.get("knowledge_id") or resource.get("knowledge_point"))
+        target_code = flow_kp_code(target_knowledge_id) if target_knowledge_id else kp_code
+        current_mastery = mastery_map.get(kp_code, 0)
+        weak_score = 1 - current_mastery
+        kp_match = 1.0 if kp_code == target_code else (0.75 if kp_code.split(".")[:2] == target_code.split(".")[:2] else 0.35)
+        quality = float(resource.get("resource_quality_score", 0) or 0.35)
+        completed_penalty = 0.15 if resource.get("completed") else 0
+        score = max(0.0, min(1.0, 0.45 * weak_score + 0.30 * kp_match + 0.20 * quality + 0.05 * (0.6 if resource["type"] == "视频" else 0.5) - completed_penalty))
+        related_text = "该资源与当前知识点属于同一章节，可帮助你形成连续学习路径"
+        reason = generate_recommend_reason(
+            profile,
+            {"name": names.get(kp_code, resource.get("knowledge_point"))},
+            {**resource, "resource_quality_score": quality, "teacher_adapt_score": resource.get("teacher_adapt_score", 0.55)},
+            {"mastery": current_mastery, "prereq_low": False, "is_key": True, "related_text": related_text}
+        )
+        resources.append({**resource, "knowledge_id": kp_code, "score": round(score, 3), "recommend_score": round(score, 3), "explain": reason})
+    resources.sort(key=lambda x: x.get("score", 0), reverse=True)
+    return resources[:int(limit or 10)]
+
+
+def build_learning_path(student_id, target_code=None):
+    """
+    构建学习路径
+    
+    现已改用新的 generate_learning_path 函数
+    支持先修知识点优先、相关知识点推荐等规则
+    """
+    return generate_learning_path(student_id, target_code)
+
+
+def build_student_dashboard(student_id):
+    sid = normalize_student_id(student_id)
+    profile = get_user_profile(sid)
+    payload = mastery_points_payload(sid)
+    weak_points = sorted(payload["leaf_points"], key=lambda x: (x["score"], natural_sort_key(x["kp_id"])))[:5]
+    rec_payload = build_records_payload(sid)
+    recent_groups = rec_payload.get("groups", [])[:5]
+    today_str = datetime.now().strftime("%Y-%m-%d")
+    today_items = []
+    for g in recent_groups:
+        if g["date"] == today_str:
+            today_items = g["items"]
+            break
+    return {
+        "success": True,
+        "stats": payload["stats"],
+        "profile": profile,
+        "weak_points": [{"name": display_kp_name(x["full_name"]), "score": x["score"]} for x in weak_points],
+        "recommendations": hybrid_recommend(sid, weak_points[0]["kp_id"] if weak_points else None, scene="home", limit=4),
+        "recent_groups": recent_groups,
+        "today_count": len(today_items),
+        "today_items": today_items[:10],
+    }
+
+
+def build_records_payload(student_id):
+    sid = normalize_student_id(student_id)
+    records = get_learning_records(sid)
+    groups_map = {}
+    for record in records:
+        date = str(record.get("created_at") or "")[:10]
+        norm_type = normalize_resource_type(record["resource_type"])
+        groups_map.setdefault(date, []).append({
+            "record_id": record["record_id"],
+            "name": record["resource_name"],
+            "type": norm_type,
+            "chapter_label": record["chapter_label"],
+            "knowledge_point": record["knowledge_point"],
+            "action_type": record["action_type"],
+            "time": str(record.get("created_at") or "")[11:16],
+            "resource_exists": record["resource_exists"],
+        })
+    groups = [{"date": key, "items": value} for key, value in sorted(groups_map.items(), reverse=True)]
+    summary = {
+        "total": len(records),
+        "video": sum(1 for r in records if normalize_resource_type(r["resource_type"]) == "视频"),
+        "document": sum(1 for r in records if normalize_resource_type(r["resource_type"]) == "文档"),
+        "exercise": sum(1 for r in records if normalize_resource_type(r["resource_type"]) == "习题"),
+        "week": sum(1 for r in records if (datetime.now() - datetime.fromisoformat(r["created_at"])).days < 7),
+    }
+    return {"success": True, "records": records, "groups": groups, "summary": summary}
+
+
+def build_wrong_questions(student_id):
+    sid = normalize_student_id(student_id)
+    history = load_question_history_clean().get(sid, {})
+    qmap = get_question_map_clean()
+    mastery_data = mastery_points_payload(sid)
+    kp_score_map = {point["kp_id"]: point["score"] for point in mastery_data["leaf_points"]}
+    items = []
+    for qid, item in history.items():
+        if int(item.get("wrong_count", 0) or 0) <= 0 or item.get("removed"):
+            continue
+        question = qmap.get(str(qid))
+        if not question:
+            continue
+        code = flow_kp_code(question.get("knowledge_point"))
+        score = kp_score_map.get(code, 0)
+        items.append({
+            **question,
+            "wrong_count": int(item.get("wrong_count", 0) or 0),
+            "correct_count": int(item.get("correct_count", 0) or 0),
+            "consecutive_correct": int(item.get("consecutive_correct", 0) or 0),
+            "last_wrong_time": item.get("last_wrong_time") or item.get("first_wrong_time") or "",
+            "last_answer": item.get("last_answer") or "",
+            "mastered": bool(item.get("mastered")),
+            "mastery": round(score, 3),
+        })
+    items.sort(key=lambda x: (natural_sort_key(x.get("knowledge_point") or ""), -(x.get("wrong_count") or 0)))
+    return items
+
+
+def get_knowledge_graph(student_id):
+    sid = normalize_student_id(student_id) if student_id else None
+    score_map, detail_map, names, children = calculate_mastery_tree(sid) if sid else ({}, {}, {}, {})
+    if not names:
+        names = build_knowledge_catalog_names()
+        score_map = {code: 0 for code in names}
+    code_to_name = {code: name for code, name in names.items()}
+    name_to_code = {}
+    for code, name in names.items():
+        key = name.replace(' ', '').strip()
+        if key:
+            name_to_code[key] = code
+        name_to_code[name] = code
+    nodes = []
+    edges = []
+    node_ids = set()
+
+    def get_code(neo_name):
+        code = name_to_code.get(neo_name) or name_to_code.get(neo_name.replace(' ', '').strip())
+        if not code:
+            code = _kp_code(neo_name)
+            if code and code not in code_to_name:
+                code = None
+        return code
+
+    def get_mastery_info(code):
+        meta = detail_map.get(code, {})
+        return {
+            "mastery": round(score_map.get(code, 0), 3),
+            "status": get_mastery_status(score_map.get(code, 0)),
+            "question_count": int(meta.get("total_questions", 0)),
+            "correct_count": int(meta.get("correct_questions", 0)),
+        }
+
+    neo_success = False
+    kp_rows = []
+    ch_rows = []
+    rel_rows = []
+    extra_rel_rows = []
+
+    if not neo4j_temporarily_offline():
+        try:
+            with driver.session() as neo:
+                kp_rows = list(neo.run("MATCH (k:Knowledge) RETURN k.name AS name ORDER BY k.name"))
+                ch_rows = list(neo.run("MATCH (c:Chapter) RETURN c.name AS name ORDER BY c.name"))
+                rel_rows = list(neo.run("""
+                    MATCH (a)-[r]->(b)
+                    WHERE type(r) IN ['包含','CONTAINS','HAS_KNOWLEDGE','BELONGS_TO']
+                    RETURN labels(a) AS a_labels, a.name AS a_name,
+                           labels(b) AS b_labels, b.name AS b_name,
+                           type(r) AS rel_type
+                    LIMIT 500
+                """))
+                extra_rel_rows = list(neo.run("""
+                    MATCH (a)-[r]->(b)
+                    WHERE type(r) IN ['先修','PREREQUISITE','相关','RELATED_TO']
+                    RETURN a.name AS a_name, b.name AS b_name, type(r) AS rel_type
+                    LIMIT 200
+                """))
+            if kp_rows:
+                neo_success = True
+        except Exception as e:
+            pass
+
+    def build_fallback():
+        level_shape = {-1: 'diamond', 0: 'hexagon', 1: 'square', 2: 'circle'}
+        level_size = {-1: 72, 0: 50, 1: 42, 2: 28}
+        level_font = {-1: 16, 0: 14, 1: 12, 2: 10}
+        level_name = {-1: '课程', 0: '章', 1: '节', 2: '知识点'}
+        fb_nodes = [{
+            "id": "course_root",
+            "label": "操作系统",
+            "mastery": round(sum(score_map.get(c, 0) for c in score_map if c.count(".") >= 2) / max(1, len([c for c in score_map if c.count(".") >= 2])), 3),
+            "group": "course",
+            "level": -1,
+            "levelName": "课程",
+            "shape": "diamond",
+            "size": 72,
+            "fontSize": 16,
+            "question_count": 0,
+            "correct_count": 0,
+        }]
+        fb_edges = []
+        for code in sorted(names.keys(), key=natural_sort_key):
+            level = code.count(".")
+            mi = get_mastery_info(code)
+            fb_nodes.append({
+                "id": code, "label": names[code],
+                "mastery": mi["mastery"], "group": "knowledge",
+                "level": level, "levelName": level_name.get(level, "知识点"),
+                "shape": level_shape.get(level, "circle"),
+                "size": level_size.get(level, 28),
+                "fontSize": level_font.get(level, 10),
+                "question_count": mi["question_count"],
+                "correct_count": mi["correct_count"],
+            })
+            if level == 0:
+                fb_edges.append({"from": "course_root", "to": code, "type": "包含"})
+            elif level >= 1:
+                fb_edges.append({"from": ".".join(code.split(".")[:-1]), "to": code, "type": "包含"})
+        leaf_codes = sorted([c for c in names.keys() if c.count(".") >= 2], key=natural_sort_key)
+        for idx, code in enumerate(leaf_codes[1:], start=1):
+            prev_code = leaf_codes[idx - 1]
+            if code.split(".")[:2] == prev_code.split(".")[:2]:
+                fb_edges.append({"from": prev_code, "to": code, "type": "先修"})
+            elif code.split(".")[:1] == prev_code.split(".")[:1]:
+                fb_edges.append({"from": prev_code, "to": code, "type": "相关"})
+        return fb_nodes, fb_edges
+
+    if not neo_success:
+        nodes, edges = build_fallback()
+    else:
+        root_id = "course_root"
+        leaf_codes = [c for c in score_map if c.count(".") >= 2]
+        root_mastery = round(sum(score_map.get(c, 0) for c in leaf_codes) / max(1, len(leaf_codes)), 3)
+        nodes.append({
+            "id": root_id, "label": "操作系统",
+            "mastery": root_mastery, "group": "course",
+            "level": -1, "levelName": "课程",
+            "shape": "diamond", "size": 72, "fontSize": 16,
+            "question_count": 0, "correct_count": 0,
+        })
+        node_ids.add(root_id)
+
+        def extract_ch_num(name):
+            m = re.search(r'第\s*(\d+)\s*章', name)
+            if m:
+                return "第" + m.group(1) + "章"
+            return None
+
+        chapter_nodes = {}
+        for row in ch_rows:
+            ch_name = repair_text(row.get("name") or "")
+            if not ch_name:
+                continue
+            ch_num = extract_ch_num(ch_name)
+            ch_code = "ch:" + (ch_num or ch_name)
+            if ch_code not in chapter_nodes or len(ch_name) > len(chapter_nodes[ch_code]):
+                chapter_nodes[ch_code] = ch_name
+
+        for ch_code, ch_label in sorted(chapter_nodes.items(), key=lambda x: natural_sort_key(x[0])):
+            if ch_code not in node_ids:
+                nodes.append({
+                    "id": ch_code, "label": ch_label,
+                    "mastery": 0.0, "group": "chapter",
+                    "level": 0, "levelName": "章",
+                    "shape": "hexagon", "size": 50, "fontSize": 14,
+                    "question_count": 0, "correct_count": 0,
+                })
+                node_ids.add(ch_code)
+                edges.append({"from": root_id, "to": ch_code, "type": "包含"})
+
+        kp_level = {}
+        for row in kp_rows:
+            kp_name = repair_text(row.get("name") or "")
+            code = get_code(kp_name)
+            if code:
+                kp_level[kp_name] = code.count(".")
+
+        section_nodes = {}
+        for row in kp_rows:
+            kp_name = repair_text(row.get("name") or "")
+            code = get_code(kp_name)
+            if not code:
+                continue
+            if code in node_ids:
+                continue
+            mi = get_mastery_info(code)
+            level = kp_level.get(kp_name, 2)
+            level_shape = {-1: 'diamond', 0: 'hexagon', 1: 'square', 2: 'circle'}
+            level_size = {-1: 72, 0: 50, 1: 42, 2: 28}
+            level_font = {-1: 16, 0: 14, 1: 12, 2: 10}
+            level_name = {-1: '课程', 0: '章', 1: '大节', 2: '知识点'}
+            shape = level_shape.get(level, "circle")
+            size = level_size.get(level, 28)
+            font_size = level_font.get(level, 10)
+            level_name_label = level_name.get(level, "知识点")
+            nodes.append({
+                "id": code, "label": code_to_name.get(code, kp_name),
+                "mastery": mi["mastery"], "group": "knowledge",
+                "level": level, "levelName": level_name_label,
+                "shape": shape, "size": size, "fontSize": font_size,
+                "question_count": mi["question_count"],
+                "correct_count": mi["correct_count"],
+            })
+            node_ids.add(code)
+
+            if level >= 2:
+                parts = code.split(".")
+                sec_code = ".".join(parts[:-1])
+                if sec_code and sec_code not in section_nodes:
+                    sec_code_clean = sec_code.strip()
+                    if sec_code_clean:
+                        masteries = []
+                        question_counts = []
+                        correct_counts = []
+                        tgt_code = None
+                        for fn, fn_label in code_to_name.items():
+                            if fn.startswith(sec_code_clean) and fn != sec_code_clean:
+                                continue
+                            if fn == sec_code_clean:
+                                tgt_code = fn
+                                break
+                        for fn in code_to_name:
+                            if fn.startswith(sec_code + "."):
+                                mi2 = get_mastery_info(fn)
+                                masteries.append(mi2["mastery"])
+                                question_counts.append(mi2["question_count"])
+                                correct_counts.append(mi2["correct_count"])
+                        avg_mastery = round(sum(masteries) / max(1, len(masteries)), 3)
+                        sq_name = code_to_name.get(tgt_code or sec_code, sec_code)
+                        section_nodes[sec_code] = {
+                            "id": sec_code,
+                            "label": sq_name,
+                            "mastery": avg_mastery,
+                            "group": "knowledge",
+                            "level": 1,
+                            "levelName": "大节",
+                            "shape": "square",
+                            "size": 42,
+                            "fontSize": 12,
+                            "question_count": sum(question_counts),
+                            "correct_count": sum(correct_counts),
+                        }
+
+                parent_code = ".".join(parts[:-1])
+                edges.append({"from": parent_code, "to": code, "type": "包含"})
+
+        for sec_code, sec_node in sorted(section_nodes.items(), key=lambda x: natural_sort_key(x[0])):
+            if sec_code not in node_ids:
+                nodes.append(sec_node)
+                node_ids.add(sec_code)
+                ch_num = sec_code.split(".")[0] if "." in sec_code else None
+                for ch_code in chapter_nodes:
+                    ch_parts = re.findall(r'\d+', ch_code)
+                    if ch_parts and ch_parts[0] == ch_num:
+                        edges.append({"from": ch_code, "to": sec_code, "type": "包含"})
+                        break
+                else:
+                    edges.append({"from": root_id, "to": sec_code, "type": "包含"})
+
+        valid_ids = set(node_ids)
+
+        def neo_code_to_id(name):
+            code = get_code(name)
+            if code and code in valid_ids:
+                return code
+            ch_num = extract_ch_num(name)
+            if ch_num:
+                ch_code = "ch:" + ch_num
+                if ch_code in valid_ids:
+                    return ch_code
+            return None
+
+        for row in rel_rows:
+            a_labels = row.get("a_labels", [])
+            b_labels = row.get("b_labels", [])
+            a_name = repair_text(row.get("a_name") or "")
+            b_name = repair_text(row.get("b_name") or "")
+
+            a_is_course = "Course" in a_labels
+            b_is_course = "Course" in b_labels
+            a_is_ch = "Chapter" in a_labels
+            b_is_ch = "Chapter" in b_labels
+
+            if a_is_course and b_is_ch:
+                b_code = neo_code_to_id(b_name)
+                if b_code:
+                    edges.append({"from": root_id, "to": b_code, "type": "包含"})
+                continue
+
+            if a_is_ch and not b_is_ch:
+                a_code = neo_code_to_id(a_name)
+                b_code = neo_code_to_id(b_name)
+                if a_code and b_code:
+                    edges.append({"from": a_code, "to": b_code, "type": "包含"})
+                continue
+
+            if b_is_ch and not a_is_ch:
+                b_code = neo_code_to_id(b_name)
+                a_code = neo_code_to_id(a_name)
+                if a_code and b_code:
+                    edges.append({"from": b_code, "to": a_code, "type": "包含"})
+                continue
+
+            a_code = get_code(a_name)
+            b_code = get_code(b_name)
+            if not a_code or not b_code:
+                continue
+
+            a_level = kp_level.get(a_name, a_code.count("."))
+            b_level = kp_level.get(b_name, b_code.count("."))
+            if a_level < b_level:
+                src, tgt = a_code, b_code
+            elif b_level < a_level:
+                src, tgt = b_code, a_code
+            else:
+                src, tgt = a_code, b_code
+
+            if src in valid_ids and tgt in valid_ids and src != tgt:
+                edges.append({"from": src, "to": tgt, "type": "包含"})
+
+        for row in extra_rel_rows:
+            a_name = repair_text(row.get("a_name") or "")
+            b_name = repair_text(row.get("b_name") or "")
+            a_code = get_code(a_name)
+            b_code = get_code(b_name)
+            rel_type = row.get("rel_type") or "相关"
+            if rel_type in ("先修", "PREREQUISITE"):
+                rel_type = "先修"
+            else:
+                rel_type = "相关"
+            if a_code and b_code and a_code in valid_ids and b_code in valid_ids and a_code != b_code:
+                edges.append({"from": a_code, "to": b_code, "type": rel_type})
+
+        seen = set()
+        uniq_edges = []
+        for e in edges:
+            k = (e["from"], e["to"], e["type"])
+            if k not in seen:
+                seen.add(k)
+                uniq_edges.append(e)
+        edges = uniq_edges
+
+        level_shape = {-1: 'diamond', 0: 'hexagon', 1: 'square', 2: 'circle'}
+        level_size = {-1: 72, 0: 50, 1: 42, 2: 28}
+        level_font = {-1: 16, 0: 14, 1: 12, 2: 10}
+        level_name_map = {-1: '课程', 0: '章', 1: '大节', 2: '知识点'}
+        for code in sorted(names.keys(), key=natural_sort_key):
+            if code in node_ids:
+                continue
+            level = code.count(".")
+            if level < 1:
+                continue
+            mi = get_mastery_info(code)
+            nodes.append({
+                "id": code, "label": code_to_name.get(code, code),
+                "mastery": mi["mastery"], "group": "knowledge",
+                "level": level, "levelName": level_name_map.get(level, "知识点"),
+                "shape": level_shape.get(level, "circle"),
+                "size": level_size.get(level, 28),
+                "fontSize": level_font.get(level, 10),
+                "question_count": mi["question_count"],
+                "correct_count": mi["correct_count"],
+            })
+            node_ids.add(code)
+            parent_code = ".".join(code.split(".")[:-1])
+            edges.append({"from": parent_code, "to": code, "type": "包含"})
+
+    seen = set()
+    uniq_edges = []
+    for e in edges:
+        k = (e["from"], e["to"], e["type"])
+        if k not in seen:
+            seen.add(k)
+            uniq_edges.append(e)
+
+    return {"nodes": nodes, "edges": uniq_edges}
+
+def build_knowledge_catalog_names():
+    fixed = {
+        "1.1": "1.1 操作系统的定义",
+        "1.1.1": "1.1.1 基本概念",
+        "1.1.2": "1.1.2 计算机系统的视图",
+        "1.1.3": "1.1.3 操作系统的基本功能",
+        "1.2": "1.2 操作系统的形成和发展",
+        "1.3": "1.3 操作系统的分类",
+        "1.4": "1.4 操作系统的运行环境",
+        "1.5": "1.5 操作系统的结构",
+        "1.6": "1.6 现代操作系统",
+        "1.6.1": "1.6.1 现代操作系统技术特性",
+        "1.6.2": "1.6.2 UNIX技术特性",
+        "1.6.3": "1.6.3 Linux技术特性",
+        "1.6.4": "1.6.4 Windows Server技术特性",
+        "2.1": "2.1 进程概念",
+        "2.1.1": "2.1.1 单道程序的顺序执行",
+        "2.1.2": "2.1.2 多道程序的并发执行",
+        "2.2": "2.2 进程的组成与状态",
+        "2.2.1": "2.2.1 进程的概念",
+        "2.2.2": "2.2.2 进程的实体",
+        "2.2.3": "2.2.3 进程状态和转换",
+        "2.2.4": "2.2.4 进程控制",
+        "2.3": "2.3 线程模型",
+        "2.3.1": "2.3.1 线程的概念",
+        "2.3.2": "2.3.2 线程与进程的比较",
+        "2.3.3": "2.3.3 线程的实现",
+        "2.3.4": "2.3.4 线程调度激发",
+        "2.4": "2.4 多核、多线程与超线程",
+        "2.5": "2.5 进程、线程管理实例",
+        "3.1": "3.1 互斥与临界区",
+        "3.1.1": "3.1.1 并发原理",
+        "3.1.2": "3.1.2 临界资源与临界区",
+        "3.1.3": "3.1.3 互斥的软、硬件实现方法",
+        "3.1.4": "3.1.4 信号量和P、V操作",
+        "3.2": "3.2 进程同步",
+        "3.2.1": "3.2.1 进程同步概念",
+        "3.2.2": "3.2.2 用P、V操作实现同步",
+        "3.3": "3.3 进程通信",
+        "3.3.1": "3.3.1 进程通信的类型",
+        "3.3.2": "3.3.2 进程通信中的问题",
+        "3.3.3": "3.3.3 消息传递",
+        "3.4": "3.4 死锁",
+        "3.4.1": "3.4.1 死锁的概念",
+        "3.4.2": "3.4.2 死锁的必要条件",
+        "3.4.3": "3.4.3 死锁的防止",
+        "3.4.4": "3.4.4 死锁的避免",
+        "3.4.5": "3.4.5 死锁检测与恢复",
+        "3.4.6": "3.4.6 两阶段加锁",
+        "3.4.7": "3.4.7 活锁",
+        "3.4.8": "3.4.8 饥饿",
+        "3.5": "3.5 经典同步问题",
+        "3.5.1": "3.5.1 读者-写者问题",
+        "3.5.2": "3.5.2 哲学家进餐问题",
+        "3.5.3": "3.5.3 打瞌睡的理发师问题",
+        "3.6": "3.6 多核环境下的进程同步",
+        "3.7": "3.7 进程同步与通信实例",
+    }
+    names = dict(fixed)
+    catalog = build_knowledge_catalog()
+    for item in catalog:
+        code = item.get("code", "")
+        name = item.get("name", "")
+        if code and name and code not in names:
+            names[code] = name
+    return names
+
+
+def final_knowledge_points_data():
+    points = [repair_text(item["name"]) for item in build_knowledge_catalog()]
+    return jsonify({"success": True, "points": sorted(set(points), key=natural_sort_key)})
+
+
+def final_student_dashboard_data():
+    if session.get("role") != "student":
+        return jsonify({"success": False, "error": "未登录"})
+    return jsonify(build_student_dashboard(session.get("full_id")))
+
+
+def final_student_mastery_data():
+    if session.get("role") != "student":
+        return jsonify({"success": False, "error": "未登录"})
+    return jsonify({"success": True, **mastery_points_payload(session.get("full_id"))})
+
+
+def final_student_resources_data():
+    if session.get("role") != "student":
+        return jsonify({"success": False, "error": "未登录"})
+    sid = session.get("full_id")
+    resources = get_flow_resources(sid)
+    return jsonify({"success": True, "resources": resources, "questions": []})
+
+
+def final_student_path_data():
+    if session.get("role") != "student":
+        return jsonify({"success": False, "error": "未登录"})
+    target = request.args.get("target_kp", "").strip()
+    target_code = flow_kp_code(target) or target
+    path = build_learning_path(session.get("full_id"), target_code)
+    return jsonify({"success": True, "target_kp": target_code or (path[0]["kp_id"] if path else ""), "learning_path": path, "fallback_path": []})
+
+
+def final_student_records_data():
+    if session.get("role") != "student":
+        return jsonify({"success": False, "error": "未登录"})
+    return jsonify(build_records_payload(session.get("full_id")))
+
+
+def final_student_resource_complete_ext(resource_id):
+    if session.get("role") != "student":
+        return jsonify({"success": False, "error": "未登录"})
+    result = mark_resource_completed(session.get("full_id"), resource_id)
+    if not result.get("success", True):
+        return jsonify(result)
+    session["last_completed_resource"] = resource_id
+    session.modified = True
+    exercise_set = generate_exercise_set(session.get("full_id"), result.get("knowledge_id"), resource_id)
+    return jsonify({
+        "message": "已完成学习" if not result.get("repeated") else "该资源已完成学习",
+        "exercise_set": exercise_set,
+        **result
+    })
+
+
+def final_student_resource_status_ext(resource_id):
+    if session.get("role") != "student":
+        return jsonify({"success": False, "error": "未登录"})
+    st = get_completion_map(session.get("full_id")).get(str(resource_id).replace("\\", "/"))
+    return jsonify({"success": True, "completed": bool(st and st.get("completed")), "status": st})
+
+
+def final_student_resource_questions_ext(resource_id):
+    if session.get("role") != "student":
+        return jsonify({"success": False, "error": "未登录"})
+    resource = final_resource_record(resource_id)
+    questions = recommend_questions_for_knowledge(session.get("full_id"), resource["knowledge_id"], int(request.args.get("limit") or 5))
+    return jsonify({"success": True, "knowledge_id": resource["knowledge_id"], "questions": questions})
+
+
+def final_student_recommend_questions_ext():
+    if session.get("role") != "student":
+        return jsonify({"success": False, "error": "未登录"})
+    knowledge_id = request.args.get("knowledge_id") or request.args.get("kp_id")
+    return jsonify({"success": True, "questions": recommend_questions_for_knowledge(session.get("full_id"), knowledge_id, int(request.args.get("limit") or 5))})
+
+
+def final_student_questions_submit_ext():
+    if session.get("role") != "student":
+        return jsonify({"success": False, "error": "未登录"})
+    if request.method == "GET":
+        qid = str(request.args.get("load") or "")
+        q = get_question_map_clean().get(qid)
+        if not q:
+            return jsonify({"success": False, "error": "题目不存在"})
+        return jsonify({"success": True, "question": q, "question_text": q.get("title") or q.get("question") or "",
+                         "options": q.get("options") or [], "title": q.get("title") or q.get("question") or "",
+                         "correct_answer": q.get("answer") or "", "analysis": q.get("analysis") or q.get("explanation") or ""})
+    sid = session.get("full_id")
+    data = request.get_json() or {}
+    qid = str(data.get("question_id") or "")
+    q = get_question_map_clean().get(qid)
+    if not q:
+        return jsonify({"success": False, "error": "题目不存在"})
+    correct = answer_is_correct(q, data.get("answer"))
+    before_payload = mastery_points_payload(sid)
+    before_map = {p["kp_id"]: p["score"] for p in before_payload["leaf_points"]}
+    history = load_question_history_clean()
+    student_history = history.setdefault(normalize_student_id(sid), {})
+    h = student_history.setdefault(qid, {"correct_count": 0, "wrong_count": 0, "consecutive_correct": 0, "total_attempts": 0, "first_wrong_time": None})
+    h["total_attempts"] = int(h.get("total_attempts", 0) or 0) + 1
+    h["last_attempt_time"] = _now_iso()
+    h["last_answer"] = data.get("answer")
+    h["last_result"] = "correct" if correct else "wrong"
+    if correct:
+        h["correct_count"] = int(h.get("correct_count", 0) or 0) + 1
+        h["consecutive_correct"] = int(h.get("consecutive_correct", 0) or 0) + 1
+        if h["consecutive_correct"] >= 2:
+            h["mastered"] = True
+    else:
+        h["wrong_count"] = int(h.get("wrong_count", 0) or 0) + 1
+        h["consecutive_correct"] = 0
+        h["removed"] = False
+        h["last_wrong_time"] = _now_iso()
+        h["first_wrong_time"] = h.get("first_wrong_time") or h["last_wrong_time"]
+    save_question_history_clean(history)
+    log_learning_record(sid, data.get("resource_id") or session.get("last_completed_resource") or "", "question_practice")
+    recalculate_all_parent_mastery(sid)
+    after_payload = mastery_points_payload(sid)
+    target_code = flow_kp_code(q.get("knowledge_point"))
+    before_mastery = before_map.get(target_code, 0)
+    after_mastery = {p["kp_id"]: p["score"] for p in after_payload["leaf_points"]}.get(target_code, before_mastery)
+    record_resource_effect_after_question(sid, q, correct, before_mastery, after_mastery, data.get("resource_id"))
+    return jsonify({
+        "success": True,
+        "correct": correct,
+        "is_correct": correct,
+        "correct_answer": q.get("answer"),
+        "analysis": q.get("analysis") or "",
+        "mastery_before": round(before_mastery, 3),
+        "mastery_after": round(after_mastery, 3),
+        "question": q,
+    })
+
+
+def final_student_wrong_questions_data_ext():
+    if session.get("role") != "student":
+        return jsonify({"success": False, "error": "未登录"})
+    return jsonify({"success": True, "questions": build_wrong_questions(session.get("full_id"))})
+
+
+def final_student_wrong_questions_remove_ext():
+    if session.get("role") != "student":
+        return jsonify({"success": False, "error": "未登录"})
+    qid = str((request.get_json() or {}).get("question_id") or "")
+    history = load_question_history_clean()
+    sid = normalize_student_id(session.get("full_id"))
+    if sid in history and qid in history[sid]:
+        history[sid][qid]["removed"] = True
+        save_question_history_clean(history)
+        recalculate_all_parent_mastery(sid)
+    return jsonify({"success": True})
+
+
+def final_wrong_questions_page():
+    if session.get("role") != "student":
+        return redirect(url_for("login"))
+    return render_flow_page("错题集", "wrong")
+
+
+def final_student_discuss_list():
+    if session.get("role") not in ("student", "teacher"):
+        return jsonify({"success": False, "error": "未登录"})
+    posts = []
+    try:
+        with driver.session() as neo:
+            rows = neo.run("""
+            MATCH (p:DiscussionPost)
+            OPTIONAL MATCH (p)-[:HAS_COMMENT]->(c:DiscussionComment)
+            RETURN elementId(p) AS id, p.title AS title, p.body AS body, p.author AS author,
+                   p.created_at AS created_at, p.created_ts AS created_ts,
+                   coalesce(p.knowledge_tag,'') AS tag,
+                   coalesce(p.status,'未解决') AS status,
+                   count(c) AS comment_count
+            ORDER BY created_ts ASC
+            """)
+            for idx, row in enumerate(rows, 1):
+                author = repair_text(row["author"] or "")
+                posts.append({
+                    "id": row["id"],
+                    "display_id": idx,
+                    "no": str(idx),
+                    "title": repair_text(row["title"] or ""),
+                    "body": repair_text(row["body"] or ""),
+                    "author": author or "匿名",
+                    "time": str(row["created_at"])[:16] if row["created_at"] else "",
+                    "knowledge_tag": repair_text(row["tag"] or ""),
+                    "status": clean_discuss_status(row["status"]),
+                    "comment_count": int(row["comment_count"] or 0),
+                    "is_mine": author == session.get("user_name", ""),
+                })
+            posts.reverse()
+    except Exception:
+        posts = []
+    return jsonify({"success": True, "posts": posts})
+
+
+def final_student_discuss_detail(post_id):
+    if session.get("role") not in ("student", "teacher"):
+        return jsonify({"success": False, "error": "未登录"})
+    try:
+        with driver.session() as neo:
+            row = neo.run("""
+            MATCH (p:DiscussionPost)
+            WHERE elementId(p)=$pid
+            OPTIONAL MATCH (p)-[:HAS_COMMENT]->(c:DiscussionComment)
+            RETURN elementId(p) AS id, p.title AS title, p.body AS body, p.author AS author, p.created_at AS created_at, p.created_ts AS created_ts,
+                   p.knowledge_tag AS knowledge_tag, coalesce(p.status,'未解决') AS status,
+                   collect({id:elementId(c), body:c.body, author:c.author, created_at:c.created_at, ts:c.created_ts}) AS comments
+            """, pid=post_id).single()
+            if row:
+                count_row = neo.run("""
+                 MATCH (p:DiscussionPost)
+                 WHERE p.created_ts < $created_ts
+                 RETURN count(p) AS cnt
+                 """, created_ts=row["created_ts"]).single()
+                display_id = (count_row["cnt"] if count_row else 0) + 1
+            else:
+                display_id = 0
+    except Exception:
+        row = None
+        display_id = 0
+    if not row:
+        return jsonify({"success": False, "error": "问题不存在"})
+    comments = sorted([c for c in (row["comments"] or []) if c.get("id")], key=lambda x: x.get("ts") or 0)
+    author = repair_text(row["author"] or "")
+    return jsonify({"success": True, "post": {
+        "id": row["id"],
+        "display_id": display_id,
+        "no": str(display_id),
+        "title": repair_text(row["title"] or ""),
+        "body": repair_text(row["body"] or ""),
+        "author": author or "匿名",
+        "time": str(row["created_at"])[:16] if row["created_at"] else "",
+        "knowledge_tag": repair_text(row["knowledge_tag"] or ""),
+        "status": clean_discuss_status(row["status"]),
+        "is_mine": author == session.get("user_name", ""),
+        "comments": [{
+            "id": c["id"],
+            "floor": index + 1,
+            "body": repair_text(c["body"] or ""),
+            "author": repair_text(c["author"] or "") or "匿名",
+            "time": str(c["created_at"])[:16] if c.get("created_at") else "",
+            "is_mine": repair_text(c["author"] or "") == session.get("user_name", ""),
+        } for index, c in enumerate(comments)],
+    }})
+
+
+def final_student_discuss_post():
+    if session.get("role") != "student":
+        return jsonify({"success": False, "error": "未登录"})
+    data = request.get_json() or {}
+    title = repair_text((data.get("title") or "").strip())
+    body = repair_text((data.get("body") or "").strip())
+    tag = repair_text((data.get("knowledge_tag") or "").strip())
+    if not title or not body:
+        return jsonify({"success": False, "error": "标题和内容不能为空"})
+    with driver.session() as neo:
+        count_row = neo.run("MATCH (p:DiscussionPost) RETURN count(p) AS cnt").single()
+        new_display_id = (count_row["cnt"] if count_row else 0) + 1
+        row = neo.run("""
+        CREATE (p:DiscussionPost {title:$title, body:$body, author:$author, knowledge_tag:$tag,
+                                  status:'未解决', created_at:datetime(), created_ts:datetime().epochSeconds})
+        RETURN elementId(p) AS id
+        """, title=title, body=body, tag=tag, author=session.get("user_name", "学生")).single()
+    return jsonify({"success": True, "id": row["id"], "no": str(new_display_id), "display_id": new_display_id})
+
+
+def final_student_discuss_comment(post_id):
+    if session.get("role") not in ("student", "teacher"):
+        return jsonify({"success": False, "error": "未登录"})
+    body = repair_text(((request.get_json() or {}).get("body") or "").strip())
+    if not body:
+        return jsonify({"success": False, "error": "回复内容不能为空"})
+    with driver.session() as neo:
+        neo.run("""
+        MATCH (p:DiscussionPost) WHERE elementId(p)=$pid
+        CREATE (p)-[:HAS_COMMENT]->(:DiscussionComment {body:$body, author:$author, role:$role, created_at:datetime(), created_ts:datetime().epochSeconds})
+        """, pid=post_id, body=body, author=session.get("user_name", "用户"), role=session.get("role", "student"))
+    return jsonify({"success": True})
+
+
+def final_student_discuss_update(post_id):
+    if session.get("role") != "student":
+        return jsonify({"success": False, "error": "未登录"})
+    data = request.get_json() or {}
+    title = repair_text((data.get("title") or "").strip())
+    body = repair_text((data.get("body") or "").strip())
+    tag = repair_text((data.get("knowledge_tag") or "").strip())
+    with driver.session() as neo:
+        row = neo.run("""
+        MATCH (p:DiscussionPost {author:$author}) WHERE elementId(p)=$pid
+        SET p.title=$title, p.body=$body, p.knowledge_tag=$tag, p.updated_at=datetime()
+        RETURN elementId(p) AS id
+        """, author=session.get("user_name", ""), pid=post_id, title=title, body=body, tag=tag).single()
+    return jsonify({"success": bool(row), "error": "" if row else "只能修改自己的问题"})
+
+
+def final_student_discuss_delete(post_id):
+    if session.get("role") != "student":
+        return jsonify({"success": False, "error": "未登录"})
+    with driver.session() as neo:
+        row = neo.run("""
+        MATCH (p:DiscussionPost {author:$author}) WHERE elementId(p)=$pid
+        OPTIONAL MATCH (p)-[:HAS_COMMENT]->(c:DiscussionComment)
+        DETACH DELETE c, p
+        RETURN 1 AS ok
+        """, author=session.get("user_name", ""), pid=post_id).single()
+    return jsonify({"success": bool(row), "error": "" if row else "只能删除自己的问题"})
+
+
+def final_student_discuss_status(post_id):
+    if session.get("role") not in ("student", "teacher"):
+        return jsonify({"success": False, "error": "未登录"})
+    status = clean_discuss_status(((request.get_json() or {}).get("status") or "未解决"))
+    author_filter = " AND p.author=$author " if session.get("role") == "student" else ""
+    params = {"pid": post_id, "status": status}
+    if author_filter:
+        params["author"] = session.get("user_name", "")
+    with driver.session() as neo:
+        row = neo.run("""
+        MATCH (p:DiscussionPost) WHERE elementId(p)=$pid """ + author_filter + """
+        SET p.status=$status, p.updated_at=datetime()
+        RETURN 1 AS ok
+        """, **params).single()
+    return jsonify({"success": bool(row)})
+
+
+def final_student_my_comments():
+    if session.get("role") != "student":
+        return jsonify({"success": False, "error": "未登录"})
+    comments = []
+    with driver.session() as neo:
+        rows = neo.run("""
+        MATCH (p:DiscussionPost)-[:HAS_COMMENT]->(c:DiscussionComment {author:$author})
+        RETURN elementId(c) AS id, elementId(p) AS post_id, p.title AS title, c.body AS body, c.created_at AS created_at
+        ORDER BY c.created_ts DESC
+        """, author=session.get("user_name", ""))
+        for row in rows:
+            comments.append({
+                "id": row["id"],
+                "post_id": row["post_id"],
+                "title": repair_text(row["title"] or ""),
+                "body": repair_text(row["body"] or ""),
+                "time": str(row["created_at"])[:16] if row["created_at"] else "",
+            })
+    return jsonify({"success": True, "comments": comments})
+
+
+def final_delete_comment(comment_id):
+    if session.get("role") not in ("student", "teacher"):
+        return jsonify({"success": False, "error": "未登录"})
+    with driver.session() as neo:
+        if session.get("role") == "teacher":
+            row = neo.run("MATCH (c:DiscussionComment) WHERE elementId(c)=$cid DETACH DELETE c RETURN 1 AS ok", cid=comment_id).single()
+        else:
+            row = neo.run("MATCH (c:DiscussionComment {author:$author}) WHERE elementId(c)=$cid DETACH DELETE c RETURN 1 AS ok", cid=comment_id, author=session.get("user_name", "")).single()
+    return jsonify({"success": bool(row)})
+
+
+def teacher_collect_dashboard_data():
+    students = []
+    all_meta = load_student_meta()
+    profile_cache = {}
+    for sid in sorted(all_meta.keys()):
+        full_id = normalize_student_id(sid)
+        if full_id not in profile_cache:
+            try:
+                profile_cache[full_id] = get_user_profile(full_id)
+            except Exception as e:
+                profile_cache[full_id] = {
+                    "level": "需巩固",
+                    "avg_mastery": 0,
+                    "accuracy": 0,
+                    "total_questions": 0,
+                    "total_correct": 0,
+                    "description": "",
+                    "weak_points": [],
+                    "resource_completed_count": 0,
+                    "wrong_count": 0,
+                    "record_count": 0,
+                }
+        profile = profile_cache[full_id]
+        students.append({
+            "id": full_id,
+            "num": all_meta[sid].get("student_num"),
+            "name": all_meta[sid].get("name"),
+            "class_name": all_meta[sid].get("class_name"),
+            "gender": all_meta[sid].get("gender"),
+            "level": profile.get("level", "需巩固"),
+            "avg_mastery": profile.get("avg_mastery", 0),
+            "accuracy": profile.get("accuracy", 0),
+            "total_questions": profile.get("total_questions", 0),
+            "total_correct": profile.get("total_correct", 0),
+            "description": profile.get("description", ""),
+            "weak_points": profile.get("weak_points", [])[:6],
+        })
+    resource_types = {}
+    for res in all_resource_records():
+        resource_types[res["type"]] = resource_types.get(res["type"], 0) + 1
+    question_diff = {}
+    for q in load_questions_clean().get("questions", []):
+        question_diff[q["difficulty"]] = question_diff.get(q["difficulty"], 0) + 1
+    weak_counter = {}
+    for stu in students:
+        for item in stu["weak_points"][:6]:
+            weak_counter[item["name"]] = weak_counter.get(item["name"], 0) + 1
+    avg_mastery = sum(s["avg_mastery"] for s in students) / max(1, len(students))
+    avg_accuracy = sum(s["accuracy"] for s in students) / max(1, len(students))
+    level_counts = {}
+    for stu in students:
+        level_counts[stu["level"]] = level_counts.get(stu["level"], 0) + 1
+    behavior = {}
+    for s in students:
+        p = profile_cache.get(s["id"], {})
+        for k in ["resource_completed_count", "total_questions", "wrong_count", "record_count"]:
+            behavior[k] = behavior.get(k, 0) + (p.get(k, 0) or 0)
+    tiers = {"已掌握": 0, "良好": 0, "需巩固": 0}
+    for s in students:
+        m = float(s.get("avg_mastery") or 0)
+        if m >= 0.8:
+            tiers["已掌握"] = tiers.get("已掌握", 0) + 1
+        elif m >= 0.6:
+            tiers["良好"] = tiers.get("良好", 0) + 1
+        else:
+            tiers["需巩固"] = tiers.get("需巩固", 0) + 1
+    return {
+        "students": students,
+        "summary": {
+            "student_count": len(students),
+            "avg_mastery": round(avg_mastery, 3),
+            "avg_accuracy": round(avg_accuracy, 3),
+            "weak_student_count": sum(1 for s in students if s["avg_mastery"] < 0.60),
+            "resource_count": len(all_resource_records()),
+            "question_count": len(load_questions_clean().get("questions", [])),
+        },
+        "levels": level_counts,
+        "weak_rank": [{"name": name, "count": count} for name, count in sorted(weak_counter.items(), key=lambda x: (-x[1], x[0]))[:10]],
+        "resources": {"types": resource_types},
+        "questions": {"difficulty": question_diff},
+        "class_portrait": {
+            "summary": {
+                "student_count": len(students),
+                "avg_mastery": round(avg_mastery, 3),
+                "avg_accuracy": round(avg_accuracy, 3),
+                "weak_student_count": sum(1 for s in students if s["avg_mastery"] < 0.60),
+            },
+            "tiers": tiers,
+            "behavior": behavior,
+            "suggestions": [
+                "做题、视频、资源和讨论分别表示学生在该知识点下的作答表现、视频完成情况、资料学习情况和讨论参与情况，综合掌握度由多维学习行为加权计算得到。" + ("当前有{}名薄弱学生，建议重点关注".format(sum(1 for s in students if s["avg_mastery"] < 0.60)) if sum(1 for s in students if s["avg_mastery"] < 0.60) > 0 else "班级整体掌握度良好。")
+            ],
+        },
+    }
+
+
+def teacher_class_portrait():
+    data = teacher_collect_dashboard_data()
+    students = data["students"]
+    behavior = {
+        "资源完成数": sum(get_user_profile(s["id"])["resource_completed_count"] for s in students),
+        "做题总数": sum(get_user_profile(s["id"])["total_questions"] for s in students),
+        "错题总数": sum(get_user_profile(s["id"])["wrong_count"] for s in students),
+        "学习记录数": sum(get_user_profile(s["id"])["record_count"] for s in students),
+    }
+    tiers = {
+        "已掌握": sum(1 for s in students if s["avg_mastery"] >= 0.80),
+        "待巩固": sum(1 for s in students if 0.60 <= s["avg_mastery"] < 0.80),
+        "未学习/未掌握": sum(1 for s in students if s["avg_mastery"] < 0.60),
+    }
+    suggestions = []
+    if data["weak_rank"]:
+        suggestions.append("优先围绕 {} 等班级共性薄弱知识点安排讲解和练习。".format("、".join(display_kp_name(x["name"]) for x in data["weak_rank"][:3])))
+    if data["summary"]["avg_accuracy"] < 0.70:
+        suggestions.append("班级平均正确率偏低，建议增加基础选择题和错题复练。")
+    if not suggestions:
+        suggestions.append("班级整体状态较平稳，可加强综合题训练和课堂讨论。")
+    return {
+        "summary": {
+            "student_count": data["summary"]["student_count"],
+            "avg_mastery": data["summary"]["avg_mastery"],
+            "avg_accuracy": data["summary"]["avg_accuracy"],
+            "weak_student_count": data["summary"]["weak_student_count"],
+        },
+        "weak_rank": data["weak_rank"],
+        "behavior": behavior,
+        "tiers": tiers,
+        "suggestions": suggestions,
+    }
+
+
+def final_teacher_tools_data():
+    if session.get("role") != "teacher":
+        return jsonify({"success": False, "error": "未登录"})
+    data = teacher_collect_dashboard_data()
+    data["class_portrait"] = teacher_class_portrait()
+    return jsonify({"success": True, **data})
+
+
+def final_teacher_student_profile_data():
+    if session.get("role") != "teacher":
+        return jsonify({"success": False, "error": "未登录"})
+    sid = request.args.get("sid", "").strip()
+    if not sid:
+        return jsonify({"success": False, "error": "缺少学生ID"})
+    sid = normalize_student_id(sid)
+    return jsonify({
+        "success": True,
+        "profile": get_user_profile(sid),
+        "mastery": mastery_points_payload(sid),
+        "graph": get_knowledge_graph(sid),
+        "class_portrait": teacher_class_portrait(),
+    })
+
+
+def final_teacher_resources_data():
+    if session.get("role") != "teacher":
+        return jsonify({"success": False, "error": "未登录"})
+    stats = resource_stats()
+    out = []
+    for resource in all_resource_records():
+        st = recalculate_resource_quality(resource["resource_id"]) if resource["resource_id"] in stats else stats.get(resource["resource_id"], {})
+        out.append({
+            **resource,
+            "use_count": int(st.get("use_count", 0) or 0),
+            "complete_count": int(st.get("complete_count", 0) or 0),
+            "completion_rate": float(st.get("completion_rate", 0) or 0),
+            "effectiveness_score": float(st.get("effectiveness_score", 0) or 0),
+            "recommend_score": float(st.get("recommend_score", 0) or 0),
+            "avg_score_gain": float(st.get("avg_score_gain", 0) or 0),
+            "avg_mastery_gain": float(st.get("avg_mastery_gain", 0) or 0),
+            "post_practice_count": int(st.get("post_practice_count", 0) or 0),
+            "post_practice_correct_rate": float(st.get("post_practice_correct_rate", 0) or 0),
+        })
+    out.sort(key=lambda x: natural_sort_key(x["resource_id"]))
+    return jsonify({"success": True, "resources": out})
+
+
+def final_teacher_add_student():
+    if session.get("role") != "teacher":
+        return jsonify({"success": False, "error": "未登录"})
+    data = request.get_json() or {}
+    student_num = str(data.get("student_num") or "").strip()
+    if not student_num:
+        return jsonify({"success": False, "error": "学号不能为空"})
+    meta = load_student_meta()
+    if student_num in meta:
+        return jsonify({"success": False, "error": "学号不能重复"})
+    meta[student_num] = {
+        "student_num": student_num,
+        "name": str(data.get("name") or data.get("student_name") or "").strip(),
+        "class_name": str(data.get("class_name") or "").strip(),
+        "gender": str(data.get("gender") or "").strip(),
+        "password": str(data.get("password") or "123456").strip() or "123456",
+        "note": str(data.get("note") or "").strip(),
+    }
+    save_student_meta(meta)
+    sync_student_registry()
+    try:
+        with driver.session() as neo:
+            neo.run("""
+            MERGE (s:Student {id:$sid})
+            SET s.name=$name, s.num=$num, s.class_name=$class_name, s.gender=$gender
+            """, sid=normalize_student_id(student_num), name=meta[student_num]["name"], num=student_num, class_name=meta[student_num]["class_name"], gender=meta[student_num]["gender"])
+    except Exception:
+        pass
+    return jsonify({"success": True})
+
+
+def final_teacher_edit_student():
+    if session.get("role") != "teacher":
+        return jsonify({"success": False, "error": "未登录"})
+    data = request.get_json() or {}
+    original_id = normalize_student_id(data.get("student_id"))
+    old_num, _old_name = parse_student_identity(original_id)
+    student_num = str(data.get("student_num") or old_num).strip()
+    meta = load_student_meta()
+    if old_num not in meta:
+        return jsonify({"success": False, "error": "学生不存在"})
+    if student_num != old_num and student_num in meta:
+        return jsonify({"success": False, "error": "学号不能重复"})
+    item = meta.pop(old_num)
+    item.update({
+        "student_num": student_num,
+        "name": str(data.get("name") or data.get("student_name") or item.get("name") or "").strip(),
+        "class_name": str(data.get("class_name") or item.get("class_name") or "").strip(),
+        "gender": str(data.get("gender") or item.get("gender") or "").strip(),
+        "password": str(data.get("password") or item.get("password") or "123456").strip() or "123456",
+        "note": str(data.get("note") or item.get("note") or "").strip(),
+    })
+    meta[student_num] = item
+    save_student_meta(meta)
+    sync_student_registry()
+    try:
+        with driver.session() as neo:
+            neo.run("""
+            MATCH (s:Student {id:$old_id})
+            SET s.id=$new_id, s.name=$name, s.num=$num, s.class_name=$class_name, s.gender=$gender
+            """, old_id=original_id, new_id=normalize_student_id(student_num), name=item["name"], num=student_num, class_name=item["class_name"], gender=item["gender"])
+    except Exception:
+        pass
+    return jsonify({"success": True})
+
+
+def final_teacher_delete_student():
+    if session.get("role") != "teacher":
+        return jsonify({"success": False, "error": "未登录"})
+    student_id = normalize_student_id((request.get_json() or {}).get("student_id"))
+    student_num, _name = parse_student_identity(student_id)
+    meta = load_student_meta()
+    if student_num in meta:
+        del meta[student_num]
+        save_student_meta(meta)
+        sync_student_registry()
+    try:
+        with driver.session() as neo:
+            neo.run("MATCH (s:Student {id:$sid}) DETACH DELETE s", sid=student_id)
+    except Exception:
+        pass
+    return jsonify({"success": True})
+
+
+def final_api_knowledge_graph():
+    sid = request.args.get("student_id") or session.get("full_id") or ""
+    return jsonify(get_knowledge_graph(sid))
+
+
+def final_api_node_detail():
+    sid = request.args.get("student_id") or session.get("full_id") or ""
+    node_id = request.args.get("node_id") or ""
+    graph = get_knowledge_graph(sid)
+    node = next((n for n in graph["nodes"] if n["id"] == node_id), None)
+    if not node:
+        return jsonify({"success": False, "error": "节点不存在"})
+    return jsonify({
+        "success": True,
+        "id": node["id"],
+        "name": node["label"],
+        "mastery": node["mastery"],
+        "status": get_mastery_status(node["mastery"]),
+        "children": [e["to"] for e in graph["edges"] if e["from"] == node_id and e["type"] == "包含"],
+        "parents": [e["from"] for e in graph["edges"] if e["to"] == node_id and e["type"] == "包含"],
+        "related": [e["to"] for e in graph["edges"] if e["from"] == node_id and e["type"] == "相关"],
+        "prerequisites": [e["from"] for e in graph["edges"] if e["to"] == node_id and e["type"] == "先修"],
+    })
+
+
+def public_graph_payload():
+    nodes = {}
+    edges = []
+    try:
+        with driver.session() as neo:
+            for row in neo.run("""
+            MATCH (n)
+            WHERE n:Course OR n:Chapter OR n:Knowledge
+            RETURN elementId(n) AS id, labels(n) AS labels, coalesce(n.name, n.id) AS name
+            """):
+                label = "知识点"
+                if "Course" in (row["labels"] or []):
+                    label = "课程"
+                elif "Chapter" in (row["labels"] or []):
+                    label = "章节"
+                nodes[row["id"]] = {"id": row["id"], "name": repair_text(row["name"] or ""), "type": label}
+            for row in neo.run("""
+            MATCH (a)-[r]->(b)
+            WHERE (a:Course OR a:Chapter OR a:Knowledge) AND (b:Course OR b:Chapter OR b:Knowledge)
+            RETURN elementId(a) AS from_id, elementId(b) AS to_id, type(r) AS rel_type
+            LIMIT 1200
+            """):
+                rel = repair_text(row["rel_type"] or "")
+                if rel not in ("包含", "先修", "相关"):
+                    rel = "包含" if "CONTAIN" in rel.upper() else ("先修" if "PRE" in rel.upper() else "相关")
+                edges.append({"from_id": row["from_id"], "to_id": row["to_id"], "type": rel})
+    except Exception:
+        pass
+    return {"nodes": list(nodes.values()), "edges": edges}
+
+
+@app.route("/teacher/public-graph/data")
+def teacher_public_graph_data():
+    if session.get("role") != "teacher":
+        return jsonify({"success": False, "error": "未登录"})
+    return jsonify({"success": True, **public_graph_payload()})
+
+
+@app.route("/teacher/public-graph/node/save", methods=["POST"])
+def teacher_public_graph_node_save():
+    if session.get("role") != "teacher":
+        return jsonify({"success": False, "error": "未登录"})
+    data = request.get_json() or {}
+    node_id = data.get("node_id")
+    name = repair_text((data.get("name") or "").strip())
+    node_type = repair_text((data.get("node_type") or "知识点").strip())
+    if not name:
+        return jsonify({"success": False, "error": "节点名称不能为空"})
+    label = "Knowledge"
+    if node_type == "课程":
+        label = "Course"
+    elif node_type == "章节":
+        label = "Chapter"
+    try:
+        with driver.session() as neo:
+            if node_id:
+                neo.run("MATCH (n) WHERE elementId(n)=$id SET n.name=$name RETURN n", id=node_id, name=name)
+            else:
+                neo.run("CREATE (n:{} {{name:$name}}) RETURN n".format(label), name=name)
+    except Exception as exc:
+        return jsonify({"success": False, "error": str(exc)})
+    return jsonify({"success": True})
+
+
+@app.route("/teacher/public-graph/relation/save", methods=["POST"])
+def teacher_public_graph_relation_save():
+    if session.get("role") != "teacher":
+        return jsonify({"success": False, "error": "未登录"})
+    data = request.get_json() or {}
+    from_id = data.get("from_id")
+    to_id = data.get("to_id")
+    rel_type = repair_text((data.get("rel_type") or "包含").strip())
+    rel_map = {"包含": "CONTAINS", "先修": "PREREQUISITE", "相关": "RELATED"}
+    rel = rel_map.get(rel_type, "RELATED")
+    try:
+        with driver.session() as neo:
+            neo.run("""
+            MATCH (a), (b)
+            WHERE elementId(a)=$from_id AND elementId(b)=$to_id
+            CALL apoc.create.relationship(a, $rel, {}, b) YIELD rel AS created
+            RETURN created
+            """, from_id=from_id, to_id=to_id, rel=rel)
+    except Exception:
+        try:
+            with driver.session() as neo:
+                neo.run("""
+                MATCH (a), (b)
+                WHERE elementId(a)=$from_id AND elementId(b)=$to_id
+                MERGE (a)-[:PUBLIC_REL {rel:$rel_name}]->(b)
+                """, from_id=from_id, to_id=to_id, rel_name=rel_type)
+        except Exception as exc:
+            return jsonify({"success": False, "error": str(exc)})
+    return jsonify({"success": True})
+
+
+@app.route("/teacher/public-graph/node/delete", methods=["POST"])
+def teacher_public_graph_node_delete():
+    if session.get("role") != "teacher":
+        return jsonify({"success": False, "error": "未登录"})
+    node_id = (request.get_json() or {}).get("node_id")
+    try:
+        with driver.session() as neo:
+            neo.run("MATCH (n) WHERE elementId(n)=$id DETACH DELETE n", id=node_id)
+    except Exception as exc:
+        return jsonify({"success": False, "error": str(exc)})
+    return jsonify({"success": True})
+
+
+@app.route("/teacher/public-graph/relation/delete", methods=["POST"])
+def teacher_public_graph_relation_delete():
+    if session.get("role") != "teacher":
+        return jsonify({"success": False, "error": "未登录"})
+    data = request.get_json() or {}
+    try:
+        with driver.session() as neo:
+            neo.run("""
+            MATCH (a)-[r]->(b)
+            WHERE elementId(a)=$from_id AND elementId(b)=$to_id
+            DELETE r
+            """, from_id=data.get("from_id"), to_id=data.get("to_id"))
+    except Exception as exc:
+        return jsonify({"success": False, "error": str(exc)})
+    return jsonify({"success": True})
+
+
+def final_teacher_public_graph_add():
+    return teacher_public_graph_relation_save()
+
+
+def _build_question_tags(q, history_entry, is_new, in_wrong_book, kp_name_map):
+    qtype = q.get("type") or "single_choice"
+    if qtype == "choice":
+        qtype = "single_choice"
+    qtype_display = {"single_choice": "单选", "multiple_choice": "多选", "judge": "判断", "blank": "填空"}.get(qtype, qtype)
+    diff = q.get("difficulty") or "medium"
+    diff_display = {"easy": "基础", "medium": "中等", "hard": "困难"}.get(diff, diff)
+    kp_raw = q.get("knowledge_point") or q.get("knowledge_name") or ""
+    kp_code = flow_kp_code(kp_raw) or kp_raw
+    kp_name = kp_name_map.get(kp_code, kp_raw) if isinstance(kp_name_map, dict) else kp_raw
+    wrong_cnt = int((history_entry or {}).get("wrong_count", 0) or 0)
+    correct_cnt = int((history_entry or {}).get("correct_count", 0) or 0)
+    tags = '<span class="tag tag-type">{}</span>'.format(qtype_display)
+    tags += '<span class="tag tag-diff-{}">{}</span>'.format(diff, diff_display)
+    tags += '<span class="tag tag-kp">{} {}</span>'.format(kp_code, kp_name)
+    if in_wrong_book:
+        tags += '<span class="tag tag-consolidate">错题巩固</span>'
+    if is_new:
+        tags += '<span class="tag tag-new">未练习</span>'
+    else:
+        if wrong_cnt > 0:
+            tags += '<span class="tag tag-wrong">错误{}次</span>'.format(wrong_cnt)
+        if correct_cnt > 0:
+            tags += '<span class="tag tag-correct">做对{}次</span>'.format(correct_cnt)
+    return tags
+
+
+@app.route("/student/practice_set")
+def student_practice_set():
+    if session.get("role") != "student":
+        return redirect(url_for("login"))
+    exercise_set_id = request.args.get("exercise_set_id", "")
+    all_sets = _json_load(EXERCISE_SETS_FILE, {})
+    exercise_set = all_sets.get(exercise_set_id) if isinstance(all_sets, dict) else None
+    if not exercise_set:
+        return "<h2>练习套题不存在或已过期</h2><p><a href='/student/resources'>返回资源库</a></p>", 404
+    all_questions = load_questions_clean().get("questions", [])
+    q_map = {str(q.get("id")): q for q in all_questions}
+    questions = []
+    for qid in exercise_set.get("question_ids", []):
+        q = q_map.get(str(qid))
+        if q:
+            questions.append(q)
+    if not questions:
+        return "<h2>套题中暂无题目</h2><p><a href='/student/resources'>返回资源库</a></p>", 404
+    current_index = int(exercise_set.get("current_index", 0))
+    if current_index >= len(questions):
+        current_index = len(questions) - 1
+    sid = normalize_student_id(session.get("full_id"))
+    history = load_question_history_clean().get(sid, {})
+    wrong_book_data = _get_student_data(_json_load(os.path.join(RESOURCE_DIR, "wrong_book.json"), {}), sid)
+    catalog = build_knowledge_catalog()
+    kp_name_map = {item["code"]: item["name"] for item in catalog}
+    import json as _json_mod
+    qdata_parts = []
+    for q in questions:
+        qid = str(q.get("id"))
+        h = history.get(qid, {})
+        wrong_cnt = int(h.get("wrong_count", 0) or 0)
+        correct_cnt = int(h.get("correct_count", 0) or 0)
+        total_attempts = int(h.get("total_attempts", 0) or 0)
+        consecutive_correct = int(h.get("consecutive_correct", 0) or 0)
+        in_wrong_book = qid in wrong_book_data and consecutive_correct < 2
+        is_new_question = (total_attempts == 0) and (wrong_cnt == 0) and (correct_cnt == 0)
+        qtype = q.get("type") or "single_choice"
+        if qtype == "choice":
+            qtype = "single_choice"
+        qtype_display = {"single_choice": "单选", "multiple_choice": "多选", "judge": "判断", "blank": "填空"}.get(qtype, qtype)
+        diff = q.get("difficulty") or "medium"
+        diff_display = {"easy": "基础", "medium": "中等", "hard": "困难"}.get(diff, diff)
+        kp_raw = q.get("knowledge_point") or q.get("knowledge_name") or ""
+        kp_code = flow_kp_code(kp_raw) or kp_raw
+        kp_display = kp_name_map.get(kp_code, kp_raw)
+        qdata_parts.append(_json_mod.dumps({
+            "id": qid, "title": q.get("title") or q.get("question") or "",
+            "options": q.get("options", []), "answer": q.get("answer") or "",
+            "explanation": q.get("explanation") or q.get("analysis") or "",
+            "type": qtype, "type_display": qtype_display,
+            "difficulty": diff, "difficulty_display": diff_display,
+            "knowledge_code": kp_code, "knowledge_name": kp_display,
+            "wrong_count": wrong_cnt, "correct_count": correct_cnt,
+            "total_attempts": total_attempts, "in_wrong_book": in_wrong_book,
+            "is_new_question": is_new_question,
+        }, ensure_ascii=False))
+    current_q = questions[current_index]
+    cq_h = history.get(str(current_q.get("id")), {})
+    cq_consec = int(cq_h.get("consecutive_correct", 0) or 0)
+    cq_in_wb = str(current_q.get("id")) in wrong_book_data and cq_consec < 2
+    cq_is_new = int(cq_h.get("total_attempts", 0) or 0) == 0
+    cq_type = current_q.get("type") or "single_choice"
+    if cq_type == "choice":
+        cq_type = "single_choice"
+    current_tags_html = _build_question_tags(current_q, cq_h, cq_is_new, cq_in_wb, kp_name_map)
+    cq_options_html = ""
+    for i, opt in enumerate(current_q.get("options", [])):
+        letter = chr(ord("A") + i)
+        input_type = "checkbox" if cq_type == "multiple_choice" else "radio"
+        opt_clean = re.sub(r'^[A-Fa-f][.、．]\s*', '', str(opt).strip())
+        cq_options_html += '<label class="option-label"><input type="{}" name="answer" value="{}"> {}. {}</label>'.format(input_type, letter, letter, opt_clean)
+
+    html = """<!doctype html><html lang="zh-CN"><meta charset="utf-8"><title>配套练习</title>
+<style>
+*{box-sizing:border-box}
+body{margin:0;font-family:Microsoft YaHei,Arial;background:#f4f7fb}
+.top{height:60px;background:#fff;border-bottom:1px solid #dbe3ef;display:flex;align-items:center;justify-content:space-between;padding:0 24px}
+.wrap{max-width:800px;margin:18px auto;padding:0 18px}
+.card{background:#fff;border:1px solid #dbe3ef;border-radius:12px;padding:24px;margin-bottom:18px}
+.progress{height:6px;background:#e5e7eb;border-radius:3px;margin-bottom:18px;overflow:hidden}
+.progress-fill{height:100%;background:#16a34a;transition:width .3s}
+.tags{margin-bottom:14px;display:flex;flex-wrap:wrap;gap:6px;align-items:center}
+.tag{display:inline-flex;padding:3px 10px;border-radius:12px;font-size:12px;line-height:1.6}
+.tag-type{background:#e8f0fe;color:#1967d2}
+.tag-diff-easy{background:#dcfce7;color:#166534}
+.tag-diff-medium{background:#fef9c3;color:#854d0e}
+.tag-diff-hard{background:#fef2f2;color:#991b1b}
+.tag-kp{background:#f3e8ff;color:#7c3aed}
+.tag-wrong{background:#fef2f2;color:#dc2626;font-weight:bold}
+.tag-correct{background:#dcfce7;color:#16a34a}
+.tag-new{background:#f1f5f9;color:#64748b}
+.tag-consolidate{background:#fff7ed;color:#ea580c;font-weight:bold}
+.q-title{font-size:16px;font-weight:bold;margin-bottom:16px;line-height:1.6}
+.q-hint{font-size:12px;color:#64748b;margin-bottom:8px}
+.option-label{display:block;margin:6px 0;padding:12px 14px;border:2px solid #e5e7eb;border-radius:10px;cursor:pointer;transition:all .15s}
+.option-label:hover{border-color:#93c5fd;background:#f8fafc}
+.option-label.selected{border-color:#3b82f6;background:#eff6ff}
+.option-label input{margin-right:8px;accent-color:#3b82f6}
+.btn{display:inline-flex;padding:10px 18px;border-radius:10px;text-decoration:none;background:#edf5ff;color:#2563eb;border:1px solid #cfe2ff;margin:0 6px;cursor:pointer;font-size:14px;line-height:1.4}
+.btn:disabled{opacity:.5;cursor:not-allowed}
+.btn-primary{background:#16a34a;color:#fff;border-color:#16a34a}
+.btn-submit{border:0;padding:12px 28px;font-size:15px}
+.btn-complete{background:#dbeafe;color:#1d4ed8;border-color:#bfdbfe}
+.btn-back{background:#f1f5f9;color:#475569;border-color:#e2e8f0}
+.feedback{padding:14px;border-radius:8px;margin-top:14px;display:none;line-height:1.6}
+.feedback-correct{background:#dcfce7;color:#166534}
+.feedback-wrong{background:#fef2f2;color:#991b1b}
+.nav-btns{display:flex;justify-content:space-between;align-items:center;margin-top:18px;flex-wrap:wrap;gap:8px}
+.answered-dot{display:inline-block;width:8px;height:8px;border-radius:50%;margin:0 2px;vertical-align:middle}
+.answered-dot-done{background:#16a34a}
+.answered-dot-pending{background:#d1d5db}
+.answered-dot-wrong{background:#ef4444}
+.modal-overlay{position:fixed;top:0;left:0;right:0;bottom:0;background:rgba(0,0,0,.45);display:none;align-items:center;justify-content:center;z-index:1000}
+.modal-body{background:#fff;border-radius:16px;padding:32px;max-width:520px;width:90%;text-align:center}
+.modal-body h2{margin:0 0 16px}
+.result-stat{font-size:28px;font-weight:bold;margin:12px 0}
+.result-stat.good{color:#16a34a}
+.result-stat.medium{color:#d97706}
+.result-stat.poor{color:#dc2626}
+.summary-table{width:100%;border-collapse:collapse;margin:16px 0;font-size:14px}
+.summary-table td{padding:8px 12px;border-bottom:1px solid #e5e7eb;text-align:left}
+.summary-table td+td{text-align:right;font-weight:bold}
+</style>
+<div class="top"><b>配套练习</b><div><span id="counter">第1题/共{{ total }}题</span><span style="margin-left:16px" id="answerDots"></span><a class="btn btn-back" href="/student/resources">返回资源库</a></div></div>
+<div class="wrap">
+<div class="progress"><div class="progress-fill" id="progress" style="width:{{ pct }}%"></div></div>
+<div class="card">
+<div class="tags" id="tags">{{ current_tags|safe }}</div>
+<div class="q-hint" id="qhint">{{ qhint }}</div>
+<div class="q-title" id="qtitle">{{ qtitle }}</div>
+<div id="options">{{ options|safe }}</div>
+<div class="feedback" id="feedback"></div>
+<div style="margin-top:16px;display:flex;gap:8px">
+<button class="btn btn-primary btn-submit" id="submitBtn" onclick="submitAnswer()">提交答案</button>
+<button class="btn" id="nextBtn" style="display:none" onclick="nextQuestion()">下一题</button>
+</div>
+</div>
+<div class="nav-btns">
+<div><button class="btn" id="prevBtn" onclick="prevQuestion()" {{ prev_disabled }}>上一题</button></div>
+<div><span style="font-size:14px;color:#64748b">已答 <span id="answeredCount">{{ answered_count }}</span>/{{ total }} 题</span></div>
+<div><button class="btn btn-complete" id="completeBtn" onclick="completePractice()">完成练习</button></div>
+</div>
+</div>
+<div class="modal-overlay" id="modalOverlay">
+<div class="modal-body" id="modalBody"></div>
+</div>
+<script>
+var currentIndex={{ idx }};
+var totalQuestions={{ total }};
+var answered={};
+var exerciseSetId='{{ esid }}';
+var questions=[{{ qdata|safe }}];
+
+function updateDots(){
+  var dots='';
+  for(var i=0;i<totalQuestions;i++){
+    var cls='pending';
+    if(answered[i]){
+      cls=answered[i].correct?'done':'wrong';
+    }
+    dots+='<span class="answered-dot answered-dot-'+cls+'"></span>';
+  }
+  document.getElementById('answerDots').innerHTML=dots;
+}
+updateDots();
+
+function updateUI(){
+  var q=questions[currentIndex];
+  document.getElementById('qtitle').textContent=(currentIndex+1)+'. '+q.title;
+  document.getElementById('qhint').textContent=q.type==='multiple_choice'?'请选择所有正确答案（多选）':'请选择一个正确答案';
+  var opts='';
+  var isMulti=q.type==='multiple_choice';
+  for(var i=0;i<(q.options||[]).length;i++){
+    var letter=String.fromCharCode(65+i);
+    var inputType=isMulti?'checkbox':'radio';
+    opts+='<label class="option-label" id="optLabel'+i+'"><input type="'+inputType+'" name="answer" value="'+letter+'"> '+letter+'. '+q.options[i].replace(/^[A-F]\\.\\s*/,'')+'</label>';
+  }
+  document.getElementById('options').innerHTML=opts;
+  document.getElementById('feedback').style.display='none';
+  document.getElementById('feedback').textContent='';
+  document.getElementById('feedback').className='feedback';
+  document.getElementById('submitBtn').style.display='';
+  document.getElementById('nextBtn').style.display='none';
+  document.getElementById('counter').textContent='⟪'+(currentIndex+1)+'题/共'+totalQuestions+'题';
+  document.getElementById('progress').style.width=((currentIndex+1)/totalQuestions*100)+'%';
+  document.getElementById('prevBtn').disabled=currentIndex===0;
+  var ac=Object.keys(answered).length;
+  document.getElementById('answeredCount').textContent=ac;
+  var tagsHtml='<span class="tag tag-type">'+q.type_display+'</span>';
+  tagsHtml+='<span class="tag tag-diff-'+q.difficulty+'">'+q.difficulty_display+'</span>';
+  var kpLabel=(q.knowledge_name&&q.knowledge_name.indexOf(q.knowledge_code)===0)?q.knowledge_name:(q.knowledge_code+' '+q.knowledge_name);
+  tagsHtml+='<span class="tag tag-kp">'+kpLabel+'</span>';
+  if(q.in_wrong_book){
+    tagsHtml+='<span class="tag tag-consolidate">错题巩固</span>';
+  }
+  if(q.is_new_question){
+    tagsHtml+='<span class="tag tag-new">未练习</span>';
+  }else{
+    if(q.wrong_count>0)tagsHtml+='<span class="tag tag-wrong">错误'+q.wrong_count+'次</span>';
+    if(q.correct_count>0)tagsHtml+='<span class="tag tag-correct">做对'+q.correct_count+'次</span>';
+  }
+  document.getElementById('tags').innerHTML=tagsHtml;
+  if(answered[currentIndex]){
+    document.getElementById('submitBtn').style.display='none';
+    document.getElementById('nextBtn').style.display='';
+    var ans=answered[currentIndex];
+    var inputs=document.getElementsByName('answer');
+    var sel=ans.selected.split(',');
+    for(var j=0;j<inputs.length;j++){
+      if(sel.indexOf(inputs[j].value)>=0)inputs[j].checked=true;
+      inputs[j].disabled=true;
+    }
+    var fb=document.getElementById('feedback');
+    fb.style.display='block';
+    if(ans.correct){
+      fb.className='feedback feedback-correct';
+      fb.innerHTML='<b> 正确！</b>';
+      if(ans.explanation)fb.innerHTML+='<div style="margin-top:4px;font-size:13px"> 解析：'+ans.explanation+'</div>';
+    }else{
+      fb.className='feedback feedback-wrong';
+      fb.innerHTML='<b> 错误</b>。正确答案：<b>'+ans.correct_answer+'</b>';
+      if(ans.explanation)fb.innerHTML+='<div style="margin-top:4px;font-size:13px"> 解析：'+ans.explanation+'</div>';
+    }
+  }
+  updateDots();
+  if(ac>=totalQuestions){
+    document.getElementById('completeBtn').style.background='#16a34a';
+    document.getElementById('completeBtn').style.color='#fff';
+    document.getElementById('completeBtn').style.borderColor='#16a34a';
+  }
+}
+
+function getSelectedValues(){
+  var inputs=document.getElementsByName('answer');
+  var sel=[];
+  for(var i=0;i<inputs.length;i++){
+    if(inputs[i].checked)sel.push(inputs[i].value);
+  }
+  return sel.join(',');
+}
+
+function submitAnswer(){
+  var selected=getSelectedValues();
+  if(!selected){alert('请选择答案');return}
+  var q=questions[currentIndex];
+  fetch('/student/practice_set/submit',{
+    method:'POST',
+    headers:{'Content-Type':'application/json'},
+    body:JSON.stringify({
+      exercise_set_id:exerciseSetId,
+      question_id:q.id,
+      selected:selected,
+      current_index:currentIndex
+    })
+  }).then(function(r){return r.json()}).then(function(data){
+    if(!data.success){alert(data.error||'提交失败');return}
+    answered[currentIndex]={
+      selected:selected,
+      correct:data.correct,
+      correct_answer:data.correct_answer,
+      explanation:data.explanation
+    };
+    document.getElementById('submitBtn').style.display='none';
+    document.getElementById('nextBtn').style.display='';
+    var fb=document.getElementById('feedback');
+    fb.style.display='block';
+    if(data.correct){
+      fb.className='feedback feedback-correct';
+      fb.innerHTML='<b> 正确！</b>';
+      if(data.explanation)fb.innerHTML+='<div style="margin-top:4px;font-size:13px"> 解析：'+data.explanation+'</div>';
+    }else{
+      fb.className='feedback feedback-wrong';
+      fb.innerHTML='<b> 错误</b>。正确答案：<b>'+data.correct_answer+'</b>';
+      if(data.explanation)fb.innerHTML+='<div style="margin-top:4px;font-size:13px"> 解析：'+data.explanation+'</div>';
+    }
+    var inputs=document.getElementsByName('answer');
+    for(var j=0;j<inputs.length;j++)inputs[j].disabled=true;
+    updateDots();
+    var ac=Object.keys(answered).length;
+    document.getElementById('answeredCount').textContent=ac;
+    if(ac>=totalQuestions){
+      document.getElementById('completeBtn').style.background='#16a34a';
+      document.getElementById('completeBtn').style.color='#fff';
+      document.getElementById('completeBtn').style.borderColor='#16a34a';
+    }
+  });
+}
+
+function nextQuestion(){
+  if(currentIndex<totalQuestions-1){
+    currentIndex++;
+    updateUI();
+  }else{
+    if(confirm('已经是最后一题，是否完成练习？')){
+      completePractice();
+    }
+  }
+}
+
+function prevQuestion(){
+  if(currentIndex>0){
+    currentIndex--;
+    updateUI();
+  }
+}
+
+function completePractice(){
+  var ac=Object.keys(answered).length;
+  if(ac===0){
+    alert('请至少完成一道题后再提交');
+    return;
+  }
+  if(ac<totalQuestions){
+    if(!confirm('还有'+(totalQuestions-ac)+'道题未作答，确定完成练习吗？'))return;
+  }
+  var answers=[];
+  for(var i=0;i<totalQuestions;i++){
+    if(answered[i]){
+      answers.push({
+        question_id:questions[i].id,
+        selected:answered[i].selected,
+        correct:answered[i].correct
+      });
+    }
+  }
+  fetch('/student/practice_set/complete',{
+    method:'POST',
+    headers:{'Content-Type':'application/json'},
+    body:JSON.stringify({
+      exercise_set_id:exerciseSetId,
+      answers:answers
+    })
+  }).then(function(r){return r.json()}).then(function(data){
+    if(!data.success){alert(data.error||'提交失败');return}
+    var summary=data.summary;
+    var totalCorrect=summary.total_correct;
+    var totalAnswered=summary.total_answered;
+    var rate=totalAnswered>0?Math.round(totalCorrect/totalAnswered*100):0;
+    var rateClass=rate>=80?'good':(rate>=60?'medium':'poor');
+    var kpChanges='';
+    if(summary.mastery_changes&&summary.mastery_changes.length>0){
+      kpChanges='<div style="margin-top:12px;text-align:left;font-size:13px"><b>知识点掌握度变化：</b><br>';
+      for(var j=0;j<summary.mastery_changes.length;j++){
+        var mc=summary.mastery_changes[j];
+        var changeSign=mc.change>=0?'+':'';
+        kpChanges+=mc.knowledge_code+' '+mc.knowledge_name+': '
+          +Math.round(mc.before*100)+'% → '+Math.round(mc.after*100)+'%'
+          +' ('+changeSign+Math.round(mc.change*100)+'%)<br>';
+      }
+      kpChanges+='</div>';
+    }
+    document.getElementById('modalBody').innerHTML=
+      '<h2> 练习完成！</h2>'
+      +'<div class="result-stat '+rateClass+'">正确率 '+rate+'%</div>'
+      +'<table class="summary-table">'
+      +'<tr><td>总题数</td><td>'+totalQuestions+' 题</td></tr>'
+      +'<tr><td>已答题数</td><td>'+totalAnswered+' 题</td></tr>'
+      +'<tr><td>答对数</td><td style="color:#16a34a">'+totalCorrect+' 题</td></tr>'
+      +'<tr><td>答错数</td><td style="color:#dc2626">'+(totalAnswered-totalCorrect)+' 题</td></tr>'
+      +'</table>'
+      +kpChanges
+      +'<div style="margin-top:20px;display:flex;gap:12px;justify-content:center">'
+      +'<a class="btn btn-primary" style="font-size:15px;padding:12px 28px" href="/student/resources">返回资源推荐</a>'
+      +'<button class="btn" style="font-size:15px;padding:12px 28px" onclick="document.getElementById(\'modalOverlay\').style.display=\'none\'">关闭</button>'
+      +'</div>';
+    document.getElementById('modalOverlay').style.display='flex';
+    document.getElementById('completeBtn').disabled=true;
+    document.getElementById('completeBtn').textContent='已完成';
+  });
+}
+
+document.getElementById('options').addEventListener('change',function(e){
+  var labels=document.querySelectorAll('.option-label');
+  labels.forEach(function(l){l.classList.remove('selected')});
+  if(e.target.checked){
+    var cl=e.target.closest('.option-label');
+    if(cl)cl.classList.add('selected');
+  }
+});
+
+updateUI();
+</script>
+</html>"""
+    answered_count = len(exercise_set.get("answers", {}))
+    qhint_text = "请选择所有正确答案（多选）" if cq_type == "multiple_choice" else "请选择一个正确答案"
+    return render_template_string(
+        html,
+        total=len(questions),
+        pct=int((current_index + 1) / len(questions) * 100) if questions else 0,
+        idx=current_index,
+        esid=exercise_set_id,
+        qtitle=current_q.get("title") or current_q.get("question") or "",
+        options=cq_options_html,
+        qdata=",".join(qdata_parts),
+        current_tags=current_tags_html,
+        qhint=qhint_text,
+        answered_count=answered_count,
+        prev_disabled="disabled" if current_index == 0 else "",
+    )
+
+
+@app.route("/student/practice_set/submit", methods=["POST"])
+def student_practice_set_submit():
+    if session.get("role") != "student":
+        return jsonify({"success": False, "error": "未登录"})
+    data = request.get_json() or {}
+    exercise_set_id = data.get("exercise_set_id", "")
+    question_id = data.get("question_id")
+    selected = str(data.get("selected", ""))
+    current_index = data.get("current_index", 0)
+    all_sets = _json_load(EXERCISE_SETS_FILE, {})
+    if not isinstance(all_sets, dict):
+        all_sets = {}
+    exercise_set = all_sets.get(exercise_set_id)
+    if not exercise_set:
+        return jsonify({"success": False, "error": "套题不存在"})
+    q = get_question_map_clean().get(str(question_id))
+    if not q:
+        return jsonify({"success": False, "error": "题目不存在"})
+    correct = answer_is_correct(q, selected)
+    sid = normalize_student_id(session.get("full_id"))
+    history = load_question_history_clean()
+    student_history = history.setdefault(sid, {})
+    qid = str(question_id)
+    h = student_history.setdefault(qid, {
+        "correct_count": 0, "wrong_count": 0,
+        "consecutive_correct": 0, "total_attempts": 0,
+        "first_wrong_time": None,
+    })
+    h["total_attempts"] = int(h.get("total_attempts", 0) or 0) + 1
+    h["last_attempt_time"] = _now_iso()
+    h["last_result"] = "correct" if correct else "wrong"
+    if correct:
+        h["correct_count"] = int(h.get("correct_count", 0) or 0) + 1
+        h["consecutive_correct"] = int(h.get("consecutive_correct", 0) or 0) + 1
+        if h["consecutive_correct"] >= 2:
+            h["mastered"] = True
+    else:
+        h["wrong_count"] = int(h.get("wrong_count", 0) or 0) + 1
+        h["consecutive_correct"] = 0
+        h["last_wrong_time"] = _now_iso()
+        h["first_wrong_time"] = h.get("first_wrong_time") or h["last_wrong_time"]
+    save_question_history_clean(history)
+    wb_result = update_wrong_book(sid, qid, correct)
+    exercise_set["current_index"] = int(current_index)
+    exercise_set.setdefault("answers", {})[qid] = {
+        "selected": selected,
+        "correct": correct,
+        "answered_at": _now_iso(),
+    }
+    all_answered = len(exercise_set.get("answers", {}))
+    if all_answered >= len(exercise_set.get("question_ids", [])):
+        exercise_set["status"] = "completed"
+    all_sets[exercise_set_id] = exercise_set
+    _json_save(EXERCISE_SETS_FILE, all_sets)
+    correct_answer_str = str(q.get("answer") or "")
+    explanation_str = str(q.get("explanation") or q.get("analysis") or "")
+    return jsonify({
+        "success": True,
+        "correct": correct,
+        "correct_answer": correct_answer_str,
+        "explanation": explanation_str,
+        "answered_count": all_answered,
+        "wrong_book_action": wb_result.get("action"),
+    })
+
+
+@app.route("/student/practice_set/complete", methods=["POST"])
+def student_practice_set_complete():
+    if session.get("role") != "student":
+        return jsonify({"success": False, "error": "未登录"})
+    data = request.get_json() or {}
+    exercise_set_id = data.get("exercise_set_id", "")
+    answered_obj = data.get("answered", {})
+    answers_list = data.get("answers", [])
+    all_sets = _json_load(EXERCISE_SETS_FILE, {})
+    if not isinstance(all_sets, dict):
+        all_sets = {}
+    exercise_set = all_sets.get(exercise_set_id)
+    if not exercise_set:
+        return jsonify({"success": False, "error": "套题不存在"})
+    sid = normalize_student_id(session.get("full_id"))
+    question_ids = exercise_set.get("question_ids", [])
+    all_questions = load_questions_clean().get("questions", [])
+    q_map = {str(q.get("id")): q for q in all_questions}
+    if answered_obj and not answers_list:
+        answers_list = []
+        for idx_str, ans_info in answered_obj.items():
+            try:
+                idx = int(idx_str)
+                if 0 <= idx < len(question_ids):
+                    qid = question_ids[idx]
+                    answers_list.append({
+                        "question_id": qid,
+                        "selected": ans_info.get("selected", ""),
+                        "correct": ans_info.get("correct", False)
+                    })
+            except (ValueError, IndexError):
+                continue
+    total_correct = sum(1 for a in answers_list if a.get("correct"))
+    total_answered = len(answers_list)
+    total_questions = len(question_ids)
+    answer_records_file = os.path.join(RESOURCE_DIR, "answer_records.json")
+    answer_records = _json_load(answer_records_file, [])
+    if not isinstance(answer_records, list):
+        answer_records = []
+    existing_ids = set(r.get("id") for r in answer_records)
+    rec_count = len([r for r in answer_records if r.get("student_id") == sid])
+    now_ts = _now_iso()
+    for a in answers_list:
+        qid = str(a.get("question_id", ""))
+        q = q_map.get(qid)
+        if not q:
+            continue
+        kp_raw = q.get("knowledge_point") or q.get("knowledge_name") or ""
+        kp_code = flow_kp_code(kp_raw) or kp_raw
+        rec_id = "rec_{}_{}".format(sid, rec_count)
+        while rec_id in existing_ids:
+            rec_count += 1
+            rec_id = "rec_{}_{}".format(sid, rec_count)
+        rec = {
+            "id": rec_id,
+            "student_id": sid,
+            "question_id": qid,
+            "student_answer": a.get("selected", ""),
+            "is_correct": bool(a.get("correct", False)),
+            "time_spent": 60,
+            "timestamp": now_ts,
+            "knowledge_id": kp_code,
+            "knowledge_name": kp_raw,
+            "difficulty": q.get("difficulty", "medium"),
+            "type": q.get("type", "single_choice")
+        }
+        answer_records.append(rec)
+        existing_ids.add(rec_id)
+        rec_count += 1
+    _json_save(answer_records_file, answer_records)
+    exercise_set["status"] = "completed"
+    all_sets[exercise_set_id] = exercise_set
+    _json_save(EXERCISE_SETS_FILE, all_sets)
+    _MASTERY_TREE_CACHE.pop(sid, None)
+    before_mastery, _, _, _ = calculate_mastery_tree(sid)
+    affected_kps = set()
+    for a in answers_list:
+        qid = str(a.get("question_id", ""))
+        q = q_map.get(qid)
+        if q:
+            kp_raw = q.get("knowledge_point") or q.get("knowledge_name") or ""
+            kp_code = flow_kp_code(kp_raw) or kp_raw
+            if kp_code:
+                affected_kps.add(kp_code)
+    target_kp = exercise_set.get("target_knowledge_id", "")
+    if target_kp:
+        affected_kps.add(target_kp)
+    recalculate_all_parent_mastery(sid)
+    _MASTERY_TREE_CACHE.pop(sid, None)
+    after_mastery, _, _, _ = calculate_mastery_tree(sid)
+    students_mastery_file = os.path.join(RESOURCE_DIR, "students_mastery.json")
+    students_mastery = _json_load(students_mastery_file, {})
+    if not isinstance(students_mastery, dict):
+        students_mastery = {}
+    student_mastery = students_mastery.get(sid, {})
+    if not isinstance(student_mastery, dict):
+        student_mastery = {}
+    for kp, score in after_mastery.items():
+        student_mastery[kp] = round(float(score), 4)
+    students_mastery[sid] = student_mastery
+    _json_save(students_mastery_file, students_mastery)
+    catalog = build_knowledge_catalog()
+    kp_name_map = {item["code"]: item["name"] for item in catalog}
+    mastery_changes = []
+    for kp in sorted(affected_kps):
+        before = before_mastery.get(kp, 0)
+        after = after_mastery.get(kp, 0)
+        mastery_changes.append({
+            "knowledge_code": kp,
+            "knowledge_name": kp_name_map.get(kp, kp),
+            "before": round(before, 3),
+            "after": round(after, 3),
+            "change": round(after - before, 3),
+        })
+    if not target_kp and affected_kps:
+        target_kp = list(affected_kps)[0]
+    mastery_before = before_mastery.get(target_kp, 0) if target_kp else 0
+    mastery_after = after_mastery.get(target_kp, 0) if target_kp else 0
+    if mastery_before == 0 and mastery_after == 0 and affected_kps:
+        all_before = [before_mastery.get(kp, 0) for kp in affected_kps]
+        all_after = [after_mastery.get(kp, 0) for kp in affected_kps]
+        mastery_before = sum(all_before) / len(all_before) if all_before else 0
+        mastery_after = sum(all_after) / len(all_after) if all_after else 0
+    return jsonify({
+        "success": True,
+        "mastery_before": round(mastery_before, 3),
+        "mastery_after": round(mastery_after, 3),
+        "summary": {
+            "exercise_set_id": exercise_set_id,
+            "total_questions": total_questions,
+            "total_answered": total_answered,
+            "total_correct": total_correct,
+            "total_wrong": total_answered - total_correct,
+            "accuracy": round(total_correct / max(total_answered, 1), 3),
+            "mastery_changes": mastery_changes,
+        }
+    })
+
+
+def final_student_view_file(filename):
+    if session.get("role") != "student":
+        return redirect(url_for("login"))
+    if not is_valid_resource(filename):
+        return "资源不存在", 404
+    log_learning_record(session.get("full_id"), filename, "view")
+    resource = final_resource_record(filename)
+    html = """<!doctype html><html lang="zh-CN"><meta charset="utf-8"><title>{{ title }}</title>
+    <style>body{margin:0;font-family:Microsoft YaHei,Arial;background:#f4f7fb}.top{height:60px;background:#fff;border-bottom:1px solid #dbe3ef;display:flex;align-items:center;justify-content:space-between;padding:0 24px}.wrap{display:grid;grid-template-columns:minmax(0,1fr) 340px;gap:18px;padding:18px}.viewer,.side{background:#fff;border:1px solid #dbe3ef;border-radius:12px;overflow:hidden}.viewer iframe{width:100%;height:calc(100vh - 120px);border:0}.side{padding:18px}.btn{display:inline-flex;padding:10px 14px;border-radius:10px;text-decoration:none;background:#edf5ff;color:#2563eb;border:1px solid #cfe2ff;margin-right:8px}button{border:0;border-radius:10px;background:#16a34a;color:#fff;padding:10px 14px;cursor:pointer}</style>
+    <div class="top"><b>{{ title }}</b><div><a class="btn" href="/download/{{ rid }}">下载资源</a><button onclick="complete()">我已看完</button></div></div>
+    <div class="wrap"><div class="viewer"><iframe src="/student/file/{{ rid }}"></iframe></div><aside class="side"><h3>资源信息</h3><p>{{ knowledge }}</p><p>{{ chapter }} · {{ rtype }}</p><div id="result" style="color:#475569;line-height:1.8"></div><p><a class="btn" href="/student/resources">返回资源库</a></p></aside></div>
+    <script>
+    async function complete(){
+      const res=await fetch('/student/resource/{{ rid }}/complete',{method:'POST'}).then(r=>r.json());
+      const el=document.getElementById('result');
+      if(!res.success){el.textContent=res.error||'记录失败';return}
+      const es=res.exercise_set||{};
+      const total=es.total_count||0;
+      const kp=es.target_knowledge_name||'';
+      const prereq=es.prerequisite_knowledge_ids||[];
+      const related=es.related_knowledge_ids||[];
+      el.innerHTML='<div style="color:#16a34a;font-weight:bold">已完成学习</div>'
+        +'<div style="margin-top:6px">推荐下一步：完成配套练习</div>'
+        +'<div style="margin-top:6px">套题数量：'+total+' 题</div>'
+        +'<div style="margin-top:6px">覆盖知识点：当前知识点'
+        +(prereq.length?'、先修知识点':'')
+        +(related.length?'、相关知识点':'')
+        +'</div>'
+        +'<div style="margin-top:10px"><a class="btn" href="/student/recommend/practice/'+(es.exercise_set_id||'')+'" style="background:#16a34a;color:#fff;border-color:#16a34a">开始练习</a></div>';
+    }
+    </script></html>"""
+    return render_template_string(html, rid=filename, title=resource["title"], knowledge=resource["knowledge_point"], chapter=resource["chapter_label"], rtype=resource["type"])
+
+
+def final_student_watch_video(filename):
+    if session.get("role") != "student":
+        return redirect(url_for("login"))
+    if not is_valid_resource(filename):
+        return "资源不存在", 404
+    log_learning_record(session.get("full_id"), filename, "watch")
+    resource = final_resource_record(filename)
+    html = """<!doctype html><html lang="zh-CN"><meta charset="utf-8"><title>{{ title }}</title>
+    <style>body{margin:0;font-family:Microsoft YaHei,Arial;background:#f4f7fb}.top{height:60px;background:#fff;border-bottom:1px solid #dbe3ef;display:flex;align-items:center;justify-content:space-between;padding:0 24px}.wrap{display:grid;grid-template-columns:minmax(0,1fr) 340px;gap:18px;padding:18px}.player,.side{background:#fff;border:1px solid #dbe3ef;border-radius:12px;padding:18px}video{width:100%;max-height:72vh;background:#000}.btn{display:inline-flex;padding:10px 14px;border-radius:10px;text-decoration:none;background:#edf5ff;color:#2563eb;border:1px solid #cfe2ff;margin-right:8px}button{border:0;border-radius:10px;background:#16a34a;color:#fff;padding:10px 14px;cursor:pointer}</style>
+    <div class="top"><b>{{ title }}</b><div><a class="btn" href="/download/{{ rid }}">下载资源</a><button onclick="complete()">我已看完</button></div></div>
+    <div class="wrap"><div class="player"><video src="/video/{{ rid }}" controls autoplay></video></div><aside class="side"><h3>资源信息</h3><p>{{ knowledge }}</p><p>{{ chapter }} · {{ rtype }}</p><div id="result" style="color:#475569;line-height:1.8"></div><p><a class="btn" href="/student/resources">返回资源库</a></p></aside></div>
+    <script>
+    async function complete(){
+      const res=await fetch('/student/resource/{{ rid }}/complete',{method:'POST'}).then(r=>r.json());
+      const el=document.getElementById('result');
+      if(!res.success){el.textContent=res.error||'记录失败';return}
+      const es=res.exercise_set||{};
+      const total=es.total_count||0;
+      const prereq=es.prerequisite_knowledge_ids||[];
+      const related=es.related_knowledge_ids||[];
+      el.innerHTML='<div style="color:#16a34a;font-weight:bold">已完成学习</div>'
+        +'<div style="margin-top:6px">推荐下一步：完成配套练习</div>'
+        +'<div style="margin-top:6px">套题数量：'+total+' 题</div>'
+        +'<div style="margin-top:6px">覆盖知识点：当前知识点'
+        +(prereq.length?'、先修知识点':'')
+        +(related.length?'、相关知识点':'')
+        +'</div>'
+        +'<div style="margin-top:10px"><a class="btn" href="/student/recommend/practice/'+(es.exercise_set_id||'')+'" style="background:#16a34a;color:#fff;border-color:#16a34a">开始练习</a></div>';
+    }
+    </script></html>"""
+    return render_template_string(html, rid=filename, title=resource["title"], knowledge=resource["knowledge_point"], chapter=resource["chapter_label"], rtype=resource["type"])
+
+
+def final_download_file(filename):
+    if session.get("role") == "student" and is_valid_resource(filename):
+        log_learning_record(session.get("full_id"), filename, "download")
+        stats = resource_stats()
+        st = stats.setdefault(filename, {"use_count": 0, "complete_count": 0})
+        st["use_count"] = int(st.get("use_count", 0) or 0) + 1
+        stats[filename] = st
+        _json_save(RESOURCE_STATS_FILE, stats)
+    tm_path = os.path.join(TEACHING_MATERIALS_DIR, filename)
+    if os.path.isfile(tm_path):
+        return send_from_directory(TEACHING_MATERIALS_DIR, filename, as_attachment=True)
+    return send_from_directory(RESOURCE_DIR, filename, as_attachment=True)
+
+
+def final_play_video(filename):
+    if session.get("role") == "student" and is_valid_resource(filename):
+        log_learning_record(session.get("full_id"), filename, "play")
+    tm_path = os.path.join(TEACHING_MATERIALS_DIR, filename)
+    if os.path.isfile(tm_path):
+        return send_from_directory(TEACHING_MATERIALS_DIR, filename)
+    return send_from_directory(RESOURCE_DIR, filename)
+
+
+def final_record_resource_download():
+    if session.get("role") != "student":
+        return jsonify({"success": False, "error": "未登录"})
+    resource_name = ((request.get_json() or {}).get("resource_name") or "").strip()
+    if resource_name and is_valid_resource(resource_name):
+        log_learning_record(session.get("full_id"), resource_name, "download")
+    return jsonify({"success": True})
+
+
+def final_record_video_play():
+    if session.get("role") != "student":
+        return jsonify({"success": False, "error": "未登录"})
+    video_name = ((request.get_json() or {}).get("video_name") or "").strip()
+    if video_name and is_valid_resource(video_name):
+        log_learning_record(session.get("full_id"), video_name, "play")
+    return jsonify({"success": True})
+
+
+def final_login():
+    error = None
+    if request.method == "POST":
+        role = request.form.get("role")
+        user_id = (request.form.get("user_id") or "").strip()
+        password = request.form.get("password") or ""
+        sync_student_registry()
+        if role == "teacher":
+            teacher = TEACHERS.get(user_id)
+            if teacher and teacher.get("password") == password:
+                session["role"] = "teacher"
+                session["user_id"] = user_id
+                session["user_name"] = teacher.get("name") or "教师"
+                return redirect(url_for("teacher_tools"))
+            error = "账号或密码错误"
+        else:
+            student = STUDENTS.get(user_id)
+            if student and student.get("password") == password:
+                session["role"] = "student"
+                session["user_id"] = user_id
+                session["user_name"] = student.get("name")
+                session["full_id"] = student.get("full_id")
+                return redirect(url_for("student_dashboard"))
+            error = "账号或密码错误"
+    return render_template_string(LOGIN_HTML.replace("?? - ?????????", "登录 - 基于知识图谱的个性化学习推荐系统"), error=error)
+
+
+STUDENT_FINAL_HTML = r"""
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>{{ page_title }} - 基于知识图谱的个性化学习推荐系统</title>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/vis/4.21.0/vis.min.js" crossorigin="anonymous" defer></script>
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/vis/4.21.0/vis.min.css" crossorigin="anonymous">
+<style>
+:root{--bg:#f3f7fb;--card:#ffffff;--line:#dce6f2;--text:#18324b;--muted:#64748b;--blue:#2f6fed;--blue-soft:#eaf2ff;--green:#16a34a;--green-soft:#dcfce7;--orange:#f59e0b;--orange-soft:#fff7ed;--red:#ef4444;--red-soft:#fee2e2}
+*{box-sizing:border-box}body{margin:0;background:linear-gradient(180deg,#edf5ff 0,#f6f9fc 240px,#f3f7fb 100%);color:var(--text);font-family:"Microsoft YaHei","PingFang SC",Arial,sans-serif}
+.layout{display:grid;grid-template-columns:240px 1fr;min-height:100vh}.side{background:rgba(255,255,255,.96);backdrop-filter:blur(16px);border-right:1px solid var(--line);padding:22px 0;position:sticky;top:0;height:100vh}.brand{padding:0 22px 16px}.brand b{display:block;font-size:18px}.brand small{display:block;color:var(--muted);margin-top:6px}.nav a{display:flex;align-items:center;justify-content:space-between;padding:12px 22px;color:#4a5b70;text-decoration:none;border-left:3px solid transparent}.nav a.active,.nav a:hover{background:#eff5ff;color:var(--blue);border-left-color:#7ea8ff}.logout{position:absolute;left:20px;right:20px;bottom:20px}.logout a{display:block;text-align:center;text-decoration:none;background:#eef4ff;color:var(--blue);padding:10px 12px;border-radius:12px;font-weight:700}.main{min-width:0}.top{height:68px;background:rgba(255,255,255,.88);backdrop-filter:blur(18px);border-bottom:1px solid var(--line);display:flex;align-items:center;justify-content:space-between;padding:0 28px;position:sticky;top:0;z-index:5}.top h1{margin:0;font-size:22px}.user{display:flex;align-items:center;gap:12px}.avatar{width:38px;height:38px;border-radius:50%;display:grid;place-items:center;background:#dbeafe;color:var(--blue);font-weight:800}.content{padding:26px 28px 34px}.card{background:var(--card);border:1px solid var(--line);border-radius:18px;padding:18px;box-shadow:0 12px 36px rgba(47,111,237,.06);margin-bottom:16px}.grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(220px,1fr));gap:14px}.dash{display:grid;grid-template-columns:1.45fr .95fr;gap:16px;margin-bottom:16px}.hero{padding:22px;background:linear-gradient(135deg,#133b75,#2f6fed 60%,#68b7ff);color:#fff;border-radius:22px;box-shadow:0 18px 44px rgba(47,111,237,.18)}.hero h2{margin:0 0 8px 0;font-size:26px}.hero p{margin:0;line-height:1.8;color:rgba(255,255,255,.92)}.hero .btn{margin-top:16px}.hero.light{background:linear-gradient(135deg,#ffffff,#f7fbff);color:var(--text);border:1px solid var(--line)}.hero.light p{color:var(--muted)}.stat{background:var(--card);border:1px solid var(--line);border-radius:18px;padding:18px;display:block;text-decoration:none;color:inherit}.stat b{display:block;font-size:30px;margin:8px 0}.muted{color:var(--muted);line-height:1.7}.btn{display:inline-flex;align-items:center;justify-content:center;gap:6px;border:0;border-radius:12px;background:var(--blue);color:#fff;padding:10px 14px;text-decoration:none;cursor:pointer;font-weight:700}.btn.light{background:#eef4ff;color:var(--blue);border:1px solid #cfe0ff}.btn.green{background:var(--green)}.btn.danger{background:var(--red)}.toolbar{display:flex;gap:10px;flex-wrap:wrap;margin:12px 0 14px}.toolbar input,.toolbar select,textarea,input{border:1px solid #cfddeb;border-radius:12px;padding:10px 12px;background:#fff}.toolbar .search{min-width:280px}.tag{display:inline-flex;align-items:center;padding:4px 10px;border-radius:999px;font-size:12px;background:#eef4ff;color:#315da8;margin:0 6px 6px 0}.tag.ok{background:var(--green-soft);color:#166534}.tag.warn{background:var(--orange-soft);color:#9a3412}.tag.bad{background:var(--red-soft);color:#991b1b}.progress{height:9px;background:#e8eef6;border-radius:999px;overflow:hidden}.progress span{display:block;height:100%;background:linear-gradient(90deg,#52a3ff,#2f6fed)}.list{display:grid;gap:12px}.res-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(280px,1fr));gap:14px}.res-card,.question-card,.record-card,.post-card{border:1px solid var(--line);border-radius:16px;background:#fff;padding:16px}.record-card,.row{display:flex;justify-content:space-between;gap:14px;align-items:flex-start}.path-step{display:grid;grid-template-columns:54px 1fr;gap:14px;padding:18px 0;border-top:1px solid #ecf1f7}.path-step:first-child{border-top:0}.step-no{width:42px;height:42px;border-radius:14px;background:#eaf2ff;color:var(--blue);display:grid;place-items:center;font-weight:800}.forum{display:grid;grid-template-columns:1fr 1fr;gap:16px}.forum-list{min-height:660px}.comment{border-top:1px solid #ecf1f7;padding:12px 0}.summary-cards{display:grid;grid-template-columns:repeat(auto-fit,minmax(160px,1fr));gap:10px}.summary-cards .mini{padding:14px;border-radius:16px;background:#f7fbff;border:1px solid var(--line)}.empty{padding:38px;text-align:center;color:#94a3b8;border:1px dashed #cfd8e3;border-radius:16px;background:#fbfdff}.split{display:grid;grid-template-columns:1fr 340px;gap:16px}.table{width:100%;border-collapse:collapse}.table th,.table td{padding:11px;border-bottom:1px solid #edf2f7;text-align:left;vertical-align:top}.table th{background:#f8fbff}.hint{background:#f7fbff;border:1px dashed #c7d7ea;border-radius:14px;padding:14px}.section{margin-bottom:18px}.pill-row{display:flex;flex-wrap:wrap;gap:8px}.small{font-size:12px}.actions{display:flex;gap:8px;flex-wrap:wrap;margin-top:12px}
+@media(max-width:1080px){.layout{grid-template-columns:1fr}.side{position:relative;height:auto}.logout{position:relative;left:auto;right:auto;bottom:auto;margin-top:10px}.dash,.forum,.split{grid-template-columns:1fr}.content{padding:18px}.top{padding:0 18px}}
+</style>
+</head>
+<body>
+<div class="layout">
+  <aside class="side">
+    <div class="brand"><b>个性化学习推荐系统</b><small>操作系统课程 · 学生端</small></div>
+    <nav class="nav">
+      <a href="/student/dashboard" class="{% if active_page=='dashboard' %}active{% endif %}"><span>首页</span></a>
+      <a href="/student/profile" class="{% if active_page=='profile' %}active{% endif %}"><span>学习画像</span></a>
+      <a href="/student/resources" class="{% if active_page=='resources' %}active{% endif %}"><span>学习资源库</span></a>
+      <a href="/student/path" class="{% if active_page=='path' %}active{% endif %}"><span>智能学习路径</span></a>
+      <a href="/student/mastery" class="{% if active_page=='mastery' %}active{% endif %}"><span>知识点掌握度</span></a>
+      <a href="/student/wrong-questions" class="{% if active_page=='wrong' %}active{% endif %}"><span>错题集</span></a>
+      <a href="/student/discuss" class="{% if active_page=='discuss' %}active{% endif %}"><span>讨论区</span></a>
+      <a href="/student/records" class="{% if active_page=='records' %}active{% endif %}"><span>学习记录</span></a>
+      <a href="/student/graph" class="{% if active_page=='graph' %}active{% endif %}"><span>知识图谱</span></a>
+    </nav>
+    <div class="logout"><a href="/logout">退出登录</a></div>
+  </aside>
+  <main class="main">
+    <header class="top"><h1>{{ page_title }}</h1><div class="user"><span>{{ student_name }}</span><div class="avatar">{{ student_name[:1] if student_name else '学' }}</div></div></header>
+    <section class="content"><div id="app"><div class="empty">加载中...</div></div></section>
+  </main>
+</div>
+<script>
+const PAGE="{{ active_page }}";
+const TARGET=new URLSearchParams(location.search).get("target_kp")||"";
+const app=document.getElementById("app");
+const esc=s=>String(s==null?"":s).replace(/[&<>"']/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;","\"":"&quot;","'":"&#39;"}[c]));
+const pct=v=>Math.round((Number(v)||0)*100)+"%";
+const kpName=s=>String(s||"");
+const statusClass=s=>s==="已掌握"?"ok":(s==="良好"?"":(s==="需巩固"?"warn":"bad"));
+const typeClass=t=>t==="视频"?"warn":(t==="课件"?"ok":"");
+function bar(v){return `<div class="progress"><span style="width:${Math.max(3,Math.min(100,(Number(v)||0)*100))}%"></span></div>`}
+async function getJson(url){const r=await fetch(url);return await r.json();}
+function safeUrl(s){s=String(s==null?'':s);return s.split('/').map(function(p){return encodeURIComponent(p)}).join('/')}function action(r){var name=r.resource_id||r.name||'';return r.type==="视频"?`/student/watch/${safeUrl(name)}`:`/student/view/${safeUrl(name)}`}
+async function completeResource(rid,box){const d=await fetch(`/student/resource/${encodeURIComponent(rid)}/complete`,{method:"POST"}).then(r=>r.json());if(!d.success){box.innerHTML=`<span class="tag bad">${esc(d.error||"记录失败")}</span>`;return}const es=d.exercise_set||{};box.innerHTML=`<span class="tag ok">已完成学习</span><div class="small muted">掌握度 ${pct(d.mastery_before)} → ${pct(d.mastery_after)}</div><div style="margin-top:10px;padding:10px;border:2px solid #f59e0b;border-radius:6px;background:#fffbeb"><b>配套练习</b><p class="small muted">本套练习共 ${(es.total_count||10)} 题</p><a class="btn" href="/student/recommend/practice/${(es.exercise_set_id||'')}" style="background:#f59e0b;color:#fff;margin-top:6px">开始练习</a></div>`}
+function answerValue(card,q){if(q.type==="blank"){const el=card.querySelector(".blank-input");return el?el.value:""}const vals=[];card.querySelectorAll(`input[name="ans_${q.id}"]:checked`).forEach(el=>vals.push(el.value));return q.type==="multiple_choice"?vals:vals[0]}
+async function submitQuestion(qid,rid,btn){const card=btn.closest(".question-card");const q=window.ALL_QUESTIONS[qid]||{};const answer=answerValue(card,q);const d=await fetch("/student/questions/submit",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({question_id:qid,answer:answer,resource_id:rid})}).then(r=>r.json());const box=card.querySelector(".answer-result");if(!d.success){box.innerHTML=`<span class="tag bad">${esc(d.error||"提交失败")}</span>`;return}box.innerHTML=`<span class="tag ${d.correct?"ok":"bad"}">${d.correct?"回答正确":"回答错误"}</span><div class="small">正确答案：${esc(d.correct_answer||"")}</div><div class="small">解析：${esc(d.analysis||"暂无解析")}</div><div class="small">掌握度：${pct(d.mastery_before)} → ${pct(d.mastery_after)}</div>`}
+function questionCard(q,rid){window.ALL_QUESTIONS=window.ALL_QUESTIONS||{};window.ALL_QUESTIONS[q.id]=q;let opts="";if(q.type==="blank"){opts=`<input class="blank-input" placeholder="填写答案">`}else{opts=(q.options||[]).map(opt=>{const v=String(opt).split(".")[0].trim();return `<label style="display:block;margin:6px 0"><input name="ans_${esc(q.id)}" type="${q.type==="multiple_choice"?"checkbox":"radio"}" value="${esc(v)}"> ${esc(opt)}</label>`}).join("")}return `<div class="question-card"><b>${esc(q.question||q.title)}</b><div class="pill-row" style="margin-top:8px"><span class="tag">${esc(q.chapter_name||"")}</span><span class="tag">${esc(kpName(q.knowledge_point||q.knowledge_name||""))}</span><span class="tag">${esc(q.difficulty==="easy"?"简单":(q.difficulty==="hard"?"困难":"中等"))}</span></div><div style="margin-top:10px">${opts}</div><div class="actions"><button class="btn" onclick="submitQuestion('${esc(q.id)}','${esc(rid||"")}',this)">提交答案</button></div><div class="answer-result muted" style="margin-top:8px"></div></div>`}
+async function dashboard(){const d=await getJson("/student/dashboard/data");const p=d.profile||{};app.innerHTML=`<div class="dash"><div class="hero"><h2>学习资源 → 做题 → 错题 → 画像 → 推荐</h2><p>先完成资源学习，再做题查看解析，错题会进入错题集，掌握度和画像会实时更新，并继续优化推荐。</p><a class="btn" href="/student/path">进入智能学习路径</a></div><div class="hero light"><h2>学生画像简览</h2><p>综合掌握度 ${pct(p.avg_mastery)}，最近正确率 ${pct(p.recent_accuracy)}。</p><div class="pill-row" style="margin-top:12px"><span class="tag ok">已掌握 ${(d.stats||{}).mastered||0}</span><span class="tag warn">待巩固 ${(d.stats||{}).weak||0}</span><span class="tag bad">未学习 ${(d.stats||{}).severe||0}</span></div>${bar(p.avg_mastery||0)}<div class="actions"><a class="btn light" href="/student/profile">查看画像详情</a></div></div></div><div class="grid"><a class="stat" href="/student/resources"><span>学习资源库</span><b>${(d.recommendations||[]).length}</b><span class="muted">优先完成资源，再进入练习</span></a><a class="stat" href="/student/wrong-questions"><span>错题集</span><b>${p.wrong_count||0}</b><span class="muted">做错后自动进入，复练后会更新掌握度</span></a><a class="stat" href="/student/records"><span>学习记录</span><b>${p.record_count||0}</b><span class="muted">所有资源学习和练习都会被记录</span></a><a class="stat" href="/student/mastery"><span>知识点掌握度</span><b>${pct(p.avg_mastery||0)}</b><span class="muted">父节点会随子节点自动聚合</span></a></div><div class="card"><h2>薄弱知识点 Top5</h2><div class="list">${(d.weak_points||[]).map(x=>`<div class="row"><div><b>${esc(x.name)}</b><div class="muted">当前掌握度偏低，建议优先学习对应资源并完成练习。</div></div><div style="min-width:110px;text-align:right"><b>${pct(x.score)}</b></div></div>`).join("")||'<div class="empty">暂无薄弱知识点</div>'}</div></div><div class="card"><h2>学习建议</h2><div class="list">${(p.suggestions||[]).map(x=>`<div class="hint">${esc(x)}</div>`).join("")}</div></div><div class="card"><h2>推荐资源</h2><div class="res-grid">${(d.recommendations||[]).map(r=>resourceCard(r,true)).join("")||'<div class="empty">暂无推荐资源</div>'}</div></div>`}
+function resourceCard(r,showReason){return `<div class="res-card"><b>${esc(r.title||r.name)}</b><div class="pill-row" style="margin-top:8px"><span class="tag ${typeClass(r.type)}">${esc(r.type)}</span><span class="tag">${esc(r.chapter_label||"")}</span><span class="tag">${esc(r.teacher_name||"未标注")}</span></div><div class="small muted">${esc(kpName(r.knowledge_point||"未绑定知识点"))}</div>${showReason?`<div class="small muted" style="margin-top:8px">${esc(r.explain||"")}</div>`:""}<div class="actions"><a class="btn light" href="${action(r)}">学习</a><button class="btn green" onclick="completeResource('${esc(r.resource_id||r.name)}',this.closest('.res-card').querySelector('.after'))">${r.completed?"已完成学习":"我已看完"}</button><button class="btn light" onclick="loadQuestionsForResource('${esc(r.resource_id||r.name)}',this.closest('.res-card').querySelector('.after'))">练一练</button></div><div class="after"></div></div>`}
+async function loadQuestionsForResource(rid,box){const d=await fetch(`/student/resource/${encodeURIComponent(rid)}/questions?limit=5`).then(r=>r.json());box.innerHTML=`<div class="list">${(d.questions||[]).map(q=>questionCard(q,rid)).join("")||'<div class="hint">暂无题目</div>'}</div>`}
+async function profilePage(){const d=await getJson("/student/profile/data");const p=d.profile||{};const m=d.mastery||{};const weak=(p.weak_points||[]).slice(0,5);app.innerHTML=`<div class="grid"><div class="stat"><span>综合掌握度</span><b>${pct(p.avg_mastery||0)}</b><span class="muted">${esc(p.level||"")}</span></div><div class="stat"><span>最近正确率</span><b>${pct(p.accuracy||0)}</b><span class="muted">做题表现</span></div><div class="stat"><span>资源完成数</span><b>${p.resource_completed_count||0}</b><span class="muted">已完成学习资源</span></div><div class="stat"><span>错题数</span><b>${p.wrong_count||0}</b><span class="muted">待复练</span></div></div><div class="split"><div><div class="card"><h2>基本信息</h2><table class="table"><tbody><tr><td>学号</td><td>${esc(p.student_num||"")}</td><td>姓名</td><td>${esc(p.name||"")}</td></tr><tr><td>班级</td><td>${esc(p.class_name||"")}</td><td>性别</td><td>${esc(p.gender||"")}</td></tr><tr><td>学习记录</td><td>${p.record_count||0}</td><td>做题数</td><td>${p.total_questions||0}</td></tr></tbody></table></div><div class="card"><h2>薄弱知识点</h2><div class="list">${weak.map(x=>`<div class="row"><div><b>${esc(kpName(x.name))}</b></div><div>${pct(x.mastery)}</div></div>`).join("")||'<div class="empty">暂无</div>'}</div></div></div><div><div class="card"><h2>学习建议</h2>${(p.suggestions||[]).map(x=>`<div class="hint">${esc(x)}</div>`).join("")}</div><div class="card"><h2>状态统计</h2><div class="summary-cards"><div class="mini"><div class="muted">已掌握</div><b>${(m.stats||{}).mastered||0}</b></div><div class="mini"><div class="muted">待巩固</div><b>${(m.stats||{}).weak||0}</b></div><div class="mini"><div class="muted">未学习</div><b>${(m.stats||{}).severe||0}</b></div></div></div></div></div><div class="card"><h2>知识点学习明细说明</h2><div class="hint">做题、视频、资源和讨论分别表示学生在该知识点下的作答表现、视频完成情况、资料学习情况和讨论参与情况，综合掌握度由多维学习行为加权计算得到。</div></div>`}
+async function resourcesPage(){const d=await getJson("/student/resources/data");const all=(d.resources||[]).filter(function(r){var ext=(r.type||'').toLowerCase();var allowed=['mp4','avi','mov','mkv','webm','ppt','pptx','doc','docx','pdf','txt','md'];return allowed.indexOf(ext)>=0||(r.type||'')===''||/^(视频|PPT|文档)/.test(r.type)});var q='',type='全部',chapter='全部',resTimer=null;function norm(v){return (v||'').toLowerCase().replace(/\\s+/g,'')}function render(){var list=all.filter(function(r){return (type==='全部'||r.type===type||(r.type||'')==='')&&(chapter==='全部'||(r.chapter_label||'未分类')===chapter)&&(!q||norm([r.name,r.title,r.knowledge_point,r.chapter_label,r.section_label,r.teacher_name].join(' ')).indexOf(norm(q))>=0)});var groups={};list.forEach(function(r){var ch=r.chapter_label||'未分类',sec=r.subsection||r.section_label||'未分类',sub=r.topic||'';(groups[ch]||(groups[ch]={}))[sec]=groups[ch][sec]||{};if(sub&&sub!==sec)(groups[ch][sec][sub]||(groups[ch][sec][sub]=[])).push(r);else(groups[ch][sec]['_root']||(groups[ch][sec]['_root']=[])).push(r)});var html='<h2>学习资源库</h2><div class="toolbar"><input id="rq" class="search" placeholder="搜索文件名、知识点、章节、教师" oninput="window._debounceRes()"><select id="rtype" onchange="window._refreshRes()"><option value="全部">全部类型</option><option value="视频">视频</option><option value="PPT">PPT</option><option value="文档">文档</option></select></div>';var chs=Object.keys(groups).sort(function(a,b){return a.localeCompare(b,'zh-Hans',{numeric:true})});if(!chs.length){html+='<div class="empty">暂无资源</div>'}else{chs.forEach(function(chName,i){var sections=groups[chName],totalSec=Object.keys(sections).length,totalRes=0;for(var k in sections){for(var sk in sections[k]){totalRes+=sections[k][sk].length}}html+='<details class="chapter" '+(i===0?'open':'')+'><summary>'+esc(chName)+' &middot; '+totalSec+' 节 &middot; '+totalRes+' 个资源</summary>';Object.keys(sections).sort(function(a,b){return a.localeCompare(b,'zh-Hans',{numeric:true})}).forEach(function(secName){var subs=sections[secName];html+='<details class="section" open><summary>'+esc(secName)+'</summary>';Object.keys(subs).sort(function(a,b){return a.localeCompare(b,'zh-Hans',{numeric:true})}).forEach(function(subKey){var items=subs[subKey];if(subKey!=='_root')html+='<div class="small muted" style="padding-left:28px;margin-top:6px">'+esc(subKey)+'</div>';html+='<div class="res-grid" style="padding-left:'+(subKey!=='_root'?'28px':'20px')+'">';items.forEach(function(r){html+=resourceCard(r,true)});html+='</div>'});html+='</details>'});html+='</details>'});}app.innerHTML=html;document.getElementById('rq').value=q;document.getElementById('rtype').value=type}window._debounceRes=function(){if(resTimer)clearTimeout(resTimer);resTimer=setTimeout(function(){q=document.getElementById('rq').value||'';render()},300)};window._refreshRes=function(){type=document.getElementById('rtype').value||'全部';render()};render()}
+async function pathPage(){const d=await getJson("/student/path/data"+(TARGET?`?target_kp=${encodeURIComponent(TARGET)}`:""));const steps=d.learning_path||[];app.innerHTML=`<div class="card"><h2>智能学习路径</h2><div class="muted">路径围绕薄弱知识点、前置关系和资源匹配度生成。若前置知识掌握度低于 60%，系统会先推荐前置基础。</div></div><div class="card">${steps.map((s,i)=>`<div class="path-step"><div class="step-no">${i+1}</div><div><b>${esc(s.name)}</b><div class="pill-row" style="margin-top:8px"><span class="tag ${statusClass(s.status)}">${esc(s.status)}</span><span class="tag">掌握度 ${pct(s.score)}</span></div>${bar(s.score)}<div class="small muted" style="margin-top:8px">${esc(s.reason||"")}</div><div class="actions"><button class="btn light" onclick="loadStepQuestions('${esc(s.kp_id)}',this.nextElementSibling)">开始练习</button></div><div></div><div class="res-grid" style="margin-top:14px">${(s.resources||[]).map(r=>resourceCard(r,true)).join("")||'<div class="hint">暂无推荐资源</div>'}</div></div></div>`).join("")||'<div class="empty">暂无路径数据</div>'}</div>`}
+async function loadStepQuestions(kp,box){const d=await fetch(`/student/recommend/questions?knowledge_id=${encodeURIComponent(kp)}&limit=5`).then(r=>r.json());box.innerHTML=`<div class="list" style="margin-top:10px">${(d.questions||[]).map(q=>questionCard(q,"")).join("")||'<div class="hint">暂无题目</div>'}</div>`}
+async function masteryPage(){const d=await getJson("/student/mastery/data");app.innerHTML=`<div class="card"><h2>知识点掌握度</h2><div class="muted">叶子知识点由资源完成、做题结果、错题和最近学习行为综合计算；父节点掌握度由子节点聚合得到。</div></div>${(d.chapters||[]).map(ch=>`<div class="card"><h2>${esc(ch.title||ch.chapter)}</h2><div class="list">${(ch.knowledge_points||[]).map(k=>`<div><div class="row"><div><b>${esc(k.name)}</b></div><div><span class="tag ${statusClass(k.status)}">${esc(k.status)}</span> <b>${pct(k.score)}</b></div></div>${bar(k.score)}</div>`).join("")}</div></div>`).join("")}`}
+async function wrongPage(){const d=await getJson("/student/wrong-questions/data");const qs=(d.questions||[]).filter(q=>(q.consecutive_correct||0)<2);const mastered=(d.questions||[]).filter(q=>(q.consecutive_correct||0)>=2).length;const multiWrong=qs.filter(function(q){return(q.wrong_count||0)>=2}).length;app.innerHTML='<div class="grid"><div class="stat"><span>错题总数</span><b>'+qs.length+'</b><span class="muted">需复练的错题</span></div><div class="stat"><span>已掌握</span><b>'+mastered+'</b><span class="muted">连续做对2次，已移出</span></div><div class="stat"><span>多次错误</span><b>'+multiWrong+'</b><span class="muted">错误2次及以上</span></div><div class="stat"><span>涉及知识点</span><b>'+new Set(qs.map(q=>q.knowledge_point)).size+'</b><span class="muted">复练后同步更新掌握度</span></div></div><div class="card"><div class="toolbar"><input class="search" id="wrongSearch" placeholder="搜索题干、章节、知识点" oninput="renderWrong()"><select id="wrongFilter" onchange="renderWrong()"><option value="all">全部</option><option value="err1">错误1次</option><option value="multi">多次错误</option><option value="corr1">做对1次</option></select></div><div id="wrongList"></div></div>';window.WRONG_ALL=qs;window.renderWrong=()=>{const q=(document.getElementById("wrongSearch").value||"").toLowerCase();const f=document.getElementById("wrongFilter").value;let list=(window.WRONG_ALL||[]).filter(x=>!q||[x.question,x.chapter_name,x.knowledge_point].join(" ").toLowerCase().includes(q));if(f==="err1")list=list.filter(x=>(x.wrong_count||0)===1);else if(f==="multi")list=list.filter(x=>(x.wrong_count||0)>=2);else if(f==="corr1")list=list.filter(x=>(x.consecutive_correct||0)===1);document.getElementById("wrongList").innerHTML=list.map(x=>{let st='';if((x.wrong_count||0)>=2){st='<span class="tag bad">多次错误</span>'}else{st='<span class="tag bad">错误1次</span>'}if((x.consecutive_correct||0)===1){st+='<span class="tag ok">做对1次</span>'}return '<div class="res-card"><b>'+esc(x.question||x.title)+'</b><div class="pill-row" style="margin-top:8px"><span class="tag">'+esc(x.chapter_name||"")+'</span><span class="tag">'+esc(kpName(x.knowledge_point||""))+'</span><span class="tag">'+esc(x.difficulty==="easy"?"简单":(x.difficulty==="hard"?"困难":"中等"))+'</span>'+st+'</div><div class="small muted">正确答案：'+esc(x.answer||"")+'</div><div class="small muted">解析：'+esc(x.analysis||"暂无解析")+'</div><div class="small muted">最近错误：'+esc((x.last_wrong_time||"").replace("T"," ").slice(0,16)||"暂无")+'</div><div class="actions"><button class="btn light" onclick="loadWrongPractice(\''+esc(x.id)+'\',this.parentElement.nextElementSibling)">重新练习</button><button class="btn danger" onclick="removeWrong(\''+esc(x.id)+'\')">移出错题集</button></div><div></div></div>'}).join("")||'<div class="empty">暂无错题</div>'};renderWrong()}
+async function markWrongMastered(qid){await fetch("/student/wrong-questions/remove",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({question_id:qid})});wrongPage()}
+async function loadWrongPractice(qid,box){const d=await getJson(`/student/recommend/questions?knowledge_id=${encodeURIComponent((window.WRONG_ALL||[]).find(x=>x.id===qid)?.knowledge_point||"")}&limit=5`);const q=(window.WRONG_ALL||[]).find(x=>x.id===qid);box.innerHTML=questionCard(q||((d.questions||[])[0]||{}),"")}
+async function removeWrong(qid){await fetch("/student/wrong-questions/remove",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({question_id:qid})});wrongPage()}
+async function recordsPage(){const d=await getJson("/student/records/data");app.innerHTML=`<div class="grid"><div class="stat"><span>视频学习</span><b>${(d.summary||{}).video||0}</b></div><div class="stat"><span>文档学习</span><b>${(d.summary||{}).document||0}</b></div><div class="stat"><span>本周记录</span><b>${(d.summary||{}).week||0}</b></div><div class="stat"><span>总记录</span><b>${(d.summary||{}).total||0}</b></div></div><div class="card">${(d.groups||[]).map(g=>`<details open class="section"><summary><b>${esc(g.date)}</b> · ${g.items.length} 条</summary><div class="list" style="margin-top:12px">${g.items.map(r=>`<div class="record-card"><div><b>${esc(r.name)}</b><div class="small muted">${esc(r.chapter_label||"")} · ${esc(kpName(r.knowledge_point||""))} · ${esc(r.action_type||"")} · ${esc(r.type||"")}${r.resource_exists?"":" · 资源已不存在"}</div></div><div class="small muted">${esc(r.time||"")}</div></div>`).join("")}</div></details>`).join("")||'<div class="empty">暂无学习记录</div>'}</div>`}
+async function discussPage(){const d=await getJson("/student/discuss/list");const kps=await getJson("/student/mastery/data");const kpOpts=(kps.points||[]).map(p=>p.full_name||p.name||p.kp_id).filter(Boolean);window.ALL_POSTS=d.posts||[];app.innerHTML=`<div class="card"><h2>发布问题区</h2><div class="toolbar"><input id="topicTitle" class="search" placeholder="问题标题"><input id="topicTag" class="search" list="kpList" placeholder="知识点标签,例如 2.2.1 进程的概念"><datalist id="kpList">${kpOpts.map(k=>`<option value="${esc(k)}">`).join("")}</datalist><button class="btn" onclick="postTopic()">发布问题</button></div><textarea id="topicBody" rows="4" style="width:100%" placeholder="描述你的问题、思路或卡点"></textarea></div><div class="forum"><div class="card forum-list"><h2>问题列表区</h2><div class="toolbar"><input id="discussQ" class="search" placeholder="搜索标题、作者、知识点、状态" oninput="renderDiscussList()"><button class="btn light" onclick="window.DISC_MODE='all';renderDiscussList()">全部问题</button><button class="btn light" onclick="window.DISC_MODE='mine';renderDiscussList()">我的问题</button></div><div id="discussList"></div></div><div class="card" id="postDetail"><h2>问题详情/回复区</h2><div class="muted">点击左侧问题查看详情和回复。</div></div></div>`;window.DISC_MODE="all";renderDiscussList()}
+function postCard(p){return `<div class="post-card" onclick="openPost('${esc(p.id)}')"><div class="row"><div><b>#${esc(p.display_id||p.no)} ${esc(p.title)}</b><div class="small muted">${esc(p.author)} · ${esc(p.time)} · ${esc(kpName(p.knowledge_tag||"未标注"))}</div></div><div><span class="tag ${p.status==='已解决'?'ok':'warn'}">${esc(p.status)}</span></div></div><p class="small">${esc((p.body||"").slice(0,88))}${(p.body||"").length>88?"...":""}</p><div class="small muted">${p.comment_count||0} 条回复</div></div>`}
+function renderDiscussList(){const q=(document.getElementById('discussQ')?.value||"").toLowerCase();const list=(window.ALL_POSTS||[]).filter(p=>(window.DISC_MODE!=="mine"||p.is_mine)&&(!q||[p.title,p.body,p.author,p.knowledge_tag,p.status].join(" ").toLowerCase().includes(q)));document.getElementById('discussList').innerHTML=list.map(postCard).join("")||'<div class="empty">暂无问题</div>'}
+async function openPost(id){const d=await getJson(`/student/discuss/detail/${encodeURIComponent(id)}`);const p=d.post||{};document.getElementById('postDetail').innerHTML=`<h2>#${esc(p.display_id||p.no||"")} ${esc(p.title||"")}</h2><div class="small muted">${esc(p.author||"")} · ${esc(p.time||"")} · ${esc(kpName(p.knowledge_tag||"未标注"))}</div><div class="pill-row" style="margin-top:8px"><span class="tag ${p.status==='已解决'?'ok':'warn'}">${esc(p.status||"未解决")}</span></div><p>${esc(p.body||"")}</p>${p.is_mine?`<div class="toolbar"><button class="btn light" onclick="editTopic('${esc(p.id)}','${esc(p.title)}','${esc(p.knowledge_tag||"")}','${esc(p.body||"")}')">编辑问题</button><button class="btn danger" onclick="deleteTopic('${esc(p.id)}')">删除问题</button></div>`:""}<h3>回复</h3>${(p.comments||[]).map(c=>`<div class="comment"><b>${c.floor} 楼 · ${esc(c.author)}</b><p>${esc(c.body)}</p><div class="small muted">${esc(c.time)}</div>${c.is_mine?`<div class="actions"><button class="btn danger" onclick="deleteComment('${esc(c.id)}','${esc(p.id)}')">删除回复</button></div>`:""}</div>`).join("")||'<div class="muted">暂无回复</div>'}<textarea id="commentBody" rows="3" style="width:100%;margin-top:12px" placeholder="写下你的回复"></textarea><div class="actions"><button class="btn" onclick="commentPost('${esc(p.id)}')">提交回复</button>${p.is_mine?`<button class="btn light" onclick="setStatus('${esc(p.id)}','${p.status==='已解决'?'未解决':'已解决'}')">${p.status==='已解决'?'标记未解决':'标记已解决'}</button>`:""}</div>`}
+async function postTopic(){const title=(topicTitle.value||"").trim(),body=(topicBody.value||"").trim(),tag=(topicTag.value||"").trim();const url=window.EDIT_POST_ID?`/student/discuss/post/update/${encodeURIComponent(window.EDIT_POST_ID)}`:'/student/discuss/post';const d=await fetch(url,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({title,body,knowledge_tag:tag})}).then(r=>r.json());if(!d.success){alert(d.error||'提交失败');return}window.EDIT_POST_ID='';topicTitle.value='';topicTag.value='';topicBody.value='';discussPage()}
+function editTopic(id,title,tag,body){topicTitle.value=title;topicTag.value=tag;topicBody.value=body;topicTitle.focus();window.EDIT_POST_ID=id;}
+async function deleteTopic(id){if(!confirm('确认删除这个问题？'))return;const d=await fetch(`/student/discuss/post/delete/${encodeURIComponent(id)}`,{method:'POST'}).then(r=>r.json());if(!d.success){alert(d.error||'删除失败');return}discussPage()}
+async function commentPost(id){const body=(document.getElementById('commentBody').value||"").trim();const d=await fetch(`/student/discuss/comment/${encodeURIComponent(id)}`,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({body})}).then(r=>r.json());if(!d.success){alert(d.error||'回复失败');return}openPost(id);const list=await getJson('/student/discuss/list');window.ALL_POSTS=list.posts||[];renderDiscussList()}
+async function setStatus(id,status){await fetch(`/student/discuss/status/${encodeURIComponent(id)}`,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({status})});openPost(id);const list=await getJson('/student/discuss/list');window.ALL_POSTS=list.posts||[];renderDiscussList()}
+async function deleteComment(cid,pid){if(!confirm('确认删除这条回复？'))return;await fetch(`/student/discuss/comment/delete/${encodeURIComponent(cid)}`,{method:'POST'});openPost(pid)}
+async function graphPage(){const d=await getJson('/student/flow-graph/data');app.innerHTML=`<div class="card"><h2>知识图谱</h2><div class="muted">当前以课程、章节、知识点及其包含/先修/相关关系展示学习结构。</div></div><div class="split"><div class="card"><h2>节点列表</h2><div class="list">${(d.nodes||[]).map(n=>`<div class="row"><div><b>${esc(kpName(n.label||n.id))}</b><div class="small muted">${esc(n.levelName||"")}</div></div><div><span class="tag ${statusClass(n.mastery>=0.85?'已掌握':(n.mastery>=0.60?'待巩固':'未学习'))}">${pct(n.mastery||0)}</span></div></div>`).join("")}</div></div><div class="card"><h2>关系列表</h2><div class="list">${(d.edges||[]).map(e=>`<div class="hint">${esc(kpName((d.nodes||[]).find(n=>n.id===e.from)?.label||e.from))} → ${esc(kpName((d.nodes||[]).find(n=>n.id===e.to)?.label||e.to))} · ${esc(e.type)}</div>`).join("")||'<div class="empty">暂无关系</div>'}</div></div></div>`}
+if(PAGE==="dashboard")dashboard();
+if(PAGE==="profile")profilePage();
+if(PAGE==="resources")resourcesPage();
+if(PAGE==="path")pathPage();
+if(PAGE==="mastery")masteryPage();
+if(PAGE==="wrong")wrongPage();
+if(PAGE==="records")recordsPage();
+if(PAGE==="discuss")discussPage();
+if(PAGE==="graph")graphPage();
+</script>
+</body>
+</html>
+"""
+
+
+
+
+def teacher_discuss_page_final():
+    if session.get("role") != "teacher":
+        return redirect(url_for("login"))
+    return render_teacher_workspace("discuss", "讨论管理")
+
+
+def teacher_students_page_final():
+    if session.get("role") != "teacher":
+        return redirect(url_for("login"))
+    return render_teacher_workspace("profiles", "学生画像")
+
+
+def teacher_manage_page_final():
+    if session.get("role") != "teacher":
+        return redirect(url_for("login"))
+    return render_teacher_workspace("students", "学生管理")
+
+
+def teacher_resource_manage_page_final():
+    if session.get("role") != "teacher":
+        return redirect(url_for("login"))
+    return render_teacher_workspace("resourceManage", "资源管理")
+
+
+def teacher_question_bank_page_final():
+    if session.get("role") != "teacher":
+        return redirect(url_for("login"))
+    return render_teacher_workspace("questionBank", "题库管理")
+
+
+def teacher_graph_tools_page_final():
+    if session.get("role") != "teacher":
+        return redirect(url_for("login"))
+    return render_teacher_workspace("graph", "知识图谱")
+
+
+def student_graph_page_final():
+    if session.get("role") != "student":
+        return redirect(url_for("login"))
+    return render_flow_page("知识图谱", "graph")
+
+
+def invalidate_resource_caches():
+    global _CLEAN_MANIFEST_CACHE, _RESOURCE_LIST_CACHE, _RESOURCE_MAP_CACHE, _KNOWLEDGE_CATALOG_CACHE
+    _CLEAN_MANIFEST_CACHE = None
+    _RESOURCE_LIST_CACHE = None
+    _RESOURCE_MAP_CACHE = None
+    _KNOWLEDGE_CATALOG_CACHE = None
+
+
+def final_teacher_resource_update():
+    result = teacher_resource_update()
+    try:
+        data = result.get_json()
+    except Exception:
+        data = None
+    if isinstance(data, dict) and data.get("success"):
+        invalidate_resource_caches()
+    return result
+
+
+def final_teacher_resource_replace_content():
+    result = teacher_resource_replace_content()
+    try:
+        data = result.get_json()
+    except Exception:
+        data = None
+    if isinstance(data, dict) and data.get("success"):
+        invalidate_resource_caches()
+    return result
+
+
+def final_teacher_resource_delete():
+    result = teacher_resource_delete()
+    try:
+        data = result.get_json()
+    except Exception:
+        data = None
+    if isinstance(data, dict) and data.get("success"):
+        invalidate_resource_caches()
+    return result
+
+
+app.view_functions["login"] = final_login
+app.view_functions["student_dashboard_data"] = final_student_dashboard_data
+app.view_functions["student_mastery_data"] = final_student_mastery_data
+app.view_functions["get_student_resources_data"] = final_student_resources_data
+app.view_functions["student_path_data"] = final_student_path_data
+app.view_functions["student_records_data"] = final_student_records_data
+app.view_functions["student_resource_complete_ext"] = final_student_resource_complete_ext
+app.view_functions["student_resource_status_ext"] = final_student_resource_status_ext
+app.view_functions["student_resource_questions_ext"] = final_student_resource_questions_ext
+app.view_functions["student_recommend_questions_ext"] = final_student_recommend_questions_ext
+app.view_functions["student_questions_submit_ext"] = final_student_questions_submit_ext
+app.view_functions["student_wrong_questions_data_ext"] = final_student_wrong_questions_data_ext
+app.view_functions["student_wrong_questions_remove_ext"] = final_student_wrong_questions_remove_ext
+app.view_functions["get_wrong_questions"] = final_wrong_questions_page
+app.view_functions["student_discuss_list_v2"] = final_student_discuss_list
+app.view_functions["student_discuss_detail_v2"] = final_student_discuss_detail
+app.view_functions["student_discuss_post"] = final_student_discuss_post
+app.view_functions["student_discuss_comment_v2"] = final_student_discuss_comment
+app.view_functions["student_discuss_post_update"] = final_student_discuss_update
+app.view_functions["student_discuss_post_delete"] = final_student_discuss_delete
+app.view_functions["student_discuss_status"] = final_student_discuss_status
+app.view_functions["student_my_comments"] = final_student_my_comments
+app.view_functions["student_discuss_comment_delete"] = final_delete_comment
+app.view_functions["teacher_discuss_comment_delete"] = final_delete_comment
+app.view_functions["teacher_tools_data"] = final_teacher_tools_data
+app.view_functions["teacher_student_profile_data"] = final_teacher_student_profile_data
+app.view_functions["teacher_resources_data"] = final_teacher_resources_data
+app.view_functions["teacher_knowledge_points_data"] = final_knowledge_points_data
+app.view_functions["teacher_add_student"] = final_teacher_add_student
+app.view_functions["teacher_edit_student"] = final_teacher_edit_student
+app.view_functions["teacher_delete_student"] = final_teacher_delete_student
+app.view_functions["api_knowledge_graph"] = final_api_knowledge_graph
+app.view_functions["api_node_detail"] = final_api_node_detail
+app.view_functions["teacher_public_graph_add"] = final_teacher_public_graph_add
+app.view_functions["student_view_file"] = final_student_view_file
+app.view_functions["student_watch_video"] = final_student_watch_video
+app.view_functions["download_file"] = final_download_file
+app.view_functions["play_video"] = final_play_video
+app.view_functions["record_resource_download"] = final_record_resource_download
+app.view_functions["record_video_play"] = final_record_video_play
+app.view_functions["teacher_discuss"] = teacher_discuss_page_final
+app.view_functions["teacher_students"] = teacher_students_page_final
+app.view_functions["teacher_manage"] = teacher_manage_page_final
+app.view_functions["teacher_resource_manage"] = teacher_resource_manage_page_final
+app.view_functions["teacher_question_bank"] = teacher_question_bank_page_final
+app.view_functions["teacher_graph_tools"] = teacher_graph_tools_page_final
+app.view_functions["student_graph"] = student_graph_page_final
+app.view_functions["teacher_resource_update"] = final_teacher_resource_update
+app.view_functions["teacher_resource_replace_content"] = final_teacher_resource_replace_content
+app.view_functions["teacher_resource_delete"] = final_teacher_resource_delete
+
+# ===========================================================================
+# Teacher V2 - Server-side rendered pages (no fetch, no JS loading)
+# ===========================================================================
+
+def _teacher_v2_load_json(filename):
+    path = os.path.join(RESOURCE_DIR, filename)
+    if os.path.exists(path):
+        with open(path, "r", encoding="utf-8") as f:
+            return json.load(f)
+    return None
+
+def _teacher_v2_require_login():
+    if session.get("role") != "teacher":
+        return redirect(url_for("login"))
+    return None
+
+TEACHER_V2_LAYOUT = r"""
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>{{ page_title }} - 教师工作台</title>
+<script src="https://cdn.jsdelivr.net/npm/vis-network@9.1.2/standalone/umd/vis-network.min.js"></script>
+<style>
+:root{--primary:#1f6feb;--primary-dark:#174ea6;--ink:#1f2937;--muted:#667085;--line:#d9e2ef;--soft:#f4f7fb;--panel:#fff;--green:#16a34a;--orange:#d97706;--red:#dc2626;--nav:#18324a}
+*{box-sizing:border-box}body{margin:0;font-family:"Microsoft YaHei","PingFang SC",Arial,sans-serif;background:#eef3f8;color:var(--ink);font-size:14px}.layout{display:flex;min-height:100vh}.side{width:238px;background:var(--nav);color:#fff;display:flex;flex-direction:column;box-shadow:4px 0 16px rgba(24,50,74,.16);position:sticky;top:0;height:100vh}.brand{padding:22px 20px 18px;border-bottom:1px solid rgba(255,255,255,.12)}.brand h1{font-size:17px;margin:0 0 6px;line-height:1.35}.brand p{margin:0;color:#c7d4e5;font-size:12px}.course-pill{margin-top:12px;background:rgba(255,255,255,.1);border:1px solid rgba(255,255,255,.12);border-radius:8px;padding:10px 12px;color:#e9f1fb}.nav{padding:12px 10px;flex:1}.nav a{display:flex;align-items:center;gap:10px;color:#d7e2f0;text-decoration:none;padding:12px 12px;border-radius:8px;margin:4px 0;font-size:14px}.nav a:hover,.nav a.active{background:#244966;color:#fff}.nav .ico{width:22px;text-align:center}.logout{padding:16px 18px;border-top:1px solid rgba(255,255,255,.1)}.logout a{display:block;text-align:center;background:#eaf2ff;color:#174ea6;text-decoration:none;padding:9px;border-radius:8px;font-weight:600}.main{flex:1;min-width:0}.top{height:66px;background:rgba(255,255,255,.92);border-bottom:1px solid #dde5f0;display:flex;align-items:center;justify-content:space-between;padding:0 28px;position:sticky;top:0;z-index:5;backdrop-filter:blur(10px)}.top h2{margin:0;font-size:20px}.top-meta{display:flex;align-items:center;gap:16px;color:var(--muted)}.content{padding:24px 28px 40px;max-width:1360px}.card{background:#fff;border:1px solid var(--line);border-radius:10px;padding:20px 24px;margin-bottom:18px}.card h3{margin:0 0 12px;font-size:16px}.grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(200px,1fr));gap:16px;margin-bottom:18px}.stat{background:#fff;border:1px solid var(--line);border-radius:10px;padding:18px 20px}.stat span{display:block;color:var(--muted);font-size:13px;margin-bottom:6px}.stat b{display:block;font-size:28px;margin-top:4px}.stat .sub{color:var(--muted);font-size:12px;margin-top:4px}.table{width:100%;border-collapse:collapse}.table th,.table td{padding:10px 12px;text-align:left;border-bottom:1px solid var(--line);font-size:13px}.table th{background:var(--soft);font-weight:600;color:var(--muted)}.table tr:hover td{background:#f8fafc}.tag{display:inline-block;padding:2px 8px;border-radius:4px;font-size:12px;margin:2px}.tag.ok{background:#dcfce7;color:#166534}.tag.warn{background:#fef9c3;color:#854d0e}.tag.bad{background:#fee2e2;color:#991b1b}.tag.info{background:#dbeafe;color:#1e40af}.empty{padding:40px;text-align:center;color:var(--muted);font-size:14px}.btn{display:inline-block;background:var(--primary);color:#fff;border:0;padding:8px 16px;border-radius:6px;cursor:pointer;text-decoration:none;font-size:13px}.btn:hover{background:var(--primary-dark)}.btn.light{background:#f1f5f9;color:var(--ink)}.btn.light:hover{background:#e2e8f0}.btn.green{background:var(--green)}.btn.green:hover{background:#15803d}.btn.danger{background:var(--red)}.btn.danger:hover{background:#b91c1c}.bar-wrap{height:8px;background:#e5e7eb;border-radius:4px;margin-top:6px}.bar-fill{height:100%;border-radius:4px;background:var(--primary)}.bar-fill.warn{background:var(--orange)}.bar-fill.bad{background:var(--red)}.bar-fill.ok{background:var(--green)}.flex-row{display:flex;align-items:center;gap:8px;flex-wrap:wrap}.muted{color:var(--muted);font-size:12px}
+</style>
+</head>
+<body>
+<div class="layout">
+  <aside class="side">
+    <div class="brand">
+      <h1>教师工作台</h1>
+      <p>{{ teacher_name }}</p>
+      <div class="course-pill">操作系统课程管理</div>
+    </div>
+    <nav class="nav">
+      <a href="/teacher/v2" class="{% if active_page=='dashboard' %}active{% endif %}"><span class="ico">&#x1F4CA;</span>教师工作台</a>
+      <a href="/teacher/v2/manage" class="{% if active_page=='manage' %}active{% endif %}"><span class="ico">&#x1F393;</span>学生管理</a>
+      <a href="/teacher/v2/profile" class="{% if active_page=='profile' %}active{% endif %}"><span class="ico">&#x1F4C8;</span>学生画像</a>
+      <a href="/teacher/v2/resources" class="{% if active_page=='resources' %}active{% endif %}"><span class="ico">&#x1F4C1;</span>资源管理</a>
+      <a href="/teacher/v2/questions" class="{% if active_page=='questions' %}active{% endif %}"><span class="ico">&#x1F4DD;</span>题库管理</a>
+      <a href="/teacher/v2/graph" class="{% if active_page=='graph' %}active{% endif %}"><span class="ico">&#x1F578;</span>知识图谱</a>
+      <a href="/teacher/v2/discuss" class="{% if active_page=='discuss' %}active{% endif %}"><span class="ico">&#x1F4AC;</span>问题讨论</a>
+    </nav>
+    <div class="logout"><a href="/logout">退出登录</a></div>
+  </aside>
+  <main class="main">
+    <header class="top">
+      <h2>{{ page_title }}</h2>
+      <div class="top-meta">操作系统课程管理</div>
+    </header>
+    <section class="content">
+      {{ page_content|safe }}
+    </section>
+  </main>
+</div>
+</body>
+</html>
+"""
+
+def _teacher_v2_dashboard():
+    meta = _teacher_v2_load_json("students_meta.json") or {}
+    questions = _teacher_v2_load_json("questions.json") or {}
+    resource_manifest = _teacher_v2_load_json("resource_manifest.json") or {}
+    student_ids = list(meta.keys())
+    student_count = len(student_ids)
+    avg_mastery_scores = []
+    focus_rows = []
+    for sid in student_ids:
+        try:
+            stats = get_student_stats(sid)
+            avg_mastery = stats.get("avg_mastery", 0)
+            avg_mastery_scores.append(avg_mastery)
+            focus_rows.append({
+                "sid": sid,
+                "name": stats.get("name", sid),
+                "avg_mastery": avg_mastery,
+                "accuracy": stats.get("accuracy", 0) * 100,
+                "total": stats.get("answered_questions", 0),
+                "weak_points": [_format_weak_point_label(w) for w in stats.get("weak_points", [])[:3]]
+            })
+        except:
+            pass
+    avg_mastery = sum(avg_mastery_scores) / len(avg_mastery_scores) if avg_mastery_scores else 0
+    weak_count = sum(1 for s in avg_mastery_scores if s < 0.7)
+    qs = questions.get("questions", []) if isinstance(questions, dict) else questions
+    question_count = len(qs)
+    resource_count = resource_manifest.get("total_files", 0) if isinstance(resource_manifest, dict) else len(resource_manifest) if isinstance(resource_manifest, list) else 0
+    focus_rows.sort(key=lambda r: r["avg_mastery"])
+    def _bar(v, cls=""):
+        pct = max(0, min(100, int(round(v * 100))))
+        return '<div class="bar-wrap"><div class="bar-fill {cls}" style="width:{pct}%"></div></div>'.format(cls=cls, pct=pct)
+    rows_html = ""
+    for r in focus_rows:
+        avg = r["avg_mastery"]
+        bar_cls = "ok" if avg >= 0.85 else ("warn" if avg >= 0.7 else "bad")
+        weak_tags = " ".join('<span class="tag bad">{kp}</span>'.format(kp=k) for k in r["weak_points"])
+        rows_html += '<tr><td>{sid}</td><td><b>{name}</b></td><td>{avg_pct}</td><td>{bar}</td><td>{acc}%</td><td>{total}</td><td>{weak}</td></tr>'.format(
+            sid=r["sid"], name=r["name"],
+            avg_pct="{:.0f}%".format(avg * 100),
+            bar=_bar(avg, bar_cls),
+            acc="{:.0f}".format(r["accuracy"]),
+            total=r["total"],
+            weak=weak_tags or '<span class="muted">-</span>'
+        )
+    content = r"""
+    <div class="grid">
+      <div class="stat"><span>学生人数</span><b>{student_count}</b><div class="sub">当前班级</div></div>
+      <div class="stat"><span>平均掌握度</span><b>{avg_mastery}%</b></div>
+      <div class="stat"><span>薄弱学生</span><b>{weak_count}</b><div class="sub">掌握度低于70%</div></div>
+      <div class="stat"><span>资源数</span><b>{resource_count}</b><div class="sub">教学材料</div></div>
+      <div class="stat"><span>题目数</span><b>{question_count}</b><div class="sub">题库总量</div></div>
+    </div>
+    <div class="card">
+      <h3>重点关注学生</h3>
+      <table class="table">
+        <thead><tr><th>学号</th><th>姓名</th><th>掌握度</th><th>进度条</th><th>正确率</th><th>做题数</th><th>薄弱知识点</th></tr></thead>
+        <tbody>{rows}</tbody>
+      </table>
+    </div>
+    """.format(
+        student_count=student_count,
+        avg_mastery="{:.0f}".format(avg_mastery * 100),
+        weak_count=weak_count,
+        resource_count=resource_count,
+        question_count=question_count,
+        rows=rows_html or '<tr><td colspan="7" class="empty">暂无数据</td></tr>'
+    )
+    return content
+
+def _teacher_v2_manage():
+    meta = _teacher_v2_load_json("students_meta.json") or {}
+    rows = ""
+    for sid in sorted(meta.keys()):
+        info = meta.get(sid, {})
+        name = info.get("name", sid)
+        cls = info.get("class_name", "")
+        gender = info.get("gender", "")
+        rows += '<tr><td>{sid}</td><td><b>{name}</b></td><td>{cls}</td><td>{gender}</td><td><button class="btn light btn-sm" onclick="alert(\'编辑功能待实现\')">编辑</button> <button class="btn danger btn-sm" onclick="if(confirm(\'确认删除？\'))alert(\'删除功能待实现\')">删除</button></td></tr>'.format(sid=sid, name=name, cls=cls, gender=gender)
+    content = r"""
+    <div class="card">
+      <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:16px">
+        <h3>学生管理</h3>
+        <button class="btn green" onclick="alert('新增学生功能待实现')">新增学生</button>
+      </div>
+      <p class="muted">共 {count} 名学生（仅显示基本信息，学习数据请查看学生画像）</p>
+      <table class="table">
+        <thead><tr><th>学号</th><th>姓名</th><th>班级</th><th>性别</th><th>操作</th></tr></thead>
+        <tbody>{rows}</tbody>
+      </table>
+    </div>
+    <style>.btn-sm{{padding:4px 10px;font-size:12px}}</style>
+    """.format(count=len(meta), rows=rows or '<tr><td colspan="5" class="empty">暂无数据</td></tr>')
+    return content
+
+def _teacher_v2_profile():
+    meta = _teacher_v2_load_json("students_meta.json") or {}
+    rows = ""
+    for sid in sorted(meta.keys()):
+        try:
+            stats = get_student_stats(sid)
+            name = stats.get("name", sid)
+            level = stats.get("level", "薄弱")
+            avg_mastery = stats.get("avg_mastery", 0)
+            accuracy = stats.get("accuracy", 0)
+            correct_questions = stats.get("correct_questions", 0)
+            answered_questions = stats.get("answered_questions", 0)
+            resource_completed = stats.get("resource_completed_count", 0)
+            wrong_count = stats.get("wrong_count", 0)
+            weak_points = stats.get("weak_points", [])
+            level_cls = "ok" if level in ["优秀", "良好"] else ("warn" if level == "中等" else "bad")
+            weak_tags = " ".join('<span class="tag bad">{}</span>'.format(
+                _format_weak_point_label(w, with_score=True)
+            ) for w in weak_points[:3])
+            rows += '<tr><td>{sid}</td><td><b>{name}</b></td><td><span class="tag {level_cls}">{level}</span></td><td>{avg}%</td><td>{acc}%</td><td>{correct}/{total}</td><td>{res}</td><td>{wrong}</td><td>{weak}</td></tr>'.format(
+                sid=sid, name=name, level_cls=level_cls, level=level,
+                avg="{:.0f}".format(avg_mastery * 100),
+                acc="{:.0f}".format(accuracy * 100),
+                correct=correct_questions, total=answered_questions,
+                res=resource_completed, wrong=wrong_count,
+                weak=weak_tags or '<span class="muted">-</span>'
+            )
+        except Exception as e:
+            info = meta.get(sid, {})
+            name = info.get("name", sid)
+            rows += '<tr><td>{sid}</td><td><b>{name}</b></td><td colspan="7" class="muted">数据加载失败</td></tr>'.format(sid=sid, name=name)
+    content = r"""
+    <div class="card">
+      <h3>学生画像</h3>
+      <p class="muted">共 {count} 名学生</p>
+      <table class="table">
+        <thead><tr><th>学号</th><th>姓名</th><th>等级</th><th>掌握度</th><th>正确率</th><th>做题数</th><th>资源完成</th><th>错题数</th><th>薄弱知识点</th></tr></thead>
+        <tbody>{rows}</tbody>
+      </table>
+    </div>
+    """.format(count=len(meta), rows=rows or '<tr><td colspan="9" class="empty">暂无数据</td></tr>')
+    return content
+
+def _teacher_v2_questions():
+    questions = _teacher_v2_load_json("questions.json") or {}
+    qs = questions.get("questions", []) if isinstance(questions, dict) else questions
+    if not isinstance(qs, list):
+        qs = []
+
+    TYPE_MAP = {"single_choice": "单选", "multiple_choice": "多选", "judge": "判断", "blank": "填空"}
+    TYPE_MAP_REV = {"单选": "single_choice", "多选": "multiple_choice", "判断": "judge", "填空": "blank"}
+
+    enabled_qs = [q for q in qs if q.get("status") != "deleted"]
+
+    chapters = {}
+    for q in enabled_qs:
+        ch = q.get("chapter_id") or q.get("chapter_name") or "其他"
+        ch_name = q.get("chapter_name") or ("第" + str(ch) + "章" if ch else "其他")
+        if ch not in chapters:
+            chapters[ch] = {"name": ch_name, "questions": []}
+        chapters[ch]["questions"].append(q)
+
+    chapters_html = ""
+    for ch_id in sorted(chapters.keys()):
+        ch = chapters[ch_id]
+        rows = ""
+        for q in ch["questions"]:
+            qid = q.get("id", "")
+            kp = q.get("knowledge_point", "") or q.get("knowledge_name", "")
+            diff = q.get("difficulty", "")
+            qtype = TYPE_MAP.get(q.get("type", ""), q.get("type", ""))
+            stem = q.get("question", "") or q.get("title", "")
+            ans = q.get("answer", "")
+            explanation = q.get("explanation", "") or q.get("analysis", "")
+            opts = q.get("options", [])
+            opt_a = opts[0] if len(opts) > 0 else ""
+            opt_b = opts[1] if len(opts) > 1 else ""
+            opt_c = opts[2] if len(opts) > 2 else ""
+            opt_d = opts[3] if len(opts) > 3 else ""
+            knowledge_id = q.get("knowledge_id", "")
+            knowledge_name = q.get("knowledge_name", "") or q.get("knowledge_point", "")
+
+            rows += r"""
+            <tr class="q-row" data-id="{qid}" data-diff="{diff}" data-chapter="{ch_id}">
+              <td class="q-id">{qid}</td>
+              <td class="q-kp">{kp}</td>
+              <td><span class="tag {diff_cls}">{diff}</span></td>
+              <td>{qtype}</td>
+              <td class="q-stem">{stem}</td>
+              <td class="q-ans">{ans}</td>
+              <td>
+                <button class="btn light btn-sm" onclick="toggleEdit('{qid}')">修改</button>
+                <form method="POST" action="/teacher/v2/questions/delete" style="display:inline" onsubmit="return confirm('确认删除题目 {qid}？')">
+                  <input type="hidden" name="qid" value="{qid}">
+                  <button class="btn danger btn-sm">删除</button>
+                </form>
+              </td>
+            </tr>
+            <tr class="edit-row" id="edit-{qid}" style="display:none">
+              <td colspan="7">
+                <div class="edit-form">
+                  <form method="POST" action="/teacher/v2/questions/update">
+                    <input type="hidden" name="qid" value="{qid}">
+                    <div class="form-grid">
+                      <label>知识点ID<input name="knowledge_id" value="{knowledge_id}"></label>
+                      <label>知识点名称<input name="knowledge_name" value="{knowledge_name}"></label>
+                      <label>题型<select name="question_type">
+                        <option value="single_choice"{sel_sc}>单选</option>
+                        <option value="multiple_choice"{sel_mc}>多选</option>
+                        <option value="judge"{sel_judge}>判断</option>
+                        <option value="blank"{sel_blank}>填空</option>
+                      </select></label>
+                      <label>难度<select name="difficulty">
+                        <option value="基础"{sel_base}>基础</option>
+                        <option value="中等"{sel_mid}>中等</option>
+                        <option value="困难"{sel_hard}>困难</option>
+                      </select></label>
+                    </div>
+                    <label>题干<textarea name="stem" rows="2">{stem}</textarea></label>
+                    <div class="form-grid">
+                      <label>选项A<input name="option_a" value="{opt_a}"></label>
+                      <label>选项B<input name="option_b" value="{opt_b}"></label>
+                      <label>选项C<input name="option_c" value="{opt_c}"></label>
+                      <label>选项D<input name="option_d" value="{opt_d}"></label>
+                    </div>
+                    <label>答案<input name="answer" value="{ans}" style="width:120px"></label>
+                    <label>解析<textarea name="explanation" rows="2">{explanation}</textarea></label>
+                    <div class="flex-row" style="margin-top:10px">
+                      <button class="btn green">保存修改</button>
+                      <button type="button" class="btn light" onclick="toggleEdit('{qid}')">取消</button>
+                    </div>
+                  </form>
+                </div>
+              </td>
+            </tr>
+            """.format(
+                qid=qid, kp=kp, diff=diff,
+                diff_cls="ok" if diff == "基础" else ("warn" if diff == "中等" else "bad"),
+                qtype=qtype, stem=stem, ans=ans,
+                knowledge_id=knowledge_id, knowledge_name=knowledge_name,
+                opt_a=opt_a, opt_b=opt_b, opt_c=opt_c, opt_d=opt_d,
+                explanation=explanation,
+                ch_id=ch_id,
+                sel_sc=" selected" if q.get("type") == "single_choice" else "",
+                sel_mc=" selected" if q.get("type") == "multiple_choice" else "",
+                sel_judge=" selected" if q.get("type") == "judge" else "",
+                sel_blank=" selected" if q.get("type") == "blank" else "",
+                sel_base=" selected" if diff == "基础" else "",
+                sel_mid=" selected" if diff == "中等" else "",
+                sel_hard=" selected" if diff == "困难" else "",
+            )
+
+        chapters_html += r"""
+        <div class="chapter-group" data-chapter="{ch_id}">
+          <div class="chapter-header" onclick="toggleChapter(this)">
+            <span class="ch-arrow">&#9660;</span>
+            <h3>{ch_name}</h3>
+            <span class="muted">({count} 题)</span>
+          </div>
+          <div class="chapter-body">
+            <table class="table">
+              <thead><tr><th>ID</th><th>知识点</th><th>难度</th><th>题型</th><th>题干</th><th>答案</th><th>操作</th></tr></thead>
+              <tbody>{rows}</tbody>
+            </table>
+          </div>
+        </div>
+        """.format(ch_id=ch_id, ch_name=ch["name"], count=len(ch["questions"]), rows=rows)
+
+    content = r"""
+    <style>
+    .toolbar{display:flex;gap:12px;align-items:center;flex-wrap:wrap;margin-bottom:16px}
+    .toolbar input,.toolbar select{padding:8px 12px;border:1px solid var(--line);border-radius:6px;font-size:13px}
+    .toolbar input{flex:1;min-width:200px;max-width:360px}
+    .chapter-group{margin-bottom:12px}
+    .chapter-header{cursor:pointer;display:flex;align-items:center;gap:10px;padding:10px 16px;background:var(--soft);border:1px solid var(--line);border-radius:8px;user-select:none}
+    .chapter-header:hover{background:#e8eef6}
+    .chapter-header h3{margin:0;font-size:15px}
+    .ch-arrow{transition:transform .2s;font-size:12px}
+    .chapter-header.collapsed .ch-arrow{transform:rotate(-90deg)}
+    .chapter-body{overflow:hidden}
+    .chapter-body.hidden{display:none}
+    .edit-form{background:#fafbfc;border:1px solid var(--line);border-radius:8px;padding:16px;margin:8px 0}
+    .edit-form label{display:block;margin-bottom:8px;font-size:13px;color:var(--muted)}
+    .edit-form input,.edit-form textarea,.edit-form select{width:100%;padding:7px 10px;border:1px solid var(--line);border-radius:6px;font-size:13px}
+    .form-grid{display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:8px}
+    .btn-sm{padding:4px 10px;font-size:12px}
+    .q-id{font-family:monospace;font-size:12px;color:var(--muted)}
+    .q-stem{max-width:300px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+    .tab-nav{display:flex;gap:0;margin-bottom:16px;border-bottom:2px solid var(--line)}
+    .tab-nav button{padding:10px 20px;border:0;background:0;cursor:pointer;font-size:14px;color:var(--muted);border-bottom:2px solid transparent;margin-bottom:-2px}
+    .tab-nav button.active{color:var(--primary);border-bottom-color:var(--primary);font-weight:600}
+    .parse-area{width:100%;min-height:120px;padding:10px;border:1px solid var(--line);border-radius:6px;font-size:13px;font-family:monospace;resize:vertical}
+    .add-form{display:none}
+    .add-form.show{display:block}
+    </style>
+
+    <div class="card">
+      <div class="tab-nav">
+        <button class="active" onclick="switchTab('list')">题库列表</button>
+        <button onclick="switchTab('add')">新增题目</button>
+      </div>
+    </div>
+
+    <div id="tab-list">
+      <div class="card">
+        <div class="toolbar">
+          <input type="text" id="searchInput" placeholder="搜索题目ID、知识点、题干..." oninput="filterQuestions()">
+          <select id="diffFilter" onchange="filterQuestions()">
+            <option value="">全部难度</option>
+            <option value="基础">基础</option>
+            <option value="中等">中等</option>
+            <option value="困难">困难</option>
+          </select>
+          <button class="btn light" onclick="toggleAllChapters()">展开/折叠全部</button>
+          <span class="muted" id="resultCount">共 {total} 题</span>
+        </div>
+      </div>
+      {chapters_html}
+    </div>
+
+    <div id="tab-add" style="display:none">
+      <div class="card">
+        <h3>批量粘贴解析</h3>
+        <textarea class="parse-area" id="parseInput" placeholder="粘贴题目文本（格式：知识点：... 题型：... 难度：... 题干：... A. ... B. ... C. ... D. ... 答案：... 解析：...）"></textarea>
+        <div class="flex-row" style="margin-top:10px">
+          <button class="btn" onclick="parseText()">解析到表单</button>
+          <span class="muted" id="parseMsg"></span>
+        </div>
+      </div>
+      <div class="card">
+        <h3>新增题目</h3>
+        <form method="POST" action="/teacher/v2/questions/add" onsubmit="return validateAddForm()">
+          <div class="form-grid">
+            <label>知识点ID<input name="knowledge_id" id="add_knowledge_id" placeholder="如 3.4.7"></label>
+            <label>知识点名称<input name="knowledge_name" id="add_knowledge_name" placeholder="如 3.4.7 活锁"></label>
+            <label>题型<select name="question_type" id="add_question_type">
+              <option value="single_choice">单选</option>
+              <option value="multiple_choice">多选</option>
+              <option value="judge">判断</option>
+              <option value="blank">填空</option>
+            </select></label>
+            <label>难度<select name="difficulty" id="add_difficulty">
+              <option value="基础">基础</option>
+              <option value="中等" selected>中等</option>
+              <option value="困难">困难</option>
+            </select></label>
+          </div>
+          <label>题干<textarea name="stem" id="add_stem" rows="2" placeholder="输入题干"></textarea></label>
+          <div class="form-grid">
+            <label>选项A<input name="option_a" id="add_option_a" placeholder="选项A"></label>
+            <label>选项B<input name="option_b" id="add_option_b" placeholder="选项B"></label>
+            <label>选项C<input name="option_c" id="add_option_c" placeholder="选项C"></label>
+            <label>选项D<input name="option_d" id="add_option_d" placeholder="选项D"></label>
+          </div>
+          <div class="form-grid">
+            <label>答案<input name="answer" id="add_answer" placeholder="如 A" style="width:120px"></label>
+            <label>解析<textarea name="explanation" id="add_explanation" rows="2" placeholder="答案解析"></textarea></label>
+          </div>
+          <div style="margin-top:12px">
+            <button class="btn green" style="padding:10px 24px">保存题目</button>
+          </div>
+        </form>
+        <div id="addError" style="color:var(--red);margin-top:8px;display:none"></div>
+      </div>
+    </div>
+
+    <script>
+    function switchTab(tab){
+      document.getElementById('tab-list').style.display = tab==='list' ? '' : 'none';
+      document.getElementById('tab-add').style.display = tab==='add' ? '' : 'none';
+      var btns = document.querySelectorAll('.tab-nav button');
+      btns[0].classList.toggle('active', tab==='list');
+      btns[1].classList.toggle('active', tab==='add');
+    }
+
+    function filterQuestions(){
+      var kw = (document.getElementById('searchInput').value || '').toLowerCase();
+      var diff = document.getElementById('diffFilter').value || '';
+      var visible = 0;
+      var rows = document.querySelectorAll('.q-row');
+      var chapters = document.querySelectorAll('.chapter-group');
+      rows.forEach(function(r){
+        var match = true;
+        if(kw && r.textContent.toLowerCase().indexOf(kw) === -1) match = false;
+        if(diff && r.getAttribute('data-diff') !== diff) match = false;
+        r.style.display = match ? '' : 'none';
+        if(match) visible++;
+      });
+      chapters.forEach(function(ch){
+        var hasVisible = false;
+        ch.querySelectorAll('.q-row').forEach(function(r){
+          if(r.style.display !== 'none') hasVisible = true;
+        });
+        ch.style.display = hasVisible ? '' : 'none';
+      });
+      document.getElementById('resultCount').textContent = '共 ' + visible + ' 题';
+    }
+
+    function toggleChapter(el){
+      el.classList.toggle('collapsed');
+      el.nextElementSibling.classList.toggle('hidden');
+    }
+
+    function toggleAllChapters(){
+      var headers = document.querySelectorAll('.chapter-header');
+      var allCollapsed = true;
+      headers.forEach(function(h){ if(!h.classList.contains('collapsed')) allCollapsed = false; });
+      headers.forEach(function(h){
+        if(allCollapsed){ h.classList.remove('collapsed'); h.nextElementSibling.classList.remove('hidden'); }
+        else { h.classList.add('collapsed'); h.nextElementSibling.classList.add('hidden'); }
+      });
+    }
+
+    function toggleEdit(qid){
+      var row = document.getElementById('edit-' + qid);
+      if(row.style.display === 'none' || row.style.display === '') row.style.display = '';
+      else row.style.display = 'none';
+    }
+
+    function parseText(){
+      var text = document.getElementById('parseInput').value.trim();
+      var msg = document.getElementById('parseMsg');
+      if(!text){ msg.textContent = '请先粘贴题目文本'; return; }
+
+      var m = {};
+      var kpMatch = text.match(/知识点[：:]\\s*(.+)/);
+      if(kpMatch) m.knowledge_name = kpMatch[1].trim();
+
+      var typeMatch = text.match(/题型[：:]\\s*(.+)/);
+      if(typeMatch) m.type = typeMatch[1].trim();
+
+      var diffMatch = text.match(/难度[：:]\\s*(.+)/);
+      if(diffMatch) m.difficulty = diffMatch[1].trim();
+
+      var stemMatch = text.match(/题干[：:]\\s*([\\s\\S]*?)(?=\\n[A-E]\\.)/);
+      if(!stemMatch) stemMatch = text.match(/题干[：:]\\s*(.+)/);
+      if(stemMatch) m.stem = stemMatch[1].trim();
+
+      var optAMatch = text.match(/A[.、．]\\s*(.+)/);
+      if(optAMatch) m.option_a = optAMatch[1].trim();
+      var optBMatch = text.match(/B[.、．]\\s*(.+)/);
+      if(optBMatch) m.option_b = optBMatch[1].trim();
+      var optCMatch = text.match(/C[.、．]\\s*(.+)/);
+      if(optCMatch) m.option_c = optCMatch[1].trim();
+      var optDMatch = text.match(/D[.、．]\\s*(.+)/);
+      if(optDMatch) m.option_d = optDMatch[1].trim();
+
+      var ansMatch = text.match(/答案[：:]\\s*([A-Da-d])/);
+      if(ansMatch) m.answer = ansMatch[1].toUpperCase();
+
+      var expMatch = text.match(/解析[：:]\\s*([\\s\\S]*?)(?=\\n[A-E]\\.|\\n答案|\\n知识点|$)/);
+      if(!expMatch) expMatch = text.match(/解析[：:]\\s*(.+)/);
+      if(expMatch) m.explanation = expMatch[1].trim();
+
+      var kpIdMatch = (m.knowledge_name || '').match(/^([\\d.]+)/);
+      if(kpIdMatch) m.knowledge_id = kpIdMatch[1];
+
+      var typeMap = {'单选':'single_choice','多选':'multiple_choice','判断':'judge','填空':'blank'};
+      if(m.type && typeMap[m.type]) m.question_type = typeMap[m.type];
+
+      if(m.knowledge_id) setVal('add_knowledge_id', m.knowledge_id);
+      if(m.knowledge_name) setVal('add_knowledge_name', m.knowledge_name);
+      if(m.question_type) setVal('add_question_type', m.question_type);
+      if(m.difficulty) setVal('add_difficulty', m.difficulty);
+      if(m.stem) setVal('add_stem', m.stem);
+      if(m.option_a) setVal('add_option_a', m.option_a);
+      if(m.option_b) setVal('add_option_b', m.option_b);
+      if(m.option_c) setVal('add_option_c', m.option_c);
+      if(m.option_d) setVal('add_option_d', m.option_d);
+      if(m.answer) setVal('add_answer', m.answer);
+      if(m.explanation) setVal('add_explanation', m.explanation);
+
+      msg.textContent = '解析完成，请检查表单';
+      msg.style.color = 'var(--green)';
+      switchTab('add');
+    }
+
+    function setVal(id, val){
+      var el = document.getElementById(id);
+      if(el) el.value = val;
+    }
+
+    function validateAddForm(){
+      var err = document.getElementById('addError');
+      err.style.display = 'none';
+      var a = document.getElementById('add_option_a').value.trim();
+      var b = document.getElementById('add_option_b').value.trim();
+      var c = document.getElementById('add_option_c').value.trim();
+      var d = document.getElementById('add_option_d').value.trim();
+      var fake = ['选项A','选项B','选项C','选项D','OptionA','OptionB','OptionC','OptionD'];
+      if(fake.includes(a) || fake.includes(b) || fake.includes(c) || fake.includes(d)){
+        err.textContent = '不允许保存"选项A/选项B/选项C/选项D"这种假题，请填写真实选项内容';
+        err.style.display = 'block';
+        return false;
+      }
+      var stem = document.getElementById('add_stem').value.trim();
+      if(!stem){ err.textContent = '请输入题干'; err.style.display = 'block'; return false; }
+      return true;
+    }
+    </script>
+    """
+
+    content = content.replace('{total}', str(len(enabled_qs)))
+    content = content.replace('{chapters_html}', chapters_html or '<div class="card"><div class="empty">暂无数据</div></div>')
+
+    return content
+
+def _teacher_v2_resources():
+    return '<div id="resApp"></div><script>\nfunction esc(s){return String(s==null?\'\':s).replace(/[&<>"\']/g,function(c){return{\'&\':\'&amp;\',\'<\':\'&lt;\',\'>\':\'&gt;\',\'"\':\'&quot;\',"\'":\'&#39;\'}[c]})}\nfunction action(r){var t=(r.type||\'\').toLowerCase();if(t===\'pdf\'||t===\'doc\'||t===\'docx\'||t===\'txt\'||t===\'md\')return \'/view/\'+encodeURIComponent(r.name||\'\');if(t===\'mp4\'||t===\'avi\'||t===\'mov\'||t===\'mkv\'||t===\'webm\')return \'/video/\'+encodeURIComponent(r.name||\'\');if(t===\'ppt\'||t===\'pptx\')return \'/ppt/\'+encodeURIComponent(r.name||\'\');return \'/download/\'+encodeURIComponent(r.name||\'\')}\nfunction resourceCard(r,showActions){return \'<div class="res-card"><b>\'+esc(r.title||r.name)+\'</b><div class="pill-row" style="margin-top:8px"><span class="tag">\'+esc(r.type||\'未知\')+\'</span><span class="tag">\'+esc(r.chapter_label||\'\')+\'</span></div><div class="small muted">\'+esc(r.knowledge_point||\'未绑定知识点\')+\'</div>\'+(showActions?\'<div class="actions"><a class="btn light" href="\'+action(r)+\'">预览</a> <a class="btn light" href="/download/\'+encodeURIComponent(r.name||\'\')">下载</a></div>\':\'\')+\'</div>\'}\nasync function getJson(u){try{var r=await fetch(u);return await r.json()}catch(e){return{success:false,resources:[]}}}\nasync function resourcesPage(){const d=await getJson("/teacher/resources/data");const all=d.resources||[];var q=\'\',type=\'全部\',chapter=\'全部\',resTimer=null;function norm(v){return (v||\'\').toLowerCase().replace(/\\s+/g,\'\')}function render(){var list=all.filter(function(r){return (type===\'全部\'||r.type===type||(r.type||\'\')===\'\')&&(chapter===\'全部\'||(r.chapter_label||\'未分类\')===chapter)&&(!q||norm([r.name,r.title,r.knowledge_point,r.chapter_label,r.section_label,r.teacher_name].join(\' \')).indexOf(norm(q))>=0)});var groups={};list.forEach(function(r){var ch=r.chapter_label||\'未分类\',sec=r.subsection||r.section_label||\'未分类\';(groups[ch]||(groups[ch]={}))[sec]=groups[ch][sec]||[];groups[ch][sec].push(r)});var html=\'<h2>资源管理</h2><div class="toolbar"><input id="rq" class="search" placeholder="搜索文件名、知识点、章节、教师" oninput="window._debounceRes()"><select id="rtype" onchange="window._refreshRes()"><option value="全部">全部类型</option><option value="视频">视频</option><option value="PPT">PPT</option><option value="文档">文档</option></select></div>\';var chs=Object.keys(groups).sort(function(a,b){return a.localeCompare(b,\'zh-Hans\',{numeric:true})});if(!chs.length){html+=\'<div class="empty">暂无资源</div>\'}else{chs.forEach(function(chName,i){var sections=groups[chName],totalSec=Object.keys(sections).length,totalRes=0;for(var k in sections){totalRes+=sections[k].length}html+=\'<details class="chapter" \'+(i===0?\'open\':\'\')+\'><summary>\'+esc(chName)+\' · \'+totalSec+\' 节 · \'+totalRes+\' 个资源</summary>\';Object.keys(sections).sort(function(a,b){return a.localeCompare(b,\'zh-Hans\',{numeric:true})}).forEach(function(secName){var items=sections[secName];html+=\'<details class="section" open><summary>\'+esc(secName)+\' · \'+items.length+\'</summary><div class="res-grid" style="padding:12px">\'+items.map(function(r){return resourceCard(r,true)}).join(\'\')+\'</div></details>\'});html+=\'</details>\'});}document.getElementById(\'resApp\').innerHTML=html;document.getElementById(\'rq\').value=q;document.getElementById(\'rtype\').value=type}window._debounceRes=function(){if(resTimer)clearTimeout(resTimer);resTimer=setTimeout(function(){q=document.getElementById(\'rq\').value||\'\';render()},300)};window._refreshRes=function(){type=document.getElementById(\'rtype\').value||\'全部\';render()};resourcesPage()}\n</script>'
+
+
+
+def _teacher_v2_resources():
+    return r'''
+<div id="resApp"><div class="empty">加载资源中...</div></div>
+<script>
+function esc(s){return String(s==null?'':s).replace(/[&<>"']/g,function(c){return {'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]})}
+function norm(s){return String(s==null?'':s).toLowerCase().replace(/\s+/g,'')}
+function action(r){
+  var t=String(r.type||'').toLowerCase(), name=encodeURIComponent(r.name||'');
+  if(t==='pdf'||t==='doc'||t==='docx'||t==='txt'||t==='md'||r.type==='文档')return '/view/'+name;
+  if(t==='mp4'||t==='avi'||t==='mov'||t==='mkv'||t==='webm'||r.type==='视频')return '/video/'+name;
+  if(t==='ppt'||t==='pptx'||r.type==='PPT')return '/ppt/'+name;
+  return '/download/'+name;
+}
+function resourceCard(r){
+  return '<div class="resource" style="background:#f8fbff;border:1px solid #d9e5f6;border-radius:9px;padding:14px">'
+    + '<h4 style="margin:0 0 8px;font-size:15px;line-height:1.45">'+esc(r.title||r.name)+'</h4>'
+    + '<div class="flex-row"><span class="tag">'+esc(r.type||'资源')+'</span><span class="tag">'+esc(r.chapter_label||'未分类')+'</span><span class="tag">'+esc(r.teacher_name||'未标注')+'</span></div>'
+    + '<p class="muted" style="margin:8px 0">'+esc(r.knowledge_point||'未绑定知识点')+'</p>'
+    + '<div class="flex-row"><a class="btn light" href="'+action(r)+'">预览</a><a class="btn light" href="/download/'+encodeURIComponent(r.name||'')+'">下载</a></div>'
+    + '</div>';
+}
+async function resourcesPage(){
+  var app=document.getElementById('resApp');
+  try{
+    var res=await fetch('/teacher/resources/data');
+    if(!res.ok)throw new Error('HTTP '+res.status);
+    var data=await res.json();
+    var all=data.resources||[], q='', type='全部';
+    function render(){
+      var list=all.filter(function(r){
+        var hit=!q||norm([r.name,r.title,r.knowledge_point,r.chapter_label,r.section_label,r.teacher_name,r.type].join(' ')).indexOf(norm(q))>=0;
+        return (type==='全部'||r.type===type)&&hit;
+      });
+      var groups={};
+      list.forEach(function(r){
+        var ch=r.chapter_label||'未分类', sec=r.subsection||r.section_label||'未分类';
+        if(!groups[ch])groups[ch]={};
+        if(!groups[ch][sec])groups[ch][sec]=[];
+        groups[ch][sec].push(r);
+      });
+      var types=Array.from(new Set(all.map(function(r){return r.type||'资源'}))).sort();
+      var html='<div class="card"><h2>资源管理</h2><div class="toolbar">'
+        + '<input id="rq" class="search" placeholder="搜索文件名、知识点、章节、教师">'
+        + '<select id="rtype"><option value="全部">全部类型</option>'+types.map(function(t){return '<option value="'+esc(t)+'">'+esc(t)+'</option>'}).join('')+'</select>'
+        + '</div><div id="resourceList">';
+      var chapters=Object.keys(groups).sort(function(a,b){return a.localeCompare(b,'zh-Hans',{numeric:true})});
+      if(!chapters.length){
+        html+='<div class="empty">暂无资源</div>';
+      }else{
+        chapters.forEach(function(ch,i){
+          var sections=groups[ch], total=Object.keys(sections).reduce(function(n,k){return n+sections[k].length},0);
+          html+='<details class="chapter" '+(i===0?'open':'')+'><summary>'+esc(ch)+' · '+total+' 个资源</summary>';
+          Object.keys(sections).sort(function(a,b){return a.localeCompare(b,'zh-Hans',{numeric:true})}).forEach(function(sec){
+            html+='<details class="section" open><summary>'+esc(sec)+' · '+sections[sec].length+'</summary><div class="resource-list">'+sections[sec].map(resourceCard).join('')+'</div></details>';
+          });
+          html+='</details>';
+        });
+      }
+      html+='</div></div>';
+      app.innerHTML=html;
+      document.getElementById('rq').value=q;
+      document.getElementById('rtype').value=type;
+      document.getElementById('rq').oninput=function(){q=this.value||'';render()};
+      document.getElementById('rtype').onchange=function(){type=this.value||'全部';render()};
+    }
+    render();
+  }catch(e){
+    app.innerHTML='<div class="card"><h2>资源管理</h2><div class="empty">资源加载失败，请刷新页面重试。</div></div>';
+  }
+}
+resourcesPage();
+</script>
+'''
+
+
+def _teacher_v2_graph():
+    return """
+<div id="graphApp"></div>
+<script>
+function esc(s){return String(s==null?'':s).replace(/[&<>"']/g,function(c){return {'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]})}
+function pct(v){return Math.round((+v||0)*100)+'%'}
+async function getJson(u){try{var r=await fetch(u);if(!r.ok)throw new Error(r.status);return await r.json()}catch(e){return{success:false,nodes:[],edges:[],stats:{}}}}
+""" + CIRCLE_GRAPH_LAYOUT_JS + """
+async function graphPage(){
+  var d=await getJson('/teacher/flow-graph/data'),nodes=d.nodes||[],edges=d.edges||[];
+  graphApp.innerHTML='<div class="card"><h2>知识图谱</h2>'+kgLegend()+'<div style="display:grid;grid-template-columns:minmax(0,1fr) 360px;gap:18px;margin-top:14px"><div style="position:relative"><div id="mynetwork" style="height:760px;border:1px solid #e5e7eb;background:#fafafa"></div>'+kgZoomPanel()+'</div><div id="nodeDetail" class="card graph-detail"><b>节点详情</b><p class="muted">单击节点查看掌握度。</p></div></div></div>';
+  if(!nodes.length){mynetwork.innerHTML='<div class="empty">暂无图谱数据</div>';return}
+  if(!window.vis){mynetwork.innerHTML='<div class="empty">图谱库加载失败</div>';return}
+  renderKnowledgeGraph(mynetwork,nodes,edges,nodeDetail,'student');
+}
+graphPage();
+</script>
+"""
+
+def _teacher_v2_discuss():
+    return r'''<div class="card"><h2>问题讨论</h2><div class="toolbar"><input id="discussQ" class="search" placeholder="搜索编号、标题、内容、作者、知识点" oninput="renderDiscuss()"><button class="btn light" onclick="setDiscussMode(&quot;all&quot;)">全部问题</button><button class="btn light" onclick="setDiscussMode(&quot;unsolved&quot;)">未解决</button><button class="btn light" onclick="setDiscussMode(&quot;solved&quot;)">已解决</button></div></div><div class="forum"><div class="card forum-list"><h2>问题列表</h2><div id="discussList"></div></div><div class="card" id="postDetail"><h2>问题详情</h2><p class="muted">点击左侧问题查看详情和回复。</p></div></div>
+<script>
+function esc(s){return String(s==null?'':s).replace(/[&<>"']/g,function(c){return{'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]})}
+function displayKp(s){return String(s==null?'':s)}
+async function getJson(u){try{var r=await fetch(u);return await r.json()}catch(e){return{success:false,posts:[],comments:[],post:{}}}}
+var ALL_POSTS=[],DISC_MODE='all';
+(async function(){var d=await getJson('/student/discuss/list');ALL_POSTS=d.posts||[];renderDiscuss()})();
+function setDiscussMode(mode){DISC_MODE=mode;renderDiscuss()}
+function renderDiscuss(){
+var q=(discussQ&&discussQ.value||'').toLowerCase();
+var list=ALL_POSTS.filter(function(p){
+  var statusOk=DISC_MODE==='all'||(DISC_MODE==='solved'&&p.status==='已解决')||(DISC_MODE==='unsolved'&&p.status!=='已解决');
+  var hit=!q||[p.no,p.title,p.body,p.author,p.knowledge_tag,p.status].join(' ').toLowerCase().includes(q);
+  return statusOk&&hit
+});
+discussList.innerHTML=list.map(function(p){
+  return '<div class="post" onclick="openPost(&quot;'+esc(p.id)+'&quot;)"><div class="post-head"><b>#'+esc(p.no)+' '+esc(p.title)+'</b><span class="tag '+(p.status==='已解决'?'ok':'warn')+'">'+esc(p.status)+'</span></div><div class="muted">'+esc(p.author)+' · '+esc(p.time)+' · '+esc(displayKp(p.knowledge_tag)||'未标注')+' · '+(p.comment_count||0)+' 条回复</div><p>'+esc(p.body||'')+'</p></div>'
+}).join('')||'<div class="empty">暂无讨论</div>'
+}
+async function openPost(id){
+let d=await getJson('/student/discuss/detail/'+encodeURIComponent(id)),p=d.post||{};
+postDetail.innerHTML='<div class="post-head"><h2>#'+esc(p.no)+' '+esc(p.title)+'</h2><span class="tag '+(p.status==='已解决'?'ok':'warn')+'">'+esc(p.status)+'</span></div><p>'+esc(p.body||'')+'</p><div class="muted">'+esc(p.author||'')+' · '+esc(p.time||'')+' · '+esc(displayKp(p.knowledge_tag)||'未标注')+'</div><div class="toolbar"><button class="btn light" onclick="setStatus(&quot;'+esc(id)+'&quot;,&quot;已解决&quot;)">标为已解决</button><button class="btn light" onclick="setStatus(&quot;'+esc(id)+'&quot;,&quot;未解决&quot;)">标为未解决</button><button class="btn danger" onclick="deletePost(&quot;'+esc(id)+'&quot;)">删除此问题</button></div><h3>回复</h3>'+((p.comments||[]).map(function(c){
+  return '<div class="comment"><div class="comment-tools"><b>'+c.floor+'楼 · '+esc(c.author)+'</b><button class="btn light" onclick="replyTo(&quot;'+esc(c.author)+'&quot;)">回复</button><button class="btn danger btn-sm" onclick="deleteComment(&quot;'+esc(id)+'&quot;,&quot;'+esc(c.id)+'&quot;)">删除</button></div><p>'+esc(c.body)+'</p><div class="muted">'+esc(c.time)+'</div></div>'
+}).join('')||'<div class="muted">暂无回复</div>')+'<textarea id="commentBody" style="width:100%" rows="3" placeholder="写下回复"></textarea><button class="btn" onclick="commentPost(&quot;'+esc(id)+'&quot;)">提交回复</button>'
+}
+function replyTo(name){commentBody.value='回复'+name+'：';commentBody.focus()}
+async function setStatus(id,status){
+let d=await fetch('/student/discuss/status/'+encodeURIComponent(id),{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({status:status})}).then(r=>r.json());
+if(d.success){await openPost(id);let fresh=await getJson('/student/discuss/list');ALL_POSTS=fresh.posts||[];renderDiscuss()}
+else alert(d.error||'操作失败')
+}
+async function commentPost(id){
+let body=commentBody.value.trim();
+if(!body)return alert('请填写回复');
+let m=body.match(/^回复([^：:]+)[：:]/),reply=m?m[1]:'';
+let d=await fetch('/student/discuss/comment/'+encodeURIComponent(id),{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({body:body,reply_to:reply})}).then(r=>r.json());
+alert(d.success?'回复成功':(d.error||'回复失败'));
+if(d.success)await openPost(id)
+}
+async function deletePost(id){
+if(!confirm('确认删除此问题？所有评论也将被删除，此操作不可恢复。'))return;
+let d=await fetch('/student/discuss/post/delete/'+encodeURIComponent(id),{method:'POST'}).then(r=>r.json());
+if(d.success){
+  ALL_POSTS=ALL_POSTS.filter(p=>p.id!==id);
+  renderDiscuss();
+  postDetail.innerHTML='<div class="muted">问题已删除。</div>'
+}else alert(d.error||'删除失败')
+}
+async function deleteComment(postId,commentId){
+if(!confirm('确认删除此评论？此操作不可恢复。'))return;
+let d=await fetch('/student/discuss/comment/delete/'+encodeURIComponent(commentId),{method:'POST'}).then(r=>r.json());
+if(d.success)await openPost(postId);
+else alert(d.error||'删除失败')
+}
+</script>'''
+
+def _render_teacher_v2(page_title, active_page, content_func):
+    login_check = _teacher_v2_require_login()
+    if login_check:
+        return login_check
+    teacher_name = session.get("user_name", "教师")
+    page_content = content_func()
+    return render_template_string(
+        TEACHER_V2_LAYOUT,
+        teacher_name=teacher_name,
+        page_title=page_title,
+        active_page=active_page,
+        page_content=page_content
+    )
+
+# ---- V2 Routes ----
+
+@app.route("/teacher/v2")
+def teacher_v2_dashboard():
+    return _render_teacher_v2("教师工作台", "dashboard", _teacher_v2_dashboard)
+
+@app.route("/teacher/v2/manage")
+def teacher_v2_manage():
+    return _render_teacher_v2("学生管理", "manage", _teacher_v2_manage)
+
+@app.route("/teacher/v2/profile")
+def teacher_v2_profile():
+    return _render_teacher_v2("学生画像", "profile", _teacher_v2_profile)
+
+@app.route("/teacher/v2/questions")
+def teacher_v2_questions():
+    return _render_teacher_v2("题库管理", "questions", _teacher_v2_questions)
+
+@app.route("/teacher/v2/resources")
+def teacher_v2_resources():
+    return _render_teacher_v2("资源管理", "resources", _teacher_v2_resources)
+
+@app.route("/teacher/v2/graph")
+def teacher_v2_graph():
+    return _render_teacher_v2("知识图谱", "graph", _teacher_v2_graph)
+
+@app.route("/teacher/v2/discuss")
+def teacher_v2_discuss():
+    return _render_teacher_v2("问题讨论", "discuss", _teacher_v2_discuss)
+
+# ---- V2 Questions CRUD API ----
+
+def _gen_question_id(knowledge_id):
+    import random
+    ts = str(int(time.time() * 1000))[-8:]
+    rn = str(random.randint(100, 999))
+    kp_part = knowledge_id.replace(".", "_") if knowledge_id else "new"
+    return "q_{}_{}{}".format(kp_part, ts, rn)
+
+def _is_fake_question(options):
+    fake = {"选项A", "选项B", "选项C", "选项D", "OptionA", "OptionB", "OptionC", "OptionD"}
+    for opt in options:
+        if opt.strip() in fake:
+            return True
+    return False
+
+@app.route("/teacher/v2/questions/add", methods=["POST"])
+def teacher_v2_questions_add():
+    login_check = _teacher_v2_require_login()
+    if login_check:
+        return login_check
+    knowledge_id = request.form.get("knowledge_id", "").strip()
+    knowledge_name = request.form.get("knowledge_name", "").strip()
+    question_type = request.form.get("question_type", "single_choice").strip()
+    difficulty = request.form.get("difficulty", "中等").strip()
+    stem = request.form.get("stem", "").strip()
+    option_a = request.form.get("option_a", "").strip()
+    option_b = request.form.get("option_b", "").strip()
+    option_c = request.form.get("option_c", "").strip()
+    option_d = request.form.get("option_d", "").strip()
+    answer = request.form.get("answer", "").strip().upper()
+    explanation = request.form.get("explanation", "").strip()
+
+    if not stem:
+        return redirect("/teacher/v2/questions")
+
+    options = [option_a, option_b, option_c, option_d]
+    if _is_fake_question(options):
+        return redirect("/teacher/v2/questions")
+
+    qid = _gen_question_id(knowledge_id)
+    ch_id = ""
+    ch_name = ""
+    if knowledge_id:
+        parts = knowledge_id.split(".")
+        if len(parts) >= 1:
+            ch_id = parts[0]
+            ch_name = "第{}章".format(parts[0])
+
+    new_q = {
+        "id": qid,
+        "knowledge_point": knowledge_name,
+        "difficulty": difficulty,
+        "type": question_type,
+        "question": stem,
+        "options": options,
+        "answer": answer,
+        "explanation": explanation,
+        "is_key": False,
+        "title": stem,
+        "question_text": stem,
+        "analysis": explanation,
+        "knowledge_id": knowledge_id,
+        "knowledge_name": knowledge_name,
+        "chapter_id": ch_id,
+        "chapter_name": ch_name,
+        "status": "enabled",
+        "total_attempts": 0,
+        "correct_attempts": 0,
+        "wrong_attempts": 0,
+        "global_correct_rate": 0,
+    }
+
+    data = _teacher_v2_load_json("questions.json") or {"questions": []}
+    qs = data.get("questions", [])
+    qs.append(new_q)
+    data["questions"] = qs
+    save_questions(data)
+    return redirect("/teacher/v2/questions")
+
+@app.route("/teacher/v2/questions/update", methods=["POST"])
+def teacher_v2_questions_update():
+    login_check = _teacher_v2_require_login()
+    if login_check:
+        return login_check
+    qid = request.form.get("qid", "").strip()
+    knowledge_id = request.form.get("knowledge_id", "").strip()
+    knowledge_name = request.form.get("knowledge_name", "").strip()
+    question_type = request.form.get("question_type", "single_choice").strip()
+    difficulty = request.form.get("difficulty", "中等").strip()
+    stem = request.form.get("stem", "").strip()
+    option_a = request.form.get("option_a", "").strip()
+    option_b = request.form.get("option_b", "").strip()
+    option_c = request.form.get("option_c", "").strip()
+    option_d = request.form.get("option_d", "").strip()
+    answer = request.form.get("answer", "").strip().upper()
+    explanation = request.form.get("explanation", "").strip()
+
+    if not qid or not stem:
+        return redirect("/teacher/v2/questions")
+
+    data = _teacher_v2_load_json("questions.json") or {"questions": []}
+    qs = data.get("questions", [])
+    for q in qs:
+        if q.get("id") == qid:
+            q["knowledge_id"] = knowledge_id
+            q["knowledge_name"] = knowledge_name
+            q["knowledge_point"] = knowledge_name
+            q["type"] = question_type
+            q["difficulty"] = difficulty
+            q["question"] = stem
+            q["title"] = stem
+            q["question_text"] = stem
+            q["options"] = [option_a, option_b, option_c, option_d]
+            q["answer"] = answer
+            q["explanation"] = explanation
+            q["analysis"] = explanation
+            break
+    save_questions(data)
+    return redirect("/teacher/v2/questions")
+
+@app.route("/teacher/v2/questions/delete", methods=["POST"])
+def teacher_v2_questions_delete():
+    login_check = _teacher_v2_require_login()
+    if login_check:
+        return login_check
+    qid = request.form.get("qid", "").strip()
+    if not qid:
+        return redirect("/teacher/v2/questions")
+
+    data = _teacher_v2_load_json("questions.json") or {"questions": []}
+    qs = data.get("questions", [])
+    for q in qs:
+        if q.get("id") == qid:
+            q["status"] = "deleted"
+            break
+    save_questions(data)
+    return redirect("/teacher/v2/questions")
+
+# ---- Old route redirects to V2 ----
+
+@app.route("/teacher/dashboard")
+def teacher_dashboard_redirect():
+    return redirect("/teacher/v2")
+
+# /teacher/graph is a new route, so the decorator is fine
+@app.route("/teacher/graph")
+def teacher_graph_redirect():
+    return redirect("/teacher/v2/graph")
+
+# Override old route handlers via view_functions (since existing routes take priority over decorators)
+app.view_functions["teacher_manage"] = lambda: redirect("/teacher/v2/manage") if session.get("role") == "teacher" else redirect(url_for("login"))
+app.view_functions["teacher_students"] = lambda: redirect("/teacher/v2/profile") if session.get("role") == "teacher" else redirect(url_for("login"))
+app.view_functions["teacher_tools"] = lambda: redirect("/teacher/v2") if session.get("role") == "teacher" else redirect(url_for("login"))
+app.view_functions["teacher_questions"] = lambda: redirect("/teacher/v2/questions") if session.get("role") == "teacher" else redirect(url_for("login"))
+app.view_functions["teacher_resources"] = lambda: redirect("/teacher/v2/resources") if session.get("role") == "teacher" else redirect(url_for("login"))
+app.view_functions["teacher_discuss"] = lambda: redirect("/teacher/v2/discuss") if session.get("role") == "teacher" else redirect(url_for("login"))
+
 
 if __name__ == "__main__":
     app.run(debug=True)

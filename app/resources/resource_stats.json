@@ -1,0 +1,144 @@
+{
+  "1.2_操作系统的形成和发展_张老师.mp4": {
+    "use_count": 0,
+    "complete_count": 1,
+    "post_practice_count": 0,
+    "post_practice_correct_rate": 0,
+    "avg_score_gain": 0,
+    "avg_mastery_gain": 0,
+    "completion_rate": 1.0,
+    "effectiveness_score": 0.2,
+    "recommend_score": 0.32
+  },
+  "1.6.2_UNIX技术特性_张老师.mp4": {
+    "use_count": 0,
+    "complete_count": 0,
+    "post_practice_count": 3,
+    "post_practice_correct_rate": 1.0,
+    "avg_mastery_gain": 0.144,
+    "avg_score_gain": 1.0,
+    "effectiveness_score": 0.752,
+    "recommend_score": 0.451
+  },
+  "1.6.3_Linux技术特性_张老师.mp4": {
+    "use_count": 0,
+    "complete_count": 1,
+    "post_practice_count": 1,
+    "post_practice_correct_rate": 1.0,
+    "avg_mastery_gain": 0.354,
+    "avg_score_gain": 1.0,
+    "effectiveness_score": 1.0,
+    "recommend_score": 0.8,
+    "completion_rate": 1.0
+  },
+  "teaching_materials/1.1.1_基本概念_张老师.mp4": {
+    "use_count": 0,
+    "complete_count": 1,
+    "post_practice_count": 15,
+    "post_practice_correct_rate": 1.0,
+    "avg_score_gain": 0.808,
+    "avg_mastery_gain": 0.126,
+    "completion_rate": 1.0,
+    "effectiveness_score": 0.828,
+    "recommend_score": 0.697
+  },
+  "1.1.1_基本概念_张老师.pptx": {
+    "use_count": 4,
+    "complete_count": 1,
+    "completion_rate": 0.25,
+    "effectiveness_score": 0.05,
+    "recommend_score": 0.12
+  },
+  "1.1.1_基本概念_李老师.pptx": {
+    "use_count": 2,
+    "complete_count": 1,
+    "completion_rate": 0.5,
+    "post_practice_count": 1,
+    "post_practice_correct_rate": 1.0,
+    "avg_mastery_gain": 0.004,
+    "avg_score_gain": 1.0,
+    "effectiveness_score": 0.558,
+    "recommend_score": 0.455
+  },
+  "1.1.2_计算机系统的视图_张老师.pptx": {
+    "use_count": 2,
+    "complete_count": 0,
+    "effectiveness_score": 0.0,
+    "recommend_score": 0.02
+  },
+  "3.2.1_进程同步概念_陈老师.mp4": {
+    "use_count": 0,
+    "complete_count": 1,
+    "post_practice_count": 0,
+    "post_practice_correct_rate": 0,
+    "avg_score_gain": 0,
+    "avg_mastery_gain": 0,
+    "completion_rate": 1.0,
+    "effectiveness_score": 0.2,
+    "recommend_score": 0.32
+  },
+  "1.1.2_计算机系统的视图_张老师.mp4": {
+    "use_count": 0,
+    "complete_count": 1,
+    "post_practice_count": 0,
+    "post_practice_correct_rate": 0,
+    "avg_score_gain": 0,
+    "avg_mastery_gain": 0,
+    "completion_rate": 1.0,
+    "effectiveness_score": 0.2,
+    "recommend_score": 0.32
+  },
+  "3.4.7_活锁_张老师.pptx": {
+    "use_count": 0,
+    "complete_count": 1,
+    "post_practice_count": 0,
+    "post_practice_correct_rate": 0,
+    "avg_score_gain": 0,
+    "avg_mastery_gain": 0,
+    "completion_rate": 1.0,
+    "effectiveness_score": 0.2,
+    "recommend_score": 0.32
+  },
+  "3.4.1_死锁的概念_陈老师.mp4": {
+    "use_count": 0,
+    "complete_count": 1,
+    "post_practice_count": 0,
+    "post_practice_correct_rate": 0,
+    "avg_score_gain": 0,
+    "avg_mastery_gain": 0,
+    "completion_rate": 1.0,
+    "effectiveness_score": 0.2,
+    "recommend_score": 0.32
+  },
+  "teaching_materials/1.1.1_基本概念_陈老师.mp4": {
+    "use_count": 0,
+    "complete_count": 1,
+    "post_practice_count": 0,
+    "post_practice_correct_rate": 0,
+    "avg_score_gain": 0,
+    "avg_mastery_gain": 0,
+    "completion_rate": 1.0
+  },
+  "1.1.3_操作系统的基本功能_李老师.pptx": {
+    "use_count": 0,
+    "complete_count": 1,
+    "post_practice_count": 0,
+    "post_practice_correct_rate": 0,
+    "avg_score_gain": 0,
+    "avg_mastery_gain": 0,
+    "completion_rate": 1.0,
+    "effectiveness_score": 0.2,
+    "recommend_score": 0.32
+  },
+  "1.1.3_操作系统的基本功能_李老师.mp4": {
+    "use_count": 0,
+    "complete_count": 1,
+    "post_practice_count": 0,
+    "post_practice_correct_rate": 0,
+    "avg_score_gain": 0,
+    "avg_mastery_gain": 0,
+    "completion_rate": 1.0,
+    "effectiveness_score": 0.2,
+    "recommend_score": 0.32
+  }
+}

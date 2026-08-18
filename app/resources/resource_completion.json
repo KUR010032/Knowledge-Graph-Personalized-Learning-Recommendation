@@ -1,0 +1,5162 @@
+{
+  "3220602001": {
+    "1.2.2": {
+      "completed": true,
+      "completed_at": "2026-05-28",
+      "progress": 0.909206266900215
+    },
+    "1.3.1": {
+      "completed": true,
+      "completed_at": "2026-05-22",
+      "progress": 0.9032288212454734
+    },
+    "2.2.2": {
+      "completed": true,
+      "completed_at": "2026-05-09",
+      "progress": 0.98302765001852
+    },
+    "3.4.6": {
+      "completed": true,
+      "completed_at": "2026-03-15",
+      "progress": 0.9945767016965895
+    },
+    "2.1.2": {
+      "completed": true,
+      "completed_at": "2026-05-26",
+      "progress": 0.9014056471677955
+    },
+    "3.1.1": {
+      "completed": true,
+      "completed_at": "2026-03-09",
+      "progress": 0.8722175573199532
+    },
+    "1.5.1": {
+      "completed": true,
+      "completed_at": "2026-05-03",
+      "progress": 0.9952720495697212
+    },
+    "3.4.1": {
+      "completed": true,
+      "completed_at": "2026-05-28",
+      "progress": 0.9853308805940291
+    },
+    "2.3.4": {
+      "completed": true,
+      "completed_at": "2026-05-12",
+      "progress": 0.8231776612418585
+    },
+    "3.4.3": {
+      "completed": true,
+      "completed_at": "2026-03-21",
+      "progress": 0.9654241989170007
+    },
+    "2.2.1": {
+      "completed": true,
+      "completed_at": "2026-04-10",
+      "progress": 0.950356812645467
+    },
+    "3.4.7": {
+      "completed": true,
+      "completed_at": "2026-05-10",
+      "progress": 0.9621594122701393
+    },
+    "2.3.1": {
+      "completed": true,
+      "completed_at": "2026-04-14",
+      "progress": 0.9500955249756946
+    },
+    "1.1.4": {
+      "completed": true,
+      "completed_at": "2026-05-08",
+      "progress": 0.878307270023069
+    },
+    "2.4.2": {
+      "completed": true,
+      "completed_at": "2026-03-28",
+      "progress": 0.9007414120699377
+    },
+    "2.2.3": {
+      "completed": true,
+      "completed_at": "2026-04-01",
+      "progress": 0.8606124556939526
+    },
+    "3.4.5": {
+      "completed": true,
+      "completed_at": "2026-03-23",
+      "progress": 0.8328074279320924
+    },
+    "3.3.1": {
+      "completed": true,
+      "completed_at": "2026-04-25",
+      "progress": 0.8246251935599916
+    },
+    "2.3.2": {
+      "completed": true,
+      "completed_at": "2026-05-06",
+      "progress": 0.8725547016004052
+    },
+    "1.1.2": {
+      "completed": true,
+      "completed_at": "2026-04-26",
+      "progress": 0.9019107031601814
+    },
+    "2.4.1": {
+      "completed": true,
+      "completed_at": "2026-03-24",
+      "progress": 0.9912913130779573
+    },
+    "1.4.1": {
+      "completed": true,
+      "completed_at": "2026-03-08",
+      "progress": 0.995691777552785
+    },
+    "3.4.4": {
+      "completed": true,
+      "completed_at": "2026-04-17",
+      "progress": 0.823964415163606
+    },
+    "1.6.3": {
+      "completed": true,
+      "completed_at": "2026-03-25",
+      "progress": 0.9854477250831182
+    },
+    "1.6.2": {
+      "completed": true,
+      "completed_at": "2026-05-22",
+      "progress": 0.8889048620857406
+    },
+    "1.1.1": {
+      "completed": true,
+      "completed_at": "2026-05-22",
+      "progress": 0.8662098811312959
+    },
+    "3.1.2": {
+      "completed": true,
+      "completed_at": "2026-05-26",
+      "progress": 0.9714856982166852
+    },
+    "1.1.3": {
+      "completed": true,
+      "completed_at": "2026-05-14",
+      "progress": 0.9267980131239101
+    },
+    "2.3.3": {
+      "completed": true,
+      "completed_at": "2026-05-09",
+      "progress": 0.8748652654138802
+    },
+    "3.2.2": {
+      "completed": true,
+      "completed_at": "2026-04-02",
+      "progress": 0.8732051631244697
+    },
+    "3.4.2": {
+      "completed": true,
+      "completed_at": "2026-05-19",
+      "progress": 0.8931801172699814
+    },
+    "1.2.1": {
+      "completed": true,
+      "completed_at": "2026-03-27",
+      "progress": 0.9530784895468633
+    },
+    "1.6.1": {
+      "completed": true,
+      "completed_at": "2026-05-03",
+      "progress": 0.9580182864109061
+    },
+    "2.1.1": {
+      "completed": true,
+      "completed_at": "2026-05-22",
+      "progress": 0.9249138422501519
+    },
+    "3.2.1": {
+      "completed": true,
+      "completed_at": "2026-05-11",
+      "progress": 0.9550985394878687
+    },
+    "1.2.3": {
+      "completed": true,
+      "completed_at": "2026-04-06",
+      "progress": 0.9698084908269349
+    },
+    "2.4.3": {
+      "completed": true,
+      "completed_at": "2026-05-05",
+      "progress": 0.92227789676022
+    }
+  },
+  "3220602004": {
+    "1.1.3": {
+      "completed": true,
+      "completed_at": "2026-03-21",
+      "progress": 0.8148551977283278
+    },
+    "1.6.2": {
+      "completed": true,
+      "completed_at": "2026-03-20",
+      "progress": 0.9950153959684034
+    },
+    "2.4.2": {
+      "completed": true,
+      "completed_at": "2026-05-12",
+      "progress": 0.9932667374476396
+    },
+    "2.3.1": {
+      "completed": true,
+      "completed_at": "2026-04-27",
+      "progress": 0.8953993675036801
+    },
+    "2.4.1": {
+      "completed": true,
+      "completed_at": "2026-04-07",
+      "progress": 0.826513938002904
+    },
+    "2.3.3": {
+      "completed": true,
+      "completed_at": "2026-04-21",
+      "progress": 0.9660793306222559
+    },
+    "3.3.1": {
+      "completed": true,
+      "completed_at": "2026-04-28",
+      "progress": 0.882797359118255
+    },
+    "1.6.1": {
+      "completed": true,
+      "completed_at": "2026-03-12",
+      "progress": 0.9381450301753735
+    },
+    "3.1.2": {
+      "completed": true,
+      "completed_at": "2026-05-28",
+      "progress": 0.9675589538704621
+    },
+    "1.5.1": {
+      "completed": true,
+      "completed_at": "2026-04-26",
+      "progress": 0.9115008588717034
+    },
+    "1.2.1": {
+      "completed": true,
+      "completed_at": "2026-04-07",
+      "progress": 0.8993644301334988
+    },
+    "1.2.2": {
+      "completed": true,
+      "completed_at": "2026-04-02",
+      "progress": 0.8473531971021716
+    },
+    "1.1.2": {
+      "completed": true,
+      "completed_at": "2026-03-07",
+      "progress": 0.8827637216347056
+    },
+    "3.4.1": {
+      "completed": true,
+      "completed_at": "2026-03-28",
+      "progress": 0.9033028772882575
+    },
+    "3.2.1": {
+      "completed": true,
+      "completed_at": "2026-05-23",
+      "progress": 0.8107806729189663
+    },
+    "2.2.2": {
+      "completed": true,
+      "completed_at": "2026-04-21",
+      "progress": 0.9022719479426627
+    },
+    "2.1.2": {
+      "completed": true,
+      "completed_at": "2026-03-22",
+      "progress": 0.8912758593761503
+    },
+    "3.1.1": {
+      "completed": true,
+      "completed_at": "2026-05-09",
+      "progress": 0.9815732255025853
+    },
+    "3.4.4": {
+      "completed": true,
+      "completed_at": "2026-03-11",
+      "progress": 0.8452759950865405
+    },
+    "1.1.4": {
+      "completed": true,
+      "completed_at": "2026-03-18",
+      "progress": 0.9253610708589509
+    },
+    "2.3.2": {
+      "completed": true,
+      "completed_at": "2026-04-11",
+      "progress": 0.9092390005674462
+    },
+    "1.6.3": {
+      "completed": true,
+      "completed_at": "2026-03-06",
+      "progress": 0.9013674728784533
+    },
+    "1.3.1": {
+      "completed": true,
+      "completed_at": "2026-05-16",
+      "progress": 0.8780533011761621
+    },
+    "2.2.3": {
+      "completed": true,
+      "completed_at": "2026-03-15",
+      "progress": 0.8313776708575201
+    },
+    "2.1.1": {
+      "completed": true,
+      "completed_at": "2026-04-14",
+      "progress": 0.8115900978601659
+    },
+    "3.4.5": {
+      "completed": true,
+      "completed_at": "2026-03-10",
+      "progress": 0.8179749906063876
+    },
+    "2.3.4": {
+      "completed": true,
+      "completed_at": "2026-04-28",
+      "progress": 0.9121752752994035
+    },
+    "2.2.1": {
+      "completed": true,
+      "completed_at": "2026-05-06",
+      "progress": 0.960846262467113
+    },
+    "3.4.2": {
+      "completed": true,
+      "completed_at": "2026-04-01",
+      "progress": 0.9680812466675099
+    },
+    "1.1.1": {
+      "completed": true,
+      "completed_at": "2026-04-03",
+      "progress": 0.8953577087617128
+    },
+    "1.2.3": {
+      "completed": true,
+      "completed_at": "2026-05-19",
+      "progress": 0.853847838448772
+    },
+    "3.4.6": {
+      "completed": true,
+      "completed_at": "2026-05-23",
+      "progress": 0.9131509876920293
+    },
+    "3.4.3": {
+      "completed": true,
+      "completed_at": "2026-04-11",
+      "progress": 0.8030189213826667
+    },
+    "2.4.3": {
+      "completed": true,
+      "completed_at": "2026-03-20",
+      "progress": 0.8953482032563236
+    },
+    "1.4.1": {
+      "completed": true,
+      "completed_at": "2026-04-09",
+      "progress": 0.9897185082152226
+    },
+    "3.4.7": {
+      "completed": true,
+      "completed_at": "2026-04-02",
+      "progress": 0.9603694647032989
+    },
+    "3.2.2": {
+      "completed": true,
+      "completed_at": "2026-05-16",
+      "progress": 0.9320018604316683
+    }
+  },
+  "3220602006": {
+    "1.6.2": {
+      "completed": true,
+      "completed_at": "2026-04-28",
+      "progress": 0.9692796011695414
+    },
+    "2.3.3": {
+      "completed": true,
+      "completed_at": "2026-05-11",
+      "progress": 0.8364764732636403
+    },
+    "2.1.2": {
+      "completed": true,
+      "completed_at": "2026-04-21",
+      "progress": 0.8060203504429514
+    },
+    "2.3.1": {
+      "completed": true,
+      "completed_at": "2026-03-15",
+      "progress": 0.9120281380530374
+    },
+    "3.1.2": {
+      "completed": true,
+      "completed_at": "2026-05-24",
+      "progress": 0.836901043435681
+    },
+    "1.2.3": {
+      "completed": true,
+      "completed_at": "2026-03-12",
+      "progress": 0.9104925901649017
+    },
+    "1.1.4": {
+      "completed": true,
+      "completed_at": "2026-03-08",
+      "progress": 0.9849224344344107
+    }
+  },
+  "3220602002": {
+    "3.4.3": {
+      "completed": true,
+      "completed_at": "2026-03-11",
+      "progress": 0.943380524033534
+    },
+    "2.1.2": {
+      "completed": true,
+      "completed_at": "2026-03-23",
+      "progress": 0.8839553345587322
+    },
+    "2.4.1": {
+      "completed": true,
+      "completed_at": "2026-03-12",
+      "progress": 0.8190981598021229
+    },
+    "1.6.3": {
+      "completed": true,
+      "completed_at": "2026-05-08",
+      "progress": 0.8355991058821525
+    },
+    "1.3.1": {
+      "completed": true,
+      "completed_at": "2026-05-09",
+      "progress": 0.8043992576416031
+    },
+    "1.2.1": {
+      "completed": true,
+      "completed_at": "2026-05-24",
+      "progress": 0.8194511438301482
+    },
+    "2.4.3": {
+      "completed": true,
+      "completed_at": "2026-04-24",
+      "progress": 0.8560902566324217
+    },
+    "2.1.1": {
+      "completed": true,
+      "completed_at": "2026-04-20",
+      "progress": 0.8040560219785821
+    },
+    "2.3.3": {
+      "completed": true,
+      "completed_at": "2026-03-17",
+      "progress": 0.9985287183003942
+    },
+    "2.3.2": {
+      "completed": true,
+      "completed_at": "2026-03-11",
+      "progress": 0.8450242699701437
+    },
+    "1.6.1": {
+      "completed": true,
+      "completed_at": "2026-04-07",
+      "progress": 0.9477353426015945
+    },
+    "3.2.2": {
+      "completed": true,
+      "completed_at": "2026-04-14",
+      "progress": 0.8218268116577152
+    },
+    "2.3.4": {
+      "completed": true,
+      "completed_at": "2026-05-12",
+      "progress": 0.8312607141659974
+    },
+    "1.1.4": {
+      "completed": true,
+      "completed_at": "2026-04-21",
+      "progress": 0.9418741331700233
+    },
+    "1.6.2": {
+      "completed": true,
+      "completed_at": "2026-03-08",
+      "progress": 0.9863093633361306
+    },
+    "3.4.2": {
+      "completed": true,
+      "completed_at": "2026-03-10",
+      "progress": 0.9756968089225958
+    },
+    "3.4.1": {
+      "completed": true,
+      "completed_at": "2026-03-05",
+      "progress": 0.8829615186631848
+    },
+    "1.2.3": {
+      "completed": true,
+      "completed_at": "2026-05-19",
+      "progress": 0.8266489295260382
+    },
+    "1.4.1": {
+      "completed": true,
+      "completed_at": "2026-04-12",
+      "progress": 0.907905688428332
+    },
+    "3.1.2": {
+      "completed": true,
+      "completed_at": "2026-03-11",
+      "progress": 0.9892364183605348
+    },
+    "1.1.2": {
+      "completed": true,
+      "completed_at": "2026-03-16",
+      "progress": 0.8479729764711742
+    },
+    "3.3.1": {
+      "completed": true,
+      "completed_at": "2026-03-28",
+      "progress": 0.9926246400566425
+    },
+    "1.1.1": {
+      "completed": true,
+      "completed_at": "2026-05-20",
+      "progress": 0.8819956821022312
+    },
+    "2.2.3": {
+      "completed": true,
+      "completed_at": "2026-05-18",
+      "progress": 0.8647708153842132
+    },
+    "3.4.4": {
+      "completed": true,
+      "completed_at": "2026-03-23",
+      "progress": 0.9851821816105629
+    },
+    "3.4.7": {
+      "completed": true,
+      "completed_at": "2026-05-09",
+      "progress": 0.8650086205533274
+    },
+    "2.2.2": {
+      "completed": true,
+      "completed_at": "2026-04-17",
+      "progress": 0.9258675841210262
+    },
+    "2.4.2": {
+      "completed": true,
+      "completed_at": "2026-04-15",
+      "progress": 0.8103277488959082
+    },
+    "3.4.5": {
+      "completed": true,
+      "completed_at": "2026-05-28",
+      "progress": 0.8430448038550609
+    },
+    "3.2.1": {
+      "completed": true,
+      "completed_at": "2026-03-20",
+      "progress": 0.874960859852502
+    },
+    "1.5.1": {
+      "completed": true,
+      "completed_at": "2026-05-22",
+      "progress": 0.9179496443703066
+    },
+    "2.3.1": {
+      "completed": true,
+      "completed_at": "2026-04-19",
+      "progress": 0.8207494201964548
+    },
+    "3.4.6": {
+      "completed": true,
+      "completed_at": "2026-05-08",
+      "progress": 0.9188754733613159
+    },
+    "3.1.1": {
+      "completed": true,
+      "completed_at": "2026-04-28",
+      "progress": 0.851354343919033
+    },
+    "2.2.1": {
+      "completed": true,
+      "completed_at": "2026-05-25",
+      "progress": 0.9952792102215839
+    },
+    "1.2.2": {
+      "completed": true,
+      "completed_at": "2026-04-20",
+      "progress": 0.8435332730486234
+    },
+    "1.1.3": {
+      "completed": true,
+      "completed_at": "2026-04-21",
+      "progress": 0.938970696260029
+    }
+  },
+  "3220602003": {
+    "2.3.4": {
+      "completed": true,
+      "completed_at": "2026-05-21",
+      "progress": 0.9511422339365383
+    },
+    "3.3.1": {
+      "completed": true,
+      "completed_at": "2026-04-17",
+      "progress": 0.8110049636848846
+    },
+    "3.4.3": {
+      "completed": true,
+      "completed_at": "2026-03-02",
+      "progress": 0.8569771341369173
+    },
+    "2.2.2": {
+      "completed": true,
+      "completed_at": "2026-03-17",
+      "progress": 0.9309281328967323
+    },
+    "3.4.4": {
+      "completed": true,
+      "completed_at": "2026-04-09",
+      "progress": 0.9395951670220346
+    },
+    "1.1.4": {
+      "completed": true,
+      "completed_at": "2026-04-09",
+      "progress": 0.8631850374597532
+    },
+    "2.4.2": {
+      "completed": true,
+      "completed_at": "2026-03-25",
+      "progress": 0.998258790139951
+    },
+    "3.1.1": {
+      "completed": true,
+      "completed_at": "2026-05-05",
+      "progress": 0.869822794803888
+    },
+    "1.2.2": {
+      "completed": true,
+      "completed_at": "2026-04-05",
+      "progress": 0.8178775354821015
+    },
+    "3.4.6": {
+      "completed": true,
+      "completed_at": "2026-05-03",
+      "progress": 0.9125687102679777
+    },
+    "2.4.3": {
+      "completed": true,
+      "completed_at": "2026-04-03",
+      "progress": 0.9916332466618956
+    },
+    "1.3.1": {
+      "completed": true,
+      "completed_at": "2026-03-01",
+      "progress": 0.9136530418284735
+    },
+    "1.1.2": {
+      "completed": true,
+      "completed_at": "2026-04-24",
+      "progress": 0.9372535790192629
+    },
+    "2.2.1": {
+      "completed": true,
+      "completed_at": "2026-03-13",
+      "progress": 0.8707199154770265
+    },
+    "3.4.1": {
+      "completed": true,
+      "completed_at": "2026-05-21",
+      "progress": 0.9871717603992798
+    },
+    "3.4.2": {
+      "completed": true,
+      "completed_at": "2026-03-14",
+      "progress": 0.8682864268969022
+    },
+    "1.5.1": {
+      "completed": true,
+      "completed_at": "2026-03-10",
+      "progress": 0.9611060864234607
+    },
+    "1.6.3": {
+      "completed": true,
+      "completed_at": "2026-03-22",
+      "progress": 0.9755896789827122
+    },
+    "1.6.1": {
+      "completed": true,
+      "completed_at": "2026-03-28",
+      "progress": 0.8000315561993118
+    },
+    "3.1.2": {
+      "completed": true,
+      "completed_at": "2026-05-17",
+      "progress": 0.9084322553108312
+    },
+    "1.2.1": {
+      "completed": true,
+      "completed_at": "2026-05-21",
+      "progress": 0.9947741835099215
+    },
+    "2.1.1": {
+      "completed": true,
+      "completed_at": "2026-04-21",
+      "progress": 0.8842708517586823
+    },
+    "1.1.1": {
+      "completed": true,
+      "completed_at": "2026-05-26",
+      "progress": 0.8213622351114467
+    },
+    "2.4.1": {
+      "completed": true,
+      "completed_at": "2026-03-15",
+      "progress": 0.9793111509759702
+    },
+    "2.2.3": {
+      "completed": true,
+      "completed_at": "2026-03-06",
+      "progress": 0.8357504032657634
+    },
+    "2.3.2": {
+      "completed": true,
+      "completed_at": "2026-04-11",
+      "progress": 0.9884200423231879
+    },
+    "1.4.1": {
+      "completed": true,
+      "completed_at": "2026-04-26",
+      "progress": 0.9158915191361521
+    },
+    "3.4.7": {
+      "completed": true,
+      "completed_at": "2026-05-22",
+      "progress": 0.8379812822910888
+    },
+    "3.2.1": {
+      "completed": true,
+      "completed_at": "2026-04-19",
+      "progress": 0.8463288133666126
+    },
+    "1.2.3": {
+      "completed": true,
+      "completed_at": "2026-04-18",
+      "progress": 0.9117087380168583
+    },
+    "2.3.1": {
+      "completed": true,
+      "completed_at": "2026-05-02",
+      "progress": 0.9442201911379764
+    },
+    "3.4.5": {
+      "completed": true,
+      "completed_at": "2026-04-07",
+      "progress": 0.8286247498742338
+    },
+    "2.1.2": {
+      "completed": true,
+      "completed_at": "2026-04-28",
+      "progress": 0.9848855658501285
+    },
+    "3.2.2": {
+      "completed": true,
+      "completed_at": "2026-05-28",
+      "progress": 0.8144275361163404
+    },
+    "1.1.3": {
+      "completed": true,
+      "completed_at": "2026-05-20",
+      "progress": 0.9444520474087854
+    },
+    "2.3.3": {
+      "completed": true,
+      "completed_at": "2026-03-15",
+      "progress": 0.9914858169430798
+    },
+    "1.6.2": {
+      "completed": true,
+      "completed_at": "2026-04-08",
+      "progress": 0.8176808552405375
+    }
+  },
+  "3220602005": {
+    "1.6.1": {
+      "completed": true,
+      "completed_at": "2026-04-28",
+      "progress": 0.954514857773958
+    },
+    "2.3.3": {
+      "completed": true,
+      "completed_at": "2026-05-02",
+      "progress": 0.8648323113711438
+    },
+    "1.6.3": {
+      "completed": true,
+      "completed_at": "2026-05-12",
+      "progress": 0.9784049962731096
+    },
+    "3.3.1": {
+      "completed": true,
+      "completed_at": "2026-05-22",
+      "progress": 0.9267131055696222
+    },
+    "3.4.6": {
+      "completed": true,
+      "completed_at": "2026-05-15",
+      "progress": 0.9988212149892982
+    },
+    "2.1.2": {
+      "completed": true,
+      "completed_at": "2026-03-09",
+      "progress": 0.8288194155224348
+    },
+    "1.2.3": {
+      "completed": true,
+      "completed_at": "2026-03-23",
+      "progress": 0.8875981865956429
+    },
+    "3.4.7": {
+      "completed": true,
+      "completed_at": "2026-04-14",
+      "progress": 0.9186435680331874
+    },
+    "2.2.3": {
+      "completed": true,
+      "completed_at": "2026-04-16",
+      "progress": 0.9430528420948614
+    },
+    "3.4.4": {
+      "completed": true,
+      "completed_at": "2026-03-27",
+      "progress": 0.8746484605790809
+    },
+    "1.1.4": {
+      "completed": true,
+      "completed_at": "2026-04-19",
+      "progress": 0.8784682726593231
+    },
+    "2.4.1": {
+      "completed": true,
+      "completed_at": "2026-03-27",
+      "progress": 0.9850759170738665
+    },
+    "1.6.2": {
+      "completed": true,
+      "completed_at": "2026-03-06",
+      "progress": 0.909566668621054
+    },
+    "2.3.4": {
+      "completed": true,
+      "completed_at": "2026-04-07",
+      "progress": 0.9905727844723273
+    },
+    "1.1.3": {
+      "completed": true,
+      "completed_at": "2026-04-27",
+      "progress": 0.8254132229228206
+    },
+    "3.4.3": {
+      "completed": true,
+      "completed_at": "2026-05-01",
+      "progress": 0.8721541828747508
+    },
+    "1.5.1": {
+      "completed": true,
+      "completed_at": "2026-03-05",
+      "progress": 0.8231736949131684
+    },
+    "2.3.1": {
+      "completed": true,
+      "completed_at": "2026-05-27",
+      "progress": 0.9799902436373883
+    },
+    "1.4.1": {
+      "completed": true,
+      "completed_at": "2026-04-06",
+      "progress": 0.9206002509362113
+    },
+    "1.1.2": {
+      "completed": true,
+      "completed_at": "2026-05-13",
+      "progress": 0.9044916996816299
+    },
+    "1.1.1": {
+      "completed": true,
+      "completed_at": "2026-05-06",
+      "progress": 0.8955166134668182
+    },
+    "2.2.1": {
+      "completed": true,
+      "completed_at": "2026-04-06",
+      "progress": 0.9047095530685436
+    },
+    "1.2.1": {
+      "completed": true,
+      "completed_at": "2026-03-21",
+      "progress": 0.9616034839533946
+    },
+    "2.1.1": {
+      "completed": true,
+      "completed_at": "2026-03-13",
+      "progress": 0.9084334348508634
+    },
+    "3.4.1": {
+      "completed": true,
+      "completed_at": "2026-05-22",
+      "progress": 0.8582468066969453
+    },
+    "1.3.1": {
+      "completed": true,
+      "completed_at": "2026-04-27",
+      "progress": 0.8005978519178687
+    },
+    "3.1.1": {
+      "completed": true,
+      "completed_at": "2026-05-21",
+      "progress": 0.9431419014262753
+    },
+    "3.1.2": {
+      "completed": true,
+      "completed_at": "2026-05-13",
+      "progress": 0.9994723983201206
+    },
+    "2.4.3": {
+      "completed": true,
+      "completed_at": "2026-05-19",
+      "progress": 0.8663624092004002
+    },
+    "3.2.2": {
+      "completed": true,
+      "completed_at": "2026-05-20",
+      "progress": 0.9216889169564019
+    },
+    "2.2.2": {
+      "completed": true,
+      "completed_at": "2026-03-05",
+      "progress": 0.8140632430069037
+    },
+    "3.4.2": {
+      "completed": true,
+      "completed_at": "2026-03-22",
+      "progress": 0.965556923765999
+    },
+    "1.2.2": {
+      "completed": true,
+      "completed_at": "2026-05-08",
+      "progress": 0.8377232204880772
+    },
+    "2.3.2": {
+      "completed": true,
+      "completed_at": "2026-03-09",
+      "progress": 0.8594683947063628
+    },
+    "3.4.5": {
+      "completed": true,
+      "completed_at": "2026-03-16",
+      "progress": 0.9209993471582785
+    },
+    "3.2.1": {
+      "completed": true,
+      "completed_at": "2026-03-10",
+      "progress": 0.9915093894170526
+    },
+    "2.4.2": {
+      "completed": true,
+      "completed_at": "2026-05-25",
+      "progress": 0.8692630580310512
+    }
+  },
+  "3220602007": {
+    "2.4.1": {
+      "completed": true,
+      "completed_at": "2026-03-05",
+      "progress": 0.9497091947641139
+    },
+    "1.1.1": {
+      "completed": true,
+      "completed_at": "2026-03-14",
+      "progress": 0.9607145665193063
+    },
+    "2.3.1": {
+      "completed": true,
+      "completed_at": "2026-05-13",
+      "progress": 0.8042956596238997
+    },
+    "2.3.2": {
+      "completed": true,
+      "completed_at": "2026-05-25",
+      "progress": 0.9001230150850856
+    },
+    "3.1.2": {
+      "completed": true,
+      "completed_at": "2026-05-27",
+      "progress": 0.907071631799931
+    },
+    "1.6.1": {
+      "completed": true,
+      "completed_at": "2026-04-14",
+      "progress": 0.9186983763052464
+    },
+    "1.4.1": {
+      "completed": true,
+      "completed_at": "2026-03-25",
+      "progress": 0.8263537089890503
+    },
+    "3.4.6": {
+      "completed": true,
+      "completed_at": "2026-05-22",
+      "progress": 0.9163004355084837
+    },
+    "3.2.1": {
+      "completed": true,
+      "completed_at": "2026-05-16",
+      "progress": 0.8104261495184915
+    },
+    "2.4.3": {
+      "completed": true,
+      "completed_at": "2026-05-17",
+      "progress": 0.8023345834597019
+    },
+    "1.5.1": {
+      "completed": true,
+      "completed_at": "2026-03-09",
+      "progress": 0.8300732760890535
+    },
+    "2.3.4": {
+      "completed": true,
+      "completed_at": "2026-03-16",
+      "progress": 0.8659010831042848
+    },
+    "3.2.2": {
+      "completed": true,
+      "completed_at": "2026-03-25",
+      "progress": 0.9122950582809359
+    },
+    "2.3.3": {
+      "completed": true,
+      "completed_at": "2026-05-15",
+      "progress": 0.9742506198017791
+    },
+    "3.4.3": {
+      "completed": true,
+      "completed_at": "2026-03-05",
+      "progress": 0.8758463126936449
+    },
+    "1.1.4": {
+      "completed": true,
+      "completed_at": "2026-05-14",
+      "progress": 0.9549710348147523
+    },
+    "1.6.3": {
+      "completed": true,
+      "completed_at": "2026-04-15",
+      "progress": 0.8451391730887896
+    },
+    "1.2.3": {
+      "completed": true,
+      "completed_at": "2026-05-11",
+      "progress": 0.9779803497505271
+    },
+    "1.1.3": {
+      "completed": true,
+      "completed_at": "2026-05-23",
+      "progress": 0.9921116646925495
+    },
+    "2.1.1": {
+      "completed": true,
+      "completed_at": "2026-04-02",
+      "progress": 0.8178652804148276
+    },
+    "2.4.2": {
+      "completed": true,
+      "completed_at": "2026-04-23",
+      "progress": 0.8071604133319965
+    },
+    "3.4.7": {
+      "completed": true,
+      "completed_at": "2026-05-12",
+      "progress": 0.9577253528765518
+    },
+    "2.2.3": {
+      "completed": true,
+      "completed_at": "2026-04-25",
+      "progress": 0.8542066701878939
+    },
+    "1.1.2": {
+      "completed": true,
+      "completed_at": "2026-03-23",
+      "progress": 0.8582420568015862
+    },
+    "1.3.1": {
+      "completed": true,
+      "completed_at": "2026-04-12",
+      "progress": 0.8135054714034137
+    },
+    "3.3.1": {
+      "completed": true,
+      "completed_at": "2026-04-26",
+      "progress": 0.9687547245391449
+    },
+    "1.6.2": {
+      "completed": true,
+      "completed_at": "2026-03-04",
+      "progress": 0.8285964421050885
+    },
+    "3.4.2": {
+      "completed": true,
+      "completed_at": "2026-03-24",
+      "progress": 0.9205649419948708
+    },
+    "3.1.1": {
+      "completed": true,
+      "completed_at": "2026-04-05",
+      "progress": 0.8811558650325846
+    },
+    "3.4.1": {
+      "completed": true,
+      "completed_at": "2026-04-04",
+      "progress": 0.9026444173141583
+    },
+    "2.2.2": {
+      "completed": true,
+      "completed_at": "2026-04-02",
+      "progress": 0.9331802496091086
+    },
+    "1.2.1": {
+      "completed": true,
+      "completed_at": "2026-04-17",
+      "progress": 0.8480618295939095
+    },
+    "2.2.1": {
+      "completed": true,
+      "completed_at": "2026-05-23",
+      "progress": 0.949323904216508
+    },
+    "3.4.5": {
+      "completed": true,
+      "completed_at": "2026-04-05",
+      "progress": 0.9764052614973456
+    },
+    "2.1.2": {
+      "completed": true,
+      "completed_at": "2026-03-25",
+      "progress": 0.8874056983817727
+    },
+    "3.4.4": {
+      "completed": true,
+      "completed_at": "2026-05-21",
+      "progress": 0.9752975423856876
+    },
+    "1.2.2": {
+      "completed": true,
+      "completed_at": "2026-04-15",
+      "progress": 0.8156458709336055
+    }
+  },
+  "3220602008": {
+    "1.4.1": {
+      "completed": true,
+      "completed_at": "2026-04-01",
+      "progress": 0.8561500592864946
+    },
+    "2.3.3": {
+      "completed": true,
+      "completed_at": "2026-04-13",
+      "progress": 0.818470196467219
+    },
+    "1.2.2": {
+      "completed": true,
+      "completed_at": "2026-03-02",
+      "progress": 0.8869515195025224
+    },
+    "3.1.2": {
+      "completed": true,
+      "completed_at": "2026-05-23",
+      "progress": 0.8130164274166327
+    },
+    "2.1.1": {
+      "completed": true,
+      "completed_at": "2026-04-24",
+      "progress": 0.9014735636966245
+    },
+    "2.2.2": {
+      "completed": true,
+      "completed_at": "2026-03-26",
+      "progress": 0.8751488180332854
+    },
+    "2.2.3": {
+      "completed": true,
+      "completed_at": "2026-05-20",
+      "progress": 0.8405408840114743
+    },
+    "3.2.2": {
+      "completed": true,
+      "completed_at": "2026-03-19",
+      "progress": 0.9392393775909595
+    },
+    "1.1.3": {
+      "completed": true,
+      "completed_at": "2026-04-11",
+      "progress": 0.83859544843056
+    },
+    "1.3.1": {
+      "completed": true,
+      "completed_at": "2026-04-13",
+      "progress": 0.9547146873366886
+    },
+    "1.1.1": {
+      "completed": true,
+      "completed_at": "2026-04-12",
+      "progress": 0.8034663165660073
+    },
+    "1.1.2": {
+      "completed": true,
+      "completed_at": "2026-03-18",
+      "progress": 0.814344360770929
+    },
+    "1.5.1": {
+      "completed": true,
+      "completed_at": "2026-04-18",
+      "progress": 0.8726171908897721
+    },
+    "2.3.4": {
+      "completed": true,
+      "completed_at": "2026-03-08",
+      "progress": 0.9628994084356556
+    },
+    "3.2.1": {
+      "completed": true,
+      "completed_at": "2026-04-25",
+      "progress": 0.9426492336434138
+    },
+    "1.6.3": {
+      "completed": true,
+      "completed_at": "2026-04-21",
+      "progress": 0.8149607452404553
+    },
+    "1.2.1": {
+      "completed": true,
+      "completed_at": "2026-04-03",
+      "progress": 0.8569813760609323
+    },
+    "1.6.2": {
+      "completed": true,
+      "completed_at": "2026-05-22",
+      "progress": 0.9654272999118101
+    },
+    "2.4.2": {
+      "completed": true,
+      "completed_at": "2026-04-04",
+      "progress": 0.9928287654267642
+    },
+    "1.1.4": {
+      "completed": true,
+      "completed_at": "2026-05-20",
+      "progress": 0.9353346691720748
+    },
+    "1.6.1": {
+      "completed": true,
+      "completed_at": "2026-03-10",
+      "progress": 0.812675154697702
+    },
+    "2.4.1": {
+      "completed": true,
+      "completed_at": "2026-05-06",
+      "progress": 0.8133526029520651
+    },
+    "2.3.2": {
+      "completed": true,
+      "completed_at": "2026-03-26",
+      "progress": 0.9304918628784727
+    },
+    "3.4.2": {
+      "completed": true,
+      "completed_at": "2026-05-20",
+      "progress": 0.8480266478514793
+    },
+    "2.1.2": {
+      "completed": true,
+      "completed_at": "2026-03-18",
+      "progress": 0.8909325617653425
+    },
+    "2.4.3": {
+      "completed": true,
+      "completed_at": "2026-03-02",
+      "progress": 0.9365742882882178
+    },
+    "3.4.3": {
+      "completed": true,
+      "completed_at": "2026-03-26",
+      "progress": 0.8469815070180331
+    },
+    "3.4.1": {
+      "completed": true,
+      "completed_at": "2026-03-27",
+      "progress": 0.9861888867604612
+    },
+    "3.4.4": {
+      "completed": true,
+      "completed_at": "2026-05-19",
+      "progress": 0.8887778425247617
+    },
+    "3.4.5": {
+      "completed": true,
+      "completed_at": "2026-05-12",
+      "progress": 0.9894443682746131
+    },
+    "3.4.6": {
+      "completed": true,
+      "completed_at": "2026-03-15",
+      "progress": 0.9485235109468526
+    },
+    "3.4.7": {
+      "completed": true,
+      "completed_at": "2026-04-12",
+      "progress": 0.887132957503173
+    },
+    "1.2.3": {
+      "completed": true,
+      "completed_at": "2026-05-24",
+      "progress": 0.9380824088038135
+    },
+    "2.3.1": {
+      "completed": true,
+      "completed_at": "2026-05-10",
+      "progress": 0.9286885844213711
+    },
+    "3.3.1": {
+      "completed": true,
+      "completed_at": "2026-03-18",
+      "progress": 0.9180593652387947
+    },
+    "3.1.1": {
+      "completed": true,
+      "completed_at": "2026-04-12",
+      "progress": 0.827579903649501
+    },
+    "2.2.1": {
+      "completed": true,
+      "completed_at": "2026-04-05",
+      "progress": 0.9936869379469729
+    }
+  },
+  "3220602009": {
+    "2.2.3": {
+      "completed": true,
+      "completed_at": "2026-03-12",
+      "progress": 0.97619663523927
+    },
+    "1.1.1": {
+      "completed": true,
+      "completed_at": "2026-05-25",
+      "progress": 0.8862351713430341
+    },
+    "1.6.3": {
+      "completed": true,
+      "completed_at": "2026-03-08",
+      "progress": 0.8422161888100582
+    },
+    "3.4.2": {
+      "completed": true,
+      "completed_at": "2026-03-21",
+      "progress": 0.8427117407482718
+    },
+    "2.4.3": {
+      "completed": true,
+      "completed_at": "2026-04-14",
+      "progress": 0.8199079167949052
+    },
+    "2.2.2": {
+      "completed": true,
+      "completed_at": "2026-05-08",
+      "progress": 0.8215782107083527
+    },
+    "2.3.1": {
+      "completed": true,
+      "completed_at": "2026-03-22",
+      "progress": 0.9312462414794209
+    },
+    "1.5.1": {
+      "completed": true,
+      "completed_at": "2026-03-16",
+      "progress": 0.8279358654349053
+    },
+    "2.4.1": {
+      "completed": true,
+      "completed_at": "2026-03-23",
+      "progress": 0.9970543606108606
+    },
+    "1.1.3": {
+      "completed": true,
+      "completed_at": "2026-04-16",
+      "progress": 0.9433959226134101
+    },
+    "1.2.3": {
+      "completed": true,
+      "completed_at": "2026-05-02",
+      "progress": 0.9023261087840939
+    },
+    "1.3.1": {
+      "completed": true,
+      "completed_at": "2026-05-04",
+      "progress": 0.9890506255795083
+    },
+    "3.4.6": {
+      "completed": true,
+      "completed_at": "2026-05-28",
+      "progress": 0.8740863691658909
+    },
+    "3.4.1": {
+      "completed": true,
+      "completed_at": "2026-05-06",
+      "progress": 0.948008447772694
+    },
+    "3.4.4": {
+      "completed": true,
+      "completed_at": "2026-03-03",
+      "progress": 0.9627208487945685
+    },
+    "1.4.1": {
+      "completed": true,
+      "completed_at": "2026-03-04",
+      "progress": 0.9033118033197688
+    },
+    "1.6.1": {
+      "completed": true,
+      "completed_at": "2026-03-19",
+      "progress": 0.9098548579455036
+    },
+    "1.6.2": {
+      "completed": true,
+      "completed_at": "2026-05-24",
+      "progress": 0.8097660683205307
+    },
+    "1.2.1": {
+      "completed": true,
+      "completed_at": "2026-04-19",
+      "progress": 0.9139958504039914
+    },
+    "2.4.2": {
+      "completed": true,
+      "completed_at": "2026-03-07",
+      "progress": 0.8093417668358698
+    },
+    "2.3.2": {
+      "completed": true,
+      "completed_at": "2026-05-27",
+      "progress": 0.8126442599121383
+    },
+    "2.3.3": {
+      "completed": true,
+      "completed_at": "2026-05-26",
+      "progress": 0.92983342201221
+    },
+    "3.4.7": {
+      "completed": true,
+      "completed_at": "2026-03-21",
+      "progress": 0.9289668583979729
+    },
+    "2.1.1": {
+      "completed": true,
+      "completed_at": "2026-05-26",
+      "progress": 0.8845531729190557
+    },
+    "3.3.1": {
+      "completed": true,
+      "completed_at": "2026-03-06",
+      "progress": 0.8035759685313996
+    },
+    "3.2.2": {
+      "completed": true,
+      "completed_at": "2026-05-05",
+      "progress": 0.9123779007253082
+    },
+    "2.1.2": {
+      "completed": true,
+      "completed_at": "2026-04-22",
+      "progress": 0.9839780698178561
+    },
+    "3.2.1": {
+      "completed": true,
+      "completed_at": "2026-05-17",
+      "progress": 0.927166970250357
+    },
+    "3.4.5": {
+      "completed": true,
+      "completed_at": "2026-05-04",
+      "progress": 0.8531933698597862
+    },
+    "1.2.2": {
+      "completed": true,
+      "completed_at": "2026-03-25",
+      "progress": 0.8635595946354402
+    },
+    "3.1.2": {
+      "completed": true,
+      "completed_at": "2026-05-26",
+      "progress": 0.9990678696433963
+    },
+    "3.4.3": {
+      "completed": true,
+      "completed_at": "2026-05-14",
+      "progress": 0.8358473494414592
+    },
+    "2.3.4": {
+      "completed": true,
+      "completed_at": "2026-05-08",
+      "progress": 0.9766215412953682
+    },
+    "3.1.1": {
+      "completed": true,
+      "completed_at": "2026-04-17",
+      "progress": 0.9435661473289993
+    },
+    "1.1.4": {
+      "completed": true,
+      "completed_at": "2026-03-12",
+      "progress": 0.995735376391933
+    },
+    "1.1.2": {
+      "completed": true,
+      "completed_at": "2026-05-25",
+      "progress": 0.8903823725670243
+    },
+    "2.2.1": {
+      "completed": true,
+      "completed_at": "2026-05-27",
+      "progress": 0.9185945159727888
+    }
+  },
+  "3220602010": {
+    "1.1.3": {
+      "completed": true,
+      "completed_at": "2026-05-09",
+      "progress": 0.9108846792323066
+    },
+    "3.3.1": {
+      "completed": true,
+      "completed_at": "2026-05-02",
+      "progress": 0.8181276877241932
+    },
+    "3.1.2": {
+      "completed": true,
+      "completed_at": "2026-04-13",
+      "progress": 0.9081765183457319
+    },
+    "3.4.2": {
+      "completed": true,
+      "completed_at": "2026-05-25",
+      "progress": 0.9699918744190046
+    },
+    "1.1.4": {
+      "completed": true,
+      "completed_at": "2026-03-27",
+      "progress": 0.8803324851248074
+    },
+    "1.6.2": {
+      "completed": true,
+      "completed_at": "2026-05-22",
+      "progress": 0.9213599186456116
+    },
+    "1.4.1": {
+      "completed": true,
+      "completed_at": "2026-03-11",
+      "progress": 0.9791118139368755
+    },
+    "1.5.1": {
+      "completed": true,
+      "completed_at": "2026-04-12",
+      "progress": 0.9529260970793609
+    },
+    "2.1.1": {
+      "completed": true,
+      "completed_at": "2026-04-14",
+      "progress": 0.9354277708006086
+    },
+    "3.4.1": {
+      "completed": true,
+      "completed_at": "2026-05-04",
+      "progress": 0.8546307072849035
+    },
+    "3.2.1": {
+      "completed": true,
+      "completed_at": "2026-03-27",
+      "progress": 0.8542355381530157
+    },
+    "1.2.2": {
+      "completed": true,
+      "completed_at": "2026-04-11",
+      "progress": 0.992637679393909
+    },
+    "1.2.3": {
+      "completed": true,
+      "completed_at": "2026-04-08",
+      "progress": 0.8842763326386763
+    },
+    "2.3.3": {
+      "completed": true,
+      "completed_at": "2026-05-27",
+      "progress": 0.9767545518916851
+    },
+    "3.4.4": {
+      "completed": true,
+      "completed_at": "2026-03-21",
+      "progress": 0.9511040988152587
+    },
+    "2.3.1": {
+      "completed": true,
+      "completed_at": "2026-04-07",
+      "progress": 0.843566973895695
+    },
+    "2.2.2": {
+      "completed": true,
+      "completed_at": "2026-04-22",
+      "progress": 0.8889879376563518
+    },
+    "1.6.3": {
+      "completed": true,
+      "completed_at": "2026-05-22",
+      "progress": 0.8140726075644483
+    },
+    "3.4.5": {
+      "completed": true,
+      "completed_at": "2026-04-12",
+      "progress": 0.9960915741805505
+    },
+    "2.4.2": {
+      "completed": true,
+      "completed_at": "2026-05-13",
+      "progress": 0.8815964934307347
+    },
+    "2.3.4": {
+      "completed": true,
+      "completed_at": "2026-03-23",
+      "progress": 0.8582761590270808
+    },
+    "1.1.1": {
+      "completed": true,
+      "completed_at": "2026-05-14",
+      "progress": 0.877797446210919
+    },
+    "2.4.1": {
+      "completed": true,
+      "completed_at": "2026-05-22",
+      "progress": 0.85362469246141
+    },
+    "2.1.2": {
+      "completed": true,
+      "completed_at": "2026-05-02",
+      "progress": 0.9049235860908724
+    },
+    "2.3.2": {
+      "completed": true,
+      "completed_at": "2026-05-26",
+      "progress": 0.9851770262602455
+    },
+    "3.4.6": {
+      "completed": true,
+      "completed_at": "2026-04-16",
+      "progress": 0.8245783285038716
+    },
+    "3.4.7": {
+      "completed": true,
+      "completed_at": "2026-04-02",
+      "progress": 0.8768293993418813
+    },
+    "1.3.1": {
+      "completed": true,
+      "completed_at": "2026-03-09",
+      "progress": 0.9737659380051198
+    },
+    "2.2.1": {
+      "completed": true,
+      "completed_at": "2026-03-06",
+      "progress": 0.9317408818216162
+    },
+    "1.6.1": {
+      "completed": true,
+      "completed_at": "2026-05-11",
+      "progress": 0.9788654250485742
+    },
+    "1.2.1": {
+      "completed": true,
+      "completed_at": "2026-05-14",
+      "progress": 0.8023007130280342
+    },
+    "2.2.3": {
+      "completed": true,
+      "completed_at": "2026-04-17",
+      "progress": 0.8669479353040883
+    },
+    "3.4.3": {
+      "completed": true,
+      "completed_at": "2026-04-06",
+      "progress": 0.8355508862260995
+    },
+    "3.2.2": {
+      "completed": true,
+      "completed_at": "2026-05-26",
+      "progress": 0.9605304374980143
+    },
+    "1.1.2": {
+      "completed": true,
+      "completed_at": "2026-04-01",
+      "progress": 0.9191105271454162
+    },
+    "3.1.1": {
+      "completed": true,
+      "completed_at": "2026-04-10",
+      "progress": 0.8428949258251608
+    },
+    "2.4.3": {
+      "completed": true,
+      "completed_at": "2026-03-26",
+      "progress": 0.94699533324142
+    }
+  },
+  "3220602011": {
+    "3.4.3": {
+      "completed": true,
+      "completed_at": "2026-03-10",
+      "progress": 0.9866164967514393
+    },
+    "2.3.1": {
+      "completed": true,
+      "completed_at": "2026-05-23",
+      "progress": 0.9364125049956
+    },
+    "3.4.5": {
+      "completed": true,
+      "completed_at": "2026-03-11",
+      "progress": 0.8675928672212944
+    },
+    "3.1.1": {
+      "completed": true,
+      "completed_at": "2026-03-04",
+      "progress": 0.9389896988489462
+    },
+    "1.2.1": {
+      "completed": true,
+      "completed_at": "2026-05-27",
+      "progress": 0.8398996058204764
+    },
+    "1.2.3": {
+      "completed": true,
+      "completed_at": "2026-03-27",
+      "progress": 0.9948161288266641
+    },
+    "2.2.1": {
+      "completed": true,
+      "completed_at": "2026-04-28",
+      "progress": 0.9775841429817659
+    },
+    "1.5.1": {
+      "completed": true,
+      "completed_at": "2026-03-24",
+      "progress": 0.8178462594475103
+    },
+    "1.6.1": {
+      "completed": true,
+      "completed_at": "2026-04-24",
+      "progress": 0.826817084811804
+    },
+    "2.1.2": {
+      "completed": true,
+      "completed_at": "2026-05-16",
+      "progress": 0.9399275649916008
+    },
+    "2.4.2": {
+      "completed": true,
+      "completed_at": "2026-05-14",
+      "progress": 0.9390980887771689
+    },
+    "3.2.2": {
+      "completed": true,
+      "completed_at": "2026-03-17",
+      "progress": 0.9958974383869332
+    },
+    "3.2.1": {
+      "completed": true,
+      "completed_at": "2026-04-08",
+      "progress": 0.9489982370396347
+    },
+    "1.6.3": {
+      "completed": true,
+      "completed_at": "2026-03-25",
+      "progress": 0.8290534874666041
+    },
+    "2.2.2": {
+      "completed": true,
+      "completed_at": "2026-03-27",
+      "progress": 0.9357030809649626
+    },
+    "3.4.7": {
+      "completed": true,
+      "completed_at": "2026-03-11",
+      "progress": 0.9490633003722453
+    },
+    "2.1.1": {
+      "completed": true,
+      "completed_at": "2026-04-28",
+      "progress": 0.8304340949373146
+    },
+    "3.4.2": {
+      "completed": true,
+      "completed_at": "2026-03-06",
+      "progress": 0.8416062964795537
+    },
+    "2.3.3": {
+      "completed": true,
+      "completed_at": "2026-03-02",
+      "progress": 0.8889876078109453
+    },
+    "1.1.1": {
+      "completed": true,
+      "completed_at": "2026-05-28",
+      "progress": 0.9412584522768244
+    },
+    "1.1.2": {
+      "completed": true,
+      "completed_at": "2026-04-16",
+      "progress": 0.894749211541328
+    },
+    "3.4.1": {
+      "completed": true,
+      "completed_at": "2026-05-18",
+      "progress": 0.8562641850393997
+    },
+    "1.1.4": {
+      "completed": true,
+      "completed_at": "2026-03-02",
+      "progress": 0.8743559626326672
+    },
+    "3.4.4": {
+      "completed": true,
+      "completed_at": "2026-04-05",
+      "progress": 0.8037018861617137
+    },
+    "3.1.2": {
+      "completed": true,
+      "completed_at": "2026-05-03",
+      "progress": 0.8180586599088842
+    },
+    "2.2.3": {
+      "completed": true,
+      "completed_at": "2026-04-13",
+      "progress": 0.9749655388455434
+    },
+    "2.4.3": {
+      "completed": true,
+      "completed_at": "2026-03-16",
+      "progress": 0.8329415282596474
+    },
+    "2.3.2": {
+      "completed": true,
+      "completed_at": "2026-03-24",
+      "progress": 0.8606826082560478
+    },
+    "1.2.2": {
+      "completed": true,
+      "completed_at": "2026-03-25",
+      "progress": 0.9018667452718623
+    },
+    "1.6.2": {
+      "completed": true,
+      "completed_at": "2026-03-10",
+      "progress": 0.9130449048257014
+    },
+    "3.4.6": {
+      "completed": true,
+      "completed_at": "2026-05-15",
+      "progress": 0.9445899937393192
+    },
+    "3.3.1": {
+      "completed": true,
+      "completed_at": "2026-03-18",
+      "progress": 0.9821882398047704
+    },
+    "1.1.3": {
+      "completed": true,
+      "completed_at": "2026-05-23",
+      "progress": 0.973240126857672
+    },
+    "1.4.1": {
+      "completed": true,
+      "completed_at": "2026-04-03",
+      "progress": 0.9293460180697165
+    },
+    "2.4.1": {
+      "completed": true,
+      "completed_at": "2026-05-04",
+      "progress": 0.954919526269381
+    },
+    "2.3.4": {
+      "completed": true,
+      "completed_at": "2026-03-19",
+      "progress": 0.8541239001240033
+    },
+    "1.3.1": {
+      "completed": true,
+      "completed_at": "2026-03-24",
+      "progress": 0.9076683887248563
+    }
+  },
+  "3220602012": {
+    "1.4.1": {
+      "completed": true,
+      "completed_at": "2026-05-07",
+      "progress": 0.8247854156432766
+    },
+    "3.3.1": {
+      "completed": true,
+      "completed_at": "2026-05-21",
+      "progress": 0.9638029718400168
+    },
+    "3.1.2": {
+      "completed": true,
+      "completed_at": "2026-05-01",
+      "progress": 0.888439506402768
+    },
+    "2.1.2": {
+      "completed": true,
+      "completed_at": "2026-03-08",
+      "progress": 0.8380314967393244
+    },
+    "2.2.3": {
+      "completed": true,
+      "completed_at": "2026-04-17",
+      "progress": 0.820626759057788
+    },
+    "2.1.1": {
+      "completed": true,
+      "completed_at": "2026-03-24",
+      "progress": 0.8214927797489665
+    },
+    "3.1.1": {
+      "completed": true,
+      "completed_at": "2026-04-09",
+      "progress": 0.9874345344270385
+    },
+    "2.3.2": {
+      "completed": true,
+      "completed_at": "2026-03-27",
+      "progress": 0.8438851601465567
+    },
+    "3.4.7": {
+      "completed": true,
+      "completed_at": "2026-03-19",
+      "progress": 0.9366824054592952
+    },
+    "3.4.2": {
+      "completed": true,
+      "completed_at": "2026-04-15",
+      "progress": 0.9327770943961122
+    },
+    "1.3.1": {
+      "completed": true,
+      "completed_at": "2026-03-09",
+      "progress": 0.9356006549343403
+    },
+    "1.6.2": {
+      "completed": true,
+      "completed_at": "2026-04-27",
+      "progress": 0.940149647498463
+    },
+    "3.4.4": {
+      "completed": true,
+      "completed_at": "2026-05-18",
+      "progress": 0.98071658970962
+    },
+    "2.4.2": {
+      "completed": true,
+      "completed_at": "2026-03-07",
+      "progress": 0.8789599512070708
+    },
+    "1.1.4": {
+      "completed": true,
+      "completed_at": "2026-03-05",
+      "progress": 0.8487094065068362
+    },
+    "3.4.3": {
+      "completed": true,
+      "completed_at": "2026-05-25",
+      "progress": 0.9763920648701232
+    },
+    "2.2.2": {
+      "completed": true,
+      "completed_at": "2026-03-13",
+      "progress": 0.8484628470653239
+    },
+    "1.6.3": {
+      "completed": true,
+      "completed_at": "2026-05-15",
+      "progress": 0.89035162526467
+    },
+    "2.3.4": {
+      "completed": true,
+      "completed_at": "2026-04-09",
+      "progress": 0.9439353808665157
+    },
+    "1.2.3": {
+      "completed": true,
+      "completed_at": "2026-05-10",
+      "progress": 0.8074956861777416
+    },
+    "1.6.1": {
+      "completed": true,
+      "completed_at": "2026-03-10",
+      "progress": 0.8299898312506643
+    },
+    "3.2.2": {
+      "completed": true,
+      "completed_at": "2026-03-26",
+      "progress": 0.9370186367584872
+    },
+    "3.4.5": {
+      "completed": true,
+      "completed_at": "2026-05-16",
+      "progress": 0.918128682220064
+    },
+    "2.4.1": {
+      "completed": true,
+      "completed_at": "2026-05-17",
+      "progress": 0.8667596853660203
+    },
+    "2.4.3": {
+      "completed": true,
+      "completed_at": "2026-04-23",
+      "progress": 0.8009129182533594
+    },
+    "1.2.1": {
+      "completed": true,
+      "completed_at": "2026-05-19",
+      "progress": 0.8811974893756487
+    },
+    "1.2.2": {
+      "completed": true,
+      "completed_at": "2026-04-22",
+      "progress": 0.9943672647929209
+    },
+    "3.4.6": {
+      "completed": true,
+      "completed_at": "2026-05-15",
+      "progress": 0.9144608381459616
+    },
+    "1.1.2": {
+      "completed": true,
+      "completed_at": "2026-05-19",
+      "progress": 0.948134765308042
+    },
+    "3.4.1": {
+      "completed": true,
+      "completed_at": "2026-04-18",
+      "progress": 0.9346318646320554
+    },
+    "2.3.1": {
+      "completed": true,
+      "completed_at": "2026-03-13",
+      "progress": 0.9276549245636161
+    },
+    "2.3.3": {
+      "completed": true,
+      "completed_at": "2026-03-28",
+      "progress": 0.9556189383627334
+    },
+    "3.2.1": {
+      "completed": true,
+      "completed_at": "2026-04-19",
+      "progress": 0.9038096377213289
+    },
+    "2.2.1": {
+      "completed": true,
+      "completed_at": "2026-03-23",
+      "progress": 0.970033898304417
+    },
+    "1.5.1": {
+      "completed": true,
+      "completed_at": "2026-04-24",
+      "progress": 0.9360152645941988
+    },
+    "1.1.3": {
+      "completed": true,
+      "completed_at": "2026-05-20",
+      "progress": 0.9257819118841588
+    },
+    "1.1.1": {
+      "completed": true,
+      "completed_at": "2026-03-16",
+      "progress": 0.9317816315664285
+    }
+  },
+  "3220602013": {
+    "3.4.7": {
+      "completed": true,
+      "completed_at": "2026-04-10",
+      "progress": 0.9297355106204082
+    },
+    "3.4.3": {
+      "completed": true,
+      "completed_at": "2026-04-24",
+      "progress": 0.9044752744801317
+    },
+    "2.2.1": {
+      "completed": true,
+      "completed_at": "2026-05-27",
+      "progress": 0.9321156982897884
+    },
+    "3.4.5": {
+      "completed": true,
+      "completed_at": "2026-05-28",
+      "progress": 0.9111562741435703
+    },
+    "1.2.1": {
+      "completed": true,
+      "completed_at": "2026-03-25",
+      "progress": 0.9659859357693239
+    },
+    "1.1.1": {
+      "completed": true,
+      "completed_at": "2026-04-19",
+      "progress": 0.8662475545139153
+    },
+    "1.1.4": {
+      "completed": true,
+      "completed_at": "2026-04-10",
+      "progress": 0.83619614244607
+    },
+    "3.2.2": {
+      "completed": true,
+      "completed_at": "2026-03-05",
+      "progress": 0.9066354691903562
+    },
+    "2.4.3": {
+      "completed": true,
+      "completed_at": "2026-05-24",
+      "progress": 0.8298424679405414
+    },
+    "1.2.3": {
+      "completed": true,
+      "completed_at": "2026-04-26",
+      "progress": 0.9991206097913968
+    },
+    "1.6.3": {
+      "completed": true,
+      "completed_at": "2026-05-15",
+      "progress": 0.9731181174147605
+    },
+    "3.4.6": {
+      "completed": true,
+      "completed_at": "2026-03-10",
+      "progress": 0.9729031729334174
+    },
+    "1.4.1": {
+      "completed": true,
+      "completed_at": "2026-05-10",
+      "progress": 0.838504567259844
+    },
+    "3.4.2": {
+      "completed": true,
+      "completed_at": "2026-05-22",
+      "progress": 0.9027494148316071
+    },
+    "2.2.2": {
+      "completed": true,
+      "completed_at": "2026-03-08",
+      "progress": 0.98206849801614
+    },
+    "3.2.1": {
+      "completed": true,
+      "completed_at": "2026-04-28",
+      "progress": 0.983770098057565
+    },
+    "1.1.3": {
+      "completed": true,
+      "completed_at": "2026-05-09",
+      "progress": 0.9215085091544872
+    },
+    "2.3.2": {
+      "completed": true,
+      "completed_at": "2026-05-18",
+      "progress": 0.9733043242935342
+    },
+    "1.6.1": {
+      "completed": true,
+      "completed_at": "2026-03-26",
+      "progress": 0.9476462480337692
+    },
+    "3.1.1": {
+      "completed": true,
+      "completed_at": "2026-05-13",
+      "progress": 0.9213847544341789
+    },
+    "3.1.2": {
+      "completed": true,
+      "completed_at": "2026-04-11",
+      "progress": 0.8983392227037043
+    },
+    "3.3.1": {
+      "completed": true,
+      "completed_at": "2026-05-22",
+      "progress": 0.9779133697399867
+    },
+    "2.4.1": {
+      "completed": true,
+      "completed_at": "2026-03-21",
+      "progress": 0.8930821944994288
+    },
+    "2.3.4": {
+      "completed": true,
+      "completed_at": "2026-03-06",
+      "progress": 0.9870673703417493
+    },
+    "1.3.1": {
+      "completed": true,
+      "completed_at": "2026-03-16",
+      "progress": 0.8274283380595945
+    },
+    "2.2.3": {
+      "completed": true,
+      "completed_at": "2026-04-26",
+      "progress": 0.9140661488169329
+    },
+    "1.6.2": {
+      "completed": true,
+      "completed_at": "2026-05-21",
+      "progress": 0.9861573696847081
+    },
+    "1.2.2": {
+      "completed": true,
+      "completed_at": "2026-04-13",
+      "progress": 0.8010998594422891
+    },
+    "2.1.1": {
+      "completed": true,
+      "completed_at": "2026-03-05",
+      "progress": 0.8538149662256427
+    },
+    "3.4.1": {
+      "completed": true,
+      "completed_at": "2026-05-02",
+      "progress": 0.8461835893523053
+    },
+    "1.5.1": {
+      "completed": true,
+      "completed_at": "2026-05-23",
+      "progress": 0.8168153378915924
+    },
+    "3.4.4": {
+      "completed": true,
+      "completed_at": "2026-05-28",
+      "progress": 0.838150364851885
+    },
+    "1.1.2": {
+      "completed": true,
+      "completed_at": "2026-05-01",
+      "progress": 0.8119133522932858
+    },
+    "2.3.1": {
+      "completed": true,
+      "completed_at": "2026-05-10",
+      "progress": 0.8020551362873326
+    },
+    "2.3.3": {
+      "completed": true,
+      "completed_at": "2026-05-14",
+      "progress": 0.855551774778271
+    },
+    "2.1.2": {
+      "completed": true,
+      "completed_at": "2026-03-19",
+      "progress": 0.9641932416421163
+    },
+    "2.4.2": {
+      "completed": true,
+      "completed_at": "2026-05-28",
+      "progress": 0.8724137057760614
+    }
+  },
+  "3220602014": {
+    "1.1.3": {
+      "completed": true,
+      "completed_at": "2026-04-04",
+      "progress": 0.8749253404737061
+    },
+    "3.2.2": {
+      "completed": true,
+      "completed_at": "2026-03-04",
+      "progress": 0.901852701807754
+    },
+    "1.6.3": {
+      "completed": true,
+      "completed_at": "2026-03-06",
+      "progress": 0.8574951426873962
+    },
+    "1.6.2": {
+      "completed": true,
+      "completed_at": "2026-03-22",
+      "progress": 0.942420016033844
+    },
+    "1.1.1": {
+      "completed": true,
+      "completed_at": "2026-03-24",
+      "progress": 0.946652902032606
+    },
+    "3.4.7": {
+      "completed": true,
+      "completed_at": "2026-04-02",
+      "progress": 0.815582561530932
+    },
+    "2.4.1": {
+      "completed": true,
+      "completed_at": "2026-03-08",
+      "progress": 0.8357785347025104
+    },
+    "3.4.1": {
+      "completed": true,
+      "completed_at": "2026-05-06",
+      "progress": 0.9442455470139215
+    },
+    "2.4.2": {
+      "completed": true,
+      "completed_at": "2026-03-07",
+      "progress": 0.9138176896835285
+    },
+    "2.2.2": {
+      "completed": true,
+      "completed_at": "2026-05-22",
+      "progress": 0.8271489663814744
+    },
+    "1.2.1": {
+      "completed": true,
+      "completed_at": "2026-05-18",
+      "progress": 0.8629389597869781
+    },
+    "2.3.4": {
+      "completed": true,
+      "completed_at": "2026-05-04",
+      "progress": 0.8566243841961774
+    },
+    "3.1.2": {
+      "completed": true,
+      "completed_at": "2026-03-16",
+      "progress": 0.8466908578827155
+    },
+    "1.5.1": {
+      "completed": true,
+      "completed_at": "2026-03-06",
+      "progress": 0.8275002719460048
+    },
+    "1.4.1": {
+      "completed": true,
+      "completed_at": "2026-05-09",
+      "progress": 0.9563118501551722
+    },
+    "3.1.1": {
+      "completed": true,
+      "completed_at": "2026-05-03",
+      "progress": 0.8785126907350738
+    },
+    "2.3.1": {
+      "completed": true,
+      "completed_at": "2026-03-02",
+      "progress": 0.9380851786735773
+    },
+    "1.1.4": {
+      "completed": true,
+      "completed_at": "2026-03-20",
+      "progress": 0.9645775718199135
+    },
+    "1.3.1": {
+      "completed": true,
+      "completed_at": "2026-05-11",
+      "progress": 0.8447328711786194
+    },
+    "1.1.2": {
+      "completed": true,
+      "completed_at": "2026-03-03",
+      "progress": 0.8000130494365467
+    },
+    "3.4.5": {
+      "completed": true,
+      "completed_at": "2026-05-16",
+      "progress": 0.9004811922334555
+    },
+    "2.3.2": {
+      "completed": true,
+      "completed_at": "2026-04-22",
+      "progress": 0.9580896275924122
+    },
+    "3.4.3": {
+      "completed": true,
+      "completed_at": "2026-05-18",
+      "progress": 0.8177603882527585
+    },
+    "3.3.1": {
+      "completed": true,
+      "completed_at": "2026-04-21",
+      "progress": 0.9729906264645047
+    },
+    "1.2.2": {
+      "completed": true,
+      "completed_at": "2026-05-11",
+      "progress": 0.9681329028615371
+    },
+    "3.2.1": {
+      "completed": true,
+      "completed_at": "2026-05-21",
+      "progress": 0.9238059560174698
+    },
+    "1.6.1": {
+      "completed": true,
+      "completed_at": "2026-04-23",
+      "progress": 0.9412726329597306
+    },
+    "2.3.3": {
+      "completed": true,
+      "completed_at": "2026-05-28",
+      "progress": 0.914203149778133
+    },
+    "2.1.2": {
+      "completed": true,
+      "completed_at": "2026-05-26",
+      "progress": 0.9074651984405908
+    },
+    "2.4.3": {
+      "completed": true,
+      "completed_at": "2026-03-16",
+      "progress": 0.8813134897374427
+    },
+    "2.1.1": {
+      "completed": true,
+      "completed_at": "2026-03-22",
+      "progress": 0.8212210738578244
+    },
+    "3.4.6": {
+      "completed": true,
+      "completed_at": "2026-05-24",
+      "progress": 0.9703189534520988
+    },
+    "2.2.3": {
+      "completed": true,
+      "completed_at": "2026-03-04",
+      "progress": 0.8695586327856155
+    },
+    "2.2.1": {
+      "completed": true,
+      "completed_at": "2026-03-24",
+      "progress": 0.8227939900962452
+    },
+    "3.4.4": {
+      "completed": true,
+      "completed_at": "2026-04-23",
+      "progress": 0.88917427211924
+    },
+    "1.2.3": {
+      "completed": true,
+      "completed_at": "2026-03-03",
+      "progress": 0.9335349012797702
+    },
+    "3.4.2": {
+      "completed": true,
+      "completed_at": "2026-03-01",
+      "progress": 0.9878090425206867
+    }
+  },
+  "3220602015": {
+    "2.3.2": {
+      "completed": true,
+      "completed_at": "2026-04-14",
+      "progress": 0.9375324662483926
+    },
+    "3.4.6": {
+      "completed": true,
+      "completed_at": "2026-04-20",
+      "progress": 0.9433546574333065
+    },
+    "3.4.4": {
+      "completed": true,
+      "completed_at": "2026-04-15",
+      "progress": 0.989224700392193
+    },
+    "1.4.1": {
+      "completed": true,
+      "completed_at": "2026-03-05",
+      "progress": 0.8927833822631204
+    },
+    "1.1.2": {
+      "completed": true,
+      "completed_at": "2026-05-10",
+      "progress": 0.9607805256114256
+    },
+    "3.1.2": {
+      "completed": true,
+      "completed_at": "2026-05-01",
+      "progress": 0.8193841281954656
+    },
+    "3.4.5": {
+      "completed": true,
+      "completed_at": "2026-03-12",
+      "progress": 0.9954477810509849
+    },
+    "2.3.4": {
+      "completed": true,
+      "completed_at": "2026-04-05",
+      "progress": 0.8642351043191927
+    },
+    "1.6.2": {
+      "completed": true,
+      "completed_at": "2026-03-08",
+      "progress": 0.9297239121008064
+    },
+    "1.6.3": {
+      "completed": true,
+      "completed_at": "2026-03-10",
+      "progress": 0.9544617021532752
+    },
+    "1.2.1": {
+      "completed": true,
+      "completed_at": "2026-05-15",
+      "progress": 0.9611654699497056
+    },
+    "2.3.3": {
+      "completed": true,
+      "completed_at": "2026-04-22",
+      "progress": 0.8395266399031066
+    },
+    "3.1.1": {
+      "completed": true,
+      "completed_at": "2026-04-18",
+      "progress": 0.885066118637664
+    },
+    "1.1.1": {
+      "completed": true,
+      "completed_at": "2026-05-17",
+      "progress": 0.8945229574503144
+    },
+    "2.4.3": {
+      "completed": true,
+      "completed_at": "2026-05-27",
+      "progress": 0.8873846960476924
+    },
+    "2.4.2": {
+      "completed": true,
+      "completed_at": "2026-03-19",
+      "progress": 0.8365861012666335
+    },
+    "3.4.7": {
+      "completed": true,
+      "completed_at": "2026-03-23",
+      "progress": 0.9344410418766255
+    },
+    "2.2.3": {
+      "completed": true,
+      "completed_at": "2026-03-27",
+      "progress": 0.9389244320109167
+    },
+    "1.2.3": {
+      "completed": true,
+      "completed_at": "2026-05-23",
+      "progress": 0.868926936818531
+    },
+    "1.2.2": {
+      "completed": true,
+      "completed_at": "2026-03-09",
+      "progress": 0.8027983354650805
+    },
+    "2.2.1": {
+      "completed": true,
+      "completed_at": "2026-04-25",
+      "progress": 0.8184650829860062
+    },
+    "2.3.1": {
+      "completed": true,
+      "completed_at": "2026-04-26",
+      "progress": 0.9961884878871938
+    },
+    "2.2.2": {
+      "completed": true,
+      "completed_at": "2026-05-09",
+      "progress": 0.8639387364476996
+    },
+    "3.2.1": {
+      "completed": true,
+      "completed_at": "2026-03-04",
+      "progress": 0.863853136892136
+    },
+    "2.4.1": {
+      "completed": true,
+      "completed_at": "2026-04-24",
+      "progress": 0.9304955260902639
+    },
+    "1.1.3": {
+      "completed": true,
+      "completed_at": "2026-03-11",
+      "progress": 0.9594608151028988
+    },
+    "1.6.1": {
+      "completed": true,
+      "completed_at": "2026-04-17",
+      "progress": 0.8230049991949058
+    },
+    "1.5.1": {
+      "completed": true,
+      "completed_at": "2026-03-14",
+      "progress": 0.8026291523731021
+    },
+    "1.1.4": {
+      "completed": true,
+      "completed_at": "2026-04-27",
+      "progress": 0.9289766799635232
+    },
+    "1.3.1": {
+      "completed": true,
+      "completed_at": "2026-05-18",
+      "progress": 0.8371663104094228
+    },
+    "3.4.3": {
+      "completed": true,
+      "completed_at": "2026-04-18",
+      "progress": 0.8129963759827643
+    },
+    "3.2.2": {
+      "completed": true,
+      "completed_at": "2026-04-02",
+      "progress": 0.8683004016633957
+    },
+    "2.1.2": {
+      "completed": true,
+      "completed_at": "2026-05-14",
+      "progress": 0.860222859103343
+    },
+    "3.3.1": {
+      "completed": true,
+      "completed_at": "2026-04-22",
+      "progress": 0.8192178083113146
+    },
+    "2.1.1": {
+      "completed": true,
+      "completed_at": "2026-04-05",
+      "progress": 0.9163269000110831
+    },
+    "3.4.2": {
+      "completed": true,
+      "completed_at": "2026-03-13",
+      "progress": 0.9126788266200244
+    },
+    "3.4.1": {
+      "completed": true,
+      "completed_at": "2026-03-11",
+      "progress": 0.9647173289117609
+    }
+  },
+  "3220602016": {
+    "2.2.3": {
+      "completed": true,
+      "completed_at": "2026-03-04",
+      "progress": 0.8100776552874939
+    },
+    "2.4.1": {
+      "completed": true,
+      "completed_at": "2026-05-06",
+      "progress": 0.9819220464956009
+    },
+    "2.1.2": {
+      "completed": true,
+      "completed_at": "2026-03-17",
+      "progress": 0.868169037532196
+    },
+    "1.6.3": {
+      "completed": true,
+      "completed_at": "2026-03-02",
+      "progress": 0.9285328691649829
+    },
+    "2.3.2": {
+      "completed": true,
+      "completed_at": "2026-04-09",
+      "progress": 0.8676043698405643
+    },
+    "2.1.1": {
+      "completed": true,
+      "completed_at": "2026-05-01",
+      "progress": 0.9964351448254523
+    },
+    "1.1.1": {
+      "completed": true,
+      "completed_at": "2026-04-09",
+      "progress": 0.8103597750376097
+    },
+    "3.4.3": {
+      "completed": true,
+      "completed_at": "2026-05-26",
+      "progress": 0.8716314769344252
+    },
+    "2.3.3": {
+      "completed": true,
+      "completed_at": "2026-04-24",
+      "progress": 0.923221327087691
+    },
+    "1.2.1": {
+      "completed": true,
+      "completed_at": "2026-04-03",
+      "progress": 0.9167858493557205
+    },
+    "3.4.2": {
+      "completed": true,
+      "completed_at": "2026-04-24",
+      "progress": 0.8514127160592241
+    },
+    "3.3.1": {
+      "completed": true,
+      "completed_at": "2026-03-25",
+      "progress": 0.9211417299070042
+    },
+    "3.4.5": {
+      "completed": true,
+      "completed_at": "2026-04-02",
+      "progress": 0.8502184986896156
+    },
+    "2.2.2": {
+      "completed": true,
+      "completed_at": "2026-04-25",
+      "progress": 0.941543814534824
+    },
+    "2.4.2": {
+      "completed": true,
+      "completed_at": "2026-05-21",
+      "progress": 0.9328284551215034
+    },
+    "3.2.2": {
+      "completed": true,
+      "completed_at": "2026-05-23",
+      "progress": 0.9126594613969282
+    },
+    "1.2.3": {
+      "completed": true,
+      "completed_at": "2026-03-25",
+      "progress": 0.9372585848234504
+    }
+  },
+  "3220602017": {
+    "2.4.2": {
+      "completed": true,
+      "completed_at": "2026-04-20",
+      "progress": 0.9716011722695402
+    },
+    "2.2.3": {
+      "completed": true,
+      "completed_at": "2026-05-11",
+      "progress": 0.8046484985464458
+    },
+    "2.3.3": {
+      "completed": true,
+      "completed_at": "2026-04-15",
+      "progress": 0.9062920147959265
+    },
+    "3.4.7": {
+      "completed": true,
+      "completed_at": "2026-05-13",
+      "progress": 0.9420320649222412
+    },
+    "3.4.6": {
+      "completed": true,
+      "completed_at": "2026-03-14",
+      "progress": 0.8394473233019286
+    },
+    "1.2.2": {
+      "completed": true,
+      "completed_at": "2026-05-27",
+      "progress": 0.8336956702265763
+    },
+    "3.4.2": {
+      "completed": true,
+      "completed_at": "2026-05-03",
+      "progress": 0.8026789963208385
+    },
+    "2.4.3": {
+      "completed": true,
+      "completed_at": "2026-05-11",
+      "progress": 0.9439659026809832
+    },
+    "2.2.2": {
+      "completed": true,
+      "completed_at": "2026-05-25",
+      "progress": 0.8321617459472117
+    },
+    "1.2.3": {
+      "completed": true,
+      "completed_at": "2026-03-06",
+      "progress": 0.8209407644275215
+    },
+    "1.1.3": {
+      "completed": true,
+      "completed_at": "2026-05-19",
+      "progress": 0.9455686209730719
+    },
+    "1.1.4": {
+      "completed": true,
+      "completed_at": "2026-04-13",
+      "progress": 0.8318473774859774
+    },
+    "2.1.2": {
+      "completed": true,
+      "completed_at": "2026-03-03",
+      "progress": 0.8868132114088899
+    },
+    "2.4.1": {
+      "completed": true,
+      "completed_at": "2026-04-12",
+      "progress": 0.9657590134410778
+    },
+    "2.3.1": {
+      "completed": true,
+      "completed_at": "2026-04-13",
+      "progress": 0.8445515005155895
+    },
+    "1.5.1": {
+      "completed": true,
+      "completed_at": "2026-05-14",
+      "progress": 0.9735653165319369
+    },
+    "3.4.4": {
+      "completed": true,
+      "completed_at": "2026-03-02",
+      "progress": 0.986970625340881
+    },
+    "2.3.4": {
+      "completed": true,
+      "completed_at": "2026-04-27",
+      "progress": 0.9358394977637096
+    },
+    "1.4.1": {
+      "completed": true,
+      "completed_at": "2026-03-07",
+      "progress": 0.8639491730644724
+    },
+    "1.2.1": {
+      "completed": true,
+      "completed_at": "2026-03-03",
+      "progress": 0.8696815168804444
+    },
+    "3.4.1": {
+      "completed": true,
+      "completed_at": "2026-04-01",
+      "progress": 0.8916901374851236
+    },
+    "1.3.1": {
+      "completed": true,
+      "completed_at": "2026-05-12",
+      "progress": 0.9674016639343432
+    },
+    "3.1.2": {
+      "completed": true,
+      "completed_at": "2026-04-23",
+      "progress": 0.8806653359039843
+    },
+    "2.3.2": {
+      "completed": true,
+      "completed_at": "2026-04-28",
+      "progress": 0.8183528680572465
+    },
+    "1.6.1": {
+      "completed": true,
+      "completed_at": "2026-04-24",
+      "progress": 0.9818287170574611
+    },
+    "2.1.1": {
+      "completed": true,
+      "completed_at": "2026-03-11",
+      "progress": 0.9238056286498668
+    },
+    "3.2.2": {
+      "completed": true,
+      "completed_at": "2026-03-23",
+      "progress": 0.9008877742218561
+    },
+    "3.4.5": {
+      "completed": true,
+      "completed_at": "2026-05-22",
+      "progress": 0.9668051192396482
+    },
+    "2.2.1": {
+      "completed": true,
+      "completed_at": "2026-04-26",
+      "progress": 0.8297325422891191
+    },
+    "3.4.3": {
+      "completed": true,
+      "completed_at": "2026-04-28",
+      "progress": 0.8914434749812624
+    },
+    "1.1.2": {
+      "completed": true,
+      "completed_at": "2026-05-04",
+      "progress": 0.931344923962695
+    },
+    "3.1.1": {
+      "completed": true,
+      "completed_at": "2026-03-26",
+      "progress": 0.9638448177085495
+    },
+    "1.6.2": {
+      "completed": true,
+      "completed_at": "2026-04-27",
+      "progress": 0.8727906665446918
+    },
+    "1.6.3": {
+      "completed": true,
+      "completed_at": "2026-05-13",
+      "progress": 0.9502506260804052
+    },
+    "3.3.1": {
+      "completed": true,
+      "completed_at": "2026-04-13",
+      "progress": 0.8619877681339309
+    },
+    "1.1.1": {
+      "completed": true,
+      "completed_at": "2026-04-07",
+      "progress": 0.8487232109648617
+    },
+    "3.2.1": {
+      "completed": true,
+      "completed_at": "2026-04-11",
+      "progress": 0.9017506798983072
+    }
+  },
+  "3220602018": {
+    "3.2.2": {
+      "completed": true,
+      "completed_at": "2026-03-16",
+      "progress": 0.9196982439905255
+    },
+    "1.3.1": {
+      "completed": true,
+      "completed_at": "2026-04-15",
+      "progress": 0.8894676068884794
+    },
+    "1.2.2": {
+      "completed": true,
+      "completed_at": "2026-04-03",
+      "progress": 0.8999491493953237
+    },
+    "1.1.4": {
+      "completed": true,
+      "completed_at": "2026-03-08",
+      "progress": 0.9398953039158762
+    },
+    "3.2.1": {
+      "completed": true,
+      "completed_at": "2026-04-24",
+      "progress": 0.9881479249235983
+    },
+    "3.1.2": {
+      "completed": true,
+      "completed_at": "2026-03-02",
+      "progress": 0.9911162040677322
+    },
+    "2.1.2": {
+      "completed": true,
+      "completed_at": "2026-05-14",
+      "progress": 0.8955731487022355
+    },
+    "2.3.1": {
+      "completed": true,
+      "completed_at": "2026-05-02",
+      "progress": 0.8735386300306309
+    },
+    "1.6.3": {
+      "completed": true,
+      "completed_at": "2026-04-24",
+      "progress": 0.9996224333864242
+    },
+    "2.3.2": {
+      "completed": true,
+      "completed_at": "2026-03-07",
+      "progress": 0.8656457885069938
+    },
+    "3.4.6": {
+      "completed": true,
+      "completed_at": "2026-05-27",
+      "progress": 0.9381862443386088
+    },
+    "3.4.3": {
+      "completed": true,
+      "completed_at": "2026-03-14",
+      "progress": 0.9344938631945469
+    },
+    "3.4.5": {
+      "completed": true,
+      "completed_at": "2026-05-22",
+      "progress": 0.872508786500418
+    },
+    "1.4.1": {
+      "completed": true,
+      "completed_at": "2026-04-20",
+      "progress": 0.9441967217423306
+    },
+    "3.3.1": {
+      "completed": true,
+      "completed_at": "2026-05-21",
+      "progress": 0.9821530515514604
+    },
+    "2.3.3": {
+      "completed": true,
+      "completed_at": "2026-03-21",
+      "progress": 0.9355659475814737
+    },
+    "2.1.1": {
+      "completed": true,
+      "completed_at": "2026-03-17",
+      "progress": 0.9692115803237928
+    },
+    "1.2.1": {
+      "completed": true,
+      "completed_at": "2026-04-10",
+      "progress": 0.9108448204225733
+    },
+    "3.4.2": {
+      "completed": true,
+      "completed_at": "2026-04-13",
+      "progress": 0.8012438624583779
+    },
+    "1.5.1": {
+      "completed": true,
+      "completed_at": "2026-05-22",
+      "progress": 0.991408651129822
+    },
+    "2.2.3": {
+      "completed": true,
+      "completed_at": "2026-04-13",
+      "progress": 0.8611759028272317
+    },
+    "1.2.3": {
+      "completed": true,
+      "completed_at": "2026-03-07",
+      "progress": 0.9703907063243264
+    },
+    "2.2.1": {
+      "completed": true,
+      "completed_at": "2026-03-22",
+      "progress": 0.8337891204378123
+    },
+    "2.2.2": {
+      "completed": true,
+      "completed_at": "2026-04-05",
+      "progress": 0.9074710738362048
+    },
+    "1.1.3": {
+      "completed": true,
+      "completed_at": "2026-04-13",
+      "progress": 0.8357178600782825
+    },
+    "2.4.2": {
+      "completed": true,
+      "completed_at": "2026-04-04",
+      "progress": 0.9831294739569115
+    },
+    "2.4.3": {
+      "completed": true,
+      "completed_at": "2026-05-05",
+      "progress": 0.8174368507516054
+    },
+    "1.1.2": {
+      "completed": true,
+      "completed_at": "2026-03-14",
+      "progress": 0.8774562653121109
+    },
+    "1.6.1": {
+      "completed": true,
+      "completed_at": "2026-04-14",
+      "progress": 0.8837552822486269
+    },
+    "3.4.1": {
+      "completed": true,
+      "completed_at": "2026-03-20",
+      "progress": 0.8111746331719489
+    },
+    "2.3.4": {
+      "completed": true,
+      "completed_at": "2026-05-25",
+      "progress": 0.9681688577596541
+    },
+    "1.6.2": {
+      "completed": true,
+      "completed_at": "2026-04-06",
+      "progress": 0.8995717446217
+    },
+    "3.1.1": {
+      "completed": true,
+      "completed_at": "2026-04-25",
+      "progress": 0.8326180591092579
+    }
+  },
+  "3220602019": {
+    "1.6.3": {
+      "completed": true,
+      "completed_at": "2026-04-14",
+      "progress": 0.8541768201262017
+    },
+    "3.1.2": {
+      "completed": true,
+      "completed_at": "2026-05-06",
+      "progress": 0.884537212694235
+    },
+    "2.4.2": {
+      "completed": true,
+      "completed_at": "2026-04-26",
+      "progress": 0.905062488669641
+    },
+    "3.2.2": {
+      "completed": true,
+      "completed_at": "2026-03-01",
+      "progress": 0.9156572514704594
+    },
+    "3.4.6": {
+      "completed": true,
+      "completed_at": "2026-04-21",
+      "progress": 0.8956643052590357
+    },
+    "1.2.1": {
+      "completed": true,
+      "completed_at": "2026-03-18",
+      "progress": 0.8488513666445637
+    },
+    "3.4.1": {
+      "completed": true,
+      "completed_at": "2026-05-21",
+      "progress": 0.9522138640536587
+    },
+    "1.4.1": {
+      "completed": true,
+      "completed_at": "2026-04-01",
+      "progress": 0.8442183116555257
+    },
+    "2.1.2": {
+      "completed": true,
+      "completed_at": "2026-03-24",
+      "progress": 0.8231739556055009
+    },
+    "2.4.1": {
+      "completed": true,
+      "completed_at": "2026-04-25",
+      "progress": 0.8835458769938913
+    },
+    "2.1.1": {
+      "completed": true,
+      "completed_at": "2026-04-01",
+      "progress": 0.8680365341801513
+    },
+    "3.4.3": {
+      "completed": true,
+      "completed_at": "2026-03-21",
+      "progress": 0.9963519198223101
+    },
+    "1.6.2": {
+      "completed": true,
+      "completed_at": "2026-05-02",
+      "progress": 0.9065589856819452
+    },
+    "3.2.1": {
+      "completed": true,
+      "completed_at": "2026-04-03",
+      "progress": 0.9198764049046669
+    },
+    "2.2.1": {
+      "completed": true,
+      "completed_at": "2026-03-18",
+      "progress": 0.9353682136319182
+    },
+    "2.3.3": {
+      "completed": true,
+      "completed_at": "2026-03-13",
+      "progress": 0.9137305235901426
+    },
+    "1.1.4": {
+      "completed": true,
+      "completed_at": "2026-05-06",
+      "progress": 0.8615172997032614
+    },
+    "3.1.1": {
+      "completed": true,
+      "completed_at": "2026-05-18",
+      "progress": 0.9900465855075042
+    },
+    "3.3.1": {
+      "completed": true,
+      "completed_at": "2026-04-14",
+      "progress": 0.9482463711082957
+    },
+    "1.1.1": {
+      "completed": true,
+      "completed_at": "2026-03-03",
+      "progress": 0.8085822892821455
+    },
+    "1.2.2": {
+      "completed": true,
+      "completed_at": "2026-03-01",
+      "progress": 0.9887604661919698
+    },
+    "2.2.2": {
+      "completed": true,
+      "completed_at": "2026-05-15",
+      "progress": 0.9749410440899089
+    },
+    "1.2.3": {
+      "completed": true,
+      "completed_at": "2026-05-13",
+      "progress": 0.8425819688369381
+    },
+    "1.1.2": {
+      "completed": true,
+      "completed_at": "2026-05-21",
+      "progress": 0.9527934745375257
+    },
+    "2.4.3": {
+      "completed": true,
+      "completed_at": "2026-04-02",
+      "progress": 0.9613799889334192
+    },
+    "1.6.1": {
+      "completed": true,
+      "completed_at": "2026-04-04",
+      "progress": 0.9863507261703603
+    },
+    "1.1.3": {
+      "completed": true,
+      "completed_at": "2026-03-13",
+      "progress": 0.8811535233794574
+    },
+    "2.3.4": {
+      "completed": true,
+      "completed_at": "2026-05-22",
+      "progress": 0.8195393550413985
+    },
+    "3.4.2": {
+      "completed": true,
+      "completed_at": "2026-03-13",
+      "progress": 0.8401921649692634
+    },
+    "2.3.1": {
+      "completed": true,
+      "completed_at": "2026-04-17",
+      "progress": 0.8698894414213602
+    },
+    "3.4.4": {
+      "completed": true,
+      "completed_at": "2026-05-14",
+      "progress": 0.8176299119434146
+    },
+    "3.4.7": {
+      "completed": true,
+      "completed_at": "2026-03-10",
+      "progress": 0.9570146776958313
+    },
+    "1.5.1": {
+      "completed": true,
+      "completed_at": "2026-03-17",
+      "progress": 0.9123812152712008
+    },
+    "2.3.2": {
+      "completed": true,
+      "completed_at": "2026-03-11",
+      "progress": 0.9690105045623938
+    },
+    "1.3.1": {
+      "completed": true,
+      "completed_at": "2026-04-09",
+      "progress": 0.9990954933604316
+    },
+    "3.4.5": {
+      "completed": true,
+      "completed_at": "2026-05-19",
+      "progress": 0.9045565883951038
+    },
+    "2.2.3": {
+      "completed": true,
+      "completed_at": "2026-05-16",
+      "progress": 0.872043667033237
+    }
+  },
+  "3220602020": {
+    "2.2.2": {
+      "completed": true,
+      "completed_at": "2026-04-23",
+      "progress": 0.8705130126971699
+    },
+    "1.1.4": {
+      "completed": true,
+      "completed_at": "2026-05-15",
+      "progress": 0.9280164905154873
+    },
+    "1.6.1": {
+      "completed": true,
+      "completed_at": "2026-03-27",
+      "progress": 0.8590121498223613
+    },
+    "2.3.2": {
+      "completed": true,
+      "completed_at": "2026-05-21",
+      "progress": 0.8803704983362561
+    },
+    "2.2.1": {
+      "completed": true,
+      "completed_at": "2026-03-14",
+      "progress": 0.8428522915348419
+    },
+    "3.3.1": {
+      "completed": true,
+      "completed_at": "2026-04-04",
+      "progress": 0.8276548020793034
+    },
+    "1.1.3": {
+      "completed": true,
+      "completed_at": "2026-03-14",
+      "progress": 0.839080355809267
+    },
+    "3.1.2": {
+      "completed": true,
+      "completed_at": "2026-04-20",
+      "progress": 0.9170767269066611
+    },
+    "1.2.3": {
+      "completed": true,
+      "completed_at": "2026-03-03",
+      "progress": 0.9946857384750953
+    },
+    "2.2.3": {
+      "completed": true,
+      "completed_at": "2026-03-07",
+      "progress": 0.9508373721331229
+    },
+    "3.4.4": {
+      "completed": true,
+      "completed_at": "2026-03-28",
+      "progress": 0.9119763491072446
+    },
+    "3.4.2": {
+      "completed": true,
+      "completed_at": "2026-04-13",
+      "progress": 0.9101828450400774
+    },
+    "2.4.3": {
+      "completed": true,
+      "completed_at": "2026-03-13",
+      "progress": 0.9142220761836742
+    },
+    "1.2.1": {
+      "completed": true,
+      "completed_at": "2026-05-11",
+      "progress": 0.8894799903625987
+    },
+    "2.1.2": {
+      "completed": true,
+      "completed_at": "2026-05-24",
+      "progress": 0.9265442340072573
+    },
+    "2.3.1": {
+      "completed": true,
+      "completed_at": "2026-03-26",
+      "progress": 0.8228980203408764
+    },
+    "1.3.1": {
+      "completed": true,
+      "completed_at": "2026-05-02",
+      "progress": 0.9682961176417909
+    },
+    "3.4.5": {
+      "completed": true,
+      "completed_at": "2026-03-09",
+      "progress": 0.8408508332363818
+    },
+    "1.5.1": {
+      "completed": true,
+      "completed_at": "2026-04-05",
+      "progress": 0.921882576014408
+    },
+    "1.4.1": {
+      "completed": true,
+      "completed_at": "2026-03-24",
+      "progress": 0.8643462112622224
+    },
+    "3.2.1": {
+      "completed": true,
+      "completed_at": "2026-03-04",
+      "progress": 0.9705984417179488
+    },
+    "3.1.1": {
+      "completed": true,
+      "completed_at": "2026-04-27",
+      "progress": 0.8388706195940058
+    },
+    "1.6.3": {
+      "completed": true,
+      "completed_at": "2026-04-15",
+      "progress": 0.8176871624207687
+    },
+    "3.4.7": {
+      "completed": true,
+      "completed_at": "2026-03-01",
+      "progress": 0.9779050186048568
+    },
+    "1.6.2": {
+      "completed": true,
+      "completed_at": "2026-04-16",
+      "progress": 0.862019140447599
+    },
+    "2.3.4": {
+      "completed": true,
+      "completed_at": "2026-03-27",
+      "progress": 0.813772167592051
+    },
+    "1.1.1": {
+      "completed": true,
+      "completed_at": "2026-05-18",
+      "progress": 0.8849630147257525
+    },
+    "1.2.2": {
+      "completed": true,
+      "completed_at": "2026-04-17",
+      "progress": 0.8373904355328653
+    },
+    "2.3.3": {
+      "completed": true,
+      "completed_at": "2026-05-15",
+      "progress": 0.9533037336664147
+    },
+    "3.4.6": {
+      "completed": true,
+      "completed_at": "2026-05-22",
+      "progress": 0.9022299549714413
+    },
+    "2.4.1": {
+      "completed": true,
+      "completed_at": "2026-03-05",
+      "progress": 0.9966015625779197
+    },
+    "3.4.3": {
+      "completed": true,
+      "completed_at": "2026-04-13",
+      "progress": 0.8619317617987965
+    },
+    "3.2.2": {
+      "completed": true,
+      "completed_at": "2026-05-11",
+      "progress": 0.9761433195522807
+    },
+    "3.4.1": {
+      "completed": true,
+      "completed_at": "2026-03-04",
+      "progress": 0.9351314616840267
+    },
+    "2.4.2": {
+      "completed": true,
+      "completed_at": "2026-03-16",
+      "progress": 0.8796599561560551
+    },
+    "1.1.2": {
+      "completed": true,
+      "completed_at": "2026-05-23",
+      "progress": 0.8111301041806132
+    },
+    "2.1.1": {
+      "completed": true,
+      "completed_at": "2026-03-01",
+      "progress": 0.9531316309573343
+    }
+  },
+  "3220602021": {
+    "2.4.3": {
+      "completed": true,
+      "completed_at": "2026-03-25",
+      "progress": 0.9392711977252615
+    },
+    "1.1.3": {
+      "completed": true,
+      "completed_at": "2026-03-28",
+      "progress": 0.8485155786353152
+    },
+    "3.2.1": {
+      "completed": true,
+      "completed_at": "2026-03-07",
+      "progress": 0.8139077174362827
+    },
+    "3.3.1": {
+      "completed": true,
+      "completed_at": "2026-03-01",
+      "progress": 0.8456010101593311
+    },
+    "2.3.2": {
+      "completed": true,
+      "completed_at": "2026-04-16",
+      "progress": 0.8319074920226248
+    },
+    "2.2.2": {
+      "completed": true,
+      "completed_at": "2026-05-10",
+      "progress": 0.8882348078918052
+    },
+    "1.3.1": {
+      "completed": true,
+      "completed_at": "2026-03-18",
+      "progress": 0.8172707280681633
+    },
+    "2.3.3": {
+      "completed": true,
+      "completed_at": "2026-05-02",
+      "progress": 0.8395452862123305
+    },
+    "1.6.1": {
+      "completed": true,
+      "completed_at": "2026-03-07",
+      "progress": 0.94491161964339
+    },
+    "3.1.1": {
+      "completed": true,
+      "completed_at": "2026-04-05",
+      "progress": 0.8087755477433646
+    },
+    "2.3.1": {
+      "completed": true,
+      "completed_at": "2026-03-17",
+      "progress": 0.9438185149583072
+    },
+    "3.4.7": {
+      "completed": true,
+      "completed_at": "2026-04-24",
+      "progress": 0.9054502766517194
+    },
+    "3.4.1": {
+      "completed": true,
+      "completed_at": "2026-03-09",
+      "progress": 0.8273271162686553
+    },
+    "1.4.1": {
+      "completed": true,
+      "completed_at": "2026-05-11",
+      "progress": 0.9627460911463516
+    },
+    "1.6.2": {
+      "completed": true,
+      "completed_at": "2026-03-21",
+      "progress": 0.8153515706348667
+    },
+    "3.4.4": {
+      "completed": true,
+      "completed_at": "2026-04-17",
+      "progress": 0.9439128869150581
+    },
+    "2.2.1": {
+      "completed": true,
+      "completed_at": "2026-05-08",
+      "progress": 0.9169444071650479
+    },
+    "3.4.6": {
+      "completed": true,
+      "completed_at": "2026-03-27",
+      "progress": 0.8130389703468628
+    },
+    "2.1.1": {
+      "completed": true,
+      "completed_at": "2026-04-26",
+      "progress": 0.8492751265065916
+    },
+    "1.1.4": {
+      "completed": true,
+      "completed_at": "2026-04-16",
+      "progress": 0.9100825806650042
+    },
+    "2.4.1": {
+      "completed": true,
+      "completed_at": "2026-05-15",
+      "progress": 0.8467420789511014
+    },
+    "3.1.2": {
+      "completed": true,
+      "completed_at": "2026-05-22",
+      "progress": 0.9951640714174261
+    },
+    "2.2.3": {
+      "completed": true,
+      "completed_at": "2026-04-13",
+      "progress": 0.9873279063782833
+    },
+    "2.1.2": {
+      "completed": true,
+      "completed_at": "2026-04-14",
+      "progress": 0.9864328335756222
+    },
+    "1.2.3": {
+      "completed": true,
+      "completed_at": "2026-04-17",
+      "progress": 0.8257411623235669
+    },
+    "1.1.1": {
+      "completed": true,
+      "completed_at": "2026-03-02",
+      "progress": 0.998528943995135
+    },
+    "1.6.3": {
+      "completed": true,
+      "completed_at": "2026-05-16",
+      "progress": 0.8417536802170376
+    },
+    "1.1.2": {
+      "completed": true,
+      "completed_at": "2026-03-08",
+      "progress": 0.980121652044458
+    }
+  },
+  "3220602022": {
+    "3.2.2": {
+      "completed": true,
+      "completed_at": "2026-05-02",
+      "progress": 0.8696683805825496
+    },
+    "3.4.2": {
+      "completed": true,
+      "completed_at": "2026-04-22",
+      "progress": 0.9571806810129345
+    },
+    "2.3.1": {
+      "completed": true,
+      "completed_at": "2026-05-21",
+      "progress": 0.9455749649762957
+    },
+    "3.2.1": {
+      "completed": true,
+      "completed_at": "2026-05-17",
+      "progress": 0.9180130385027047
+    },
+    "2.2.3": {
+      "completed": true,
+      "completed_at": "2026-03-01",
+      "progress": 0.9754339190124823
+    },
+    "2.1.2": {
+      "completed": true,
+      "completed_at": "2026-05-25",
+      "progress": 0.9659941754126162
+    },
+    "2.2.2": {
+      "completed": true,
+      "completed_at": "2026-03-18",
+      "progress": 0.8057313796453762
+    },
+    "2.3.4": {
+      "completed": true,
+      "completed_at": "2026-05-15",
+      "progress": 0.8735226389626369
+    },
+    "1.6.1": {
+      "completed": true,
+      "completed_at": "2026-05-08",
+      "progress": 0.999950642248229
+    },
+    "1.1.1": {
+      "completed": true,
+      "completed_at": "2026-03-22",
+      "progress": 0.9406309764486098
+    },
+    "3.4.1": {
+      "completed": true,
+      "completed_at": "2026-05-18",
+      "progress": 0.9741495495448825
+    },
+    "3.1.2": {
+      "completed": true,
+      "completed_at": "2026-04-15",
+      "progress": 0.9525247436205397
+    },
+    "1.2.2": {
+      "completed": true,
+      "completed_at": "2026-04-26",
+      "progress": 0.8017879530144757
+    },
+    "1.6.2": {
+      "completed": true,
+      "completed_at": "2026-03-28",
+      "progress": 0.9514571617606447
+    },
+    "3.3.1": {
+      "completed": true,
+      "completed_at": "2026-04-06",
+      "progress": 0.8958163679239511
+    },
+    "3.4.6": {
+      "completed": true,
+      "completed_at": "2026-05-17",
+      "progress": 0.8479341262612947
+    },
+    "3.4.4": {
+      "completed": true,
+      "completed_at": "2026-04-25",
+      "progress": 0.9952249248855269
+    },
+    "1.5.1": {
+      "completed": true,
+      "completed_at": "2026-04-24",
+      "progress": 0.9652568695776478
+    },
+    "1.4.1": {
+      "completed": true,
+      "completed_at": "2026-05-21",
+      "progress": 0.9169565243873657
+    },
+    "3.4.7": {
+      "completed": true,
+      "completed_at": "2026-04-21",
+      "progress": 0.8394150162963456
+    },
+    "2.4.2": {
+      "completed": true,
+      "completed_at": "2026-03-26",
+      "progress": 0.9527808316259311
+    },
+    "3.4.5": {
+      "completed": true,
+      "completed_at": "2026-05-01",
+      "progress": 0.9829880576300274
+    },
+    "1.1.3": {
+      "completed": true,
+      "completed_at": "2026-04-07",
+      "progress": 0.9859660027890019
+    },
+    "2.2.1": {
+      "completed": true,
+      "completed_at": "2026-04-08",
+      "progress": 0.8503549791033821
+    },
+    "1.1.4": {
+      "completed": true,
+      "completed_at": "2026-05-03",
+      "progress": 0.9871628776167314
+    },
+    "2.4.3": {
+      "completed": true,
+      "completed_at": "2026-05-13",
+      "progress": 0.8990815572482307
+    },
+    "3.4.3": {
+      "completed": true,
+      "completed_at": "2026-03-09",
+      "progress": 0.9561389473299734
+    },
+    "2.1.1": {
+      "completed": true,
+      "completed_at": "2026-04-21",
+      "progress": 0.9330505785397201
+    },
+    "2.3.2": {
+      "completed": true,
+      "completed_at": "2026-05-02",
+      "progress": 0.8689428711387394
+    },
+    "1.3.1": {
+      "completed": true,
+      "completed_at": "2026-05-26",
+      "progress": 0.9405203585476158
+    },
+    "3.1.1": {
+      "completed": true,
+      "completed_at": "2026-04-12",
+      "progress": 0.9574390949772811
+    },
+    "2.4.1": {
+      "completed": true,
+      "completed_at": "2026-05-06",
+      "progress": 0.8741273664156631
+    },
+    "1.1.2": {
+      "completed": true,
+      "completed_at": "2026-03-09",
+      "progress": 0.9160677032285207
+    },
+    "2.3.3": {
+      "completed": true,
+      "completed_at": "2026-04-18",
+      "progress": 0.8013312556720253
+    },
+    "1.6.3": {
+      "completed": true,
+      "completed_at": "2026-04-09",
+      "progress": 0.8652703427848412
+    },
+    "1.2.1": {
+      "completed": true,
+      "completed_at": "2026-03-04",
+      "progress": 0.9301645301382172
+    },
+    "1.2.3": {
+      "completed": true,
+      "completed_at": "2026-05-07",
+      "progress": 0.81955305602364
+    }
+  },
+  "3220602023": {
+    "1.1.3": {
+      "completed": true,
+      "completed_at": "2026-04-14",
+      "progress": 0.8436229332266654
+    },
+    "2.4.1": {
+      "completed": true,
+      "completed_at": "2026-03-06",
+      "progress": 0.9877785709021325
+    },
+    "3.4.4": {
+      "completed": true,
+      "completed_at": "2026-04-25",
+      "progress": 0.9468884701777344
+    },
+    "3.4.1": {
+      "completed": true,
+      "completed_at": "2026-05-16",
+      "progress": 0.908566873873308
+    },
+    "2.4.3": {
+      "completed": true,
+      "completed_at": "2026-04-11",
+      "progress": 0.9694848272691857
+    },
+    "3.1.1": {
+      "completed": true,
+      "completed_at": "2026-04-16",
+      "progress": 0.9103286361449171
+    },
+    "3.4.2": {
+      "completed": true,
+      "completed_at": "2026-04-13",
+      "progress": 0.8920462487660606
+    },
+    "2.3.2": {
+      "completed": true,
+      "completed_at": "2026-03-14",
+      "progress": 0.9677567240281603
+    },
+    "2.4.2": {
+      "completed": true,
+      "completed_at": "2026-03-08",
+      "progress": 0.984184241511236
+    },
+    "1.4.1": {
+      "completed": true,
+      "completed_at": "2026-03-04",
+      "progress": 0.927675672883301
+    },
+    "3.4.5": {
+      "completed": true,
+      "completed_at": "2026-05-06",
+      "progress": 0.8554558475636562
+    },
+    "1.6.3": {
+      "completed": true,
+      "completed_at": "2026-05-14",
+      "progress": 0.8164075722663761
+    },
+    "3.4.7": {
+      "completed": true,
+      "completed_at": "2026-04-16",
+      "progress": 0.9222530343800398
+    },
+    "2.2.3": {
+      "completed": true,
+      "completed_at": "2026-05-28",
+      "progress": 0.9774311591661151
+    },
+    "3.2.1": {
+      "completed": true,
+      "completed_at": "2026-04-23",
+      "progress": 0.9420972438175857
+    },
+    "3.4.3": {
+      "completed": true,
+      "completed_at": "2026-05-22",
+      "progress": 0.8696165905391068
+    },
+    "3.1.2": {
+      "completed": true,
+      "completed_at": "2026-05-20",
+      "progress": 0.8822151653657795
+    },
+    "1.6.1": {
+      "completed": true,
+      "completed_at": "2026-03-23",
+      "progress": 0.8317354939592729
+    },
+    "2.2.1": {
+      "completed": true,
+      "completed_at": "2026-05-14",
+      "progress": 0.9883430110530937
+    },
+    "2.3.4": {
+      "completed": true,
+      "completed_at": "2026-05-19",
+      "progress": 0.9262686536583966
+    },
+    "3.4.6": {
+      "completed": true,
+      "completed_at": "2026-05-05",
+      "progress": 0.9831871721438542
+    },
+    "1.1.4": {
+      "completed": true,
+      "completed_at": "2026-04-04",
+      "progress": 0.8055268233622821
+    },
+    "3.3.1": {
+      "completed": true,
+      "completed_at": "2026-05-14",
+      "progress": 0.8022520988800521
+    },
+    "1.3.1": {
+      "completed": true,
+      "completed_at": "2026-03-07",
+      "progress": 0.8451735670718599
+    },
+    "2.2.2": {
+      "completed": true,
+      "completed_at": "2026-05-17",
+      "progress": 0.8040636096543576
+    },
+    "2.1.2": {
+      "completed": true,
+      "completed_at": "2026-04-23",
+      "progress": 0.9986710000716135
+    },
+    "2.1.1": {
+      "completed": true,
+      "completed_at": "2026-03-16",
+      "progress": 0.9573279559020297
+    },
+    "1.2.1": {
+      "completed": true,
+      "completed_at": "2026-03-05",
+      "progress": 0.8545327442737147
+    },
+    "1.1.2": {
+      "completed": true,
+      "completed_at": "2026-05-25",
+      "progress": 0.8978868617460516
+    },
+    "1.1.1": {
+      "completed": true,
+      "completed_at": "2026-04-18",
+      "progress": 0.9486882578034056
+    },
+    "3.2.2": {
+      "completed": true,
+      "completed_at": "2026-05-04",
+      "progress": 0.8205239138394798
+    },
+    "2.3.1": {
+      "completed": true,
+      "completed_at": "2026-03-12",
+      "progress": 0.9146685039856302
+    },
+    "1.2.2": {
+      "completed": true,
+      "completed_at": "2026-05-20",
+      "progress": 0.9678883772263722
+    },
+    "2.3.3": {
+      "completed": true,
+      "completed_at": "2026-04-03",
+      "progress": 0.9007062425737307
+    },
+    "1.6.2": {
+      "completed": true,
+      "completed_at": "2026-03-04",
+      "progress": 0.8536813000884408
+    },
+    "1.5.1": {
+      "completed": true,
+      "completed_at": "2026-04-15",
+      "progress": 0.8931418177997766
+    },
+    "1.2.3": {
+      "completed": true,
+      "completed_at": "2026-03-13",
+      "progress": 0.8405119778458793
+    }
+  },
+  "3220602024": {
+    "1.6.3": {
+      "completed": true,
+      "completed_at": "2026-05-23",
+      "progress": 0.8560994204474304
+    },
+    "3.4.4": {
+      "completed": true,
+      "completed_at": "2026-05-22",
+      "progress": 0.8536986262152549
+    },
+    "1.1.4": {
+      "completed": true,
+      "completed_at": "2026-03-14",
+      "progress": 0.9282245572112153
+    },
+    "3.1.1": {
+      "completed": true,
+      "completed_at": "2026-03-22",
+      "progress": 0.9025688348515459
+    },
+    "1.5.1": {
+      "completed": true,
+      "completed_at": "2026-03-11",
+      "progress": 0.9323385351229256
+    },
+    "3.3.1": {
+      "completed": true,
+      "completed_at": "2026-05-18",
+      "progress": 0.9493003808953928
+    },
+    "2.2.2": {
+      "completed": true,
+      "completed_at": "2026-04-10",
+      "progress": 0.9268336827158872
+    },
+    "2.4.3": {
+      "completed": true,
+      "completed_at": "2026-03-12",
+      "progress": 0.9291133974572833
+    },
+    "3.4.7": {
+      "completed": true,
+      "completed_at": "2026-03-28",
+      "progress": 0.9854420243640052
+    },
+    "3.4.2": {
+      "completed": true,
+      "completed_at": "2026-05-26",
+      "progress": 0.8630089830979153
+    },
+    "3.4.5": {
+      "completed": true,
+      "completed_at": "2026-05-10",
+      "progress": 0.8318302003252723
+    },
+    "1.1.3": {
+      "completed": true,
+      "completed_at": "2026-03-10",
+      "progress": 0.9221960392018205
+    },
+    "3.4.1": {
+      "completed": true,
+      "completed_at": "2026-04-21",
+      "progress": 0.8502082585149883
+    },
+    "2.4.2": {
+      "completed": true,
+      "completed_at": "2026-05-06",
+      "progress": 0.9007415421237978
+    },
+    "2.3.1": {
+      "completed": true,
+      "completed_at": "2026-04-15",
+      "progress": 0.9339463894650758
+    },
+    "3.4.6": {
+      "completed": true,
+      "completed_at": "2026-04-15",
+      "progress": 0.863166456263522
+    },
+    "2.4.1": {
+      "completed": true,
+      "completed_at": "2026-05-14",
+      "progress": 0.8817994573124439
+    },
+    "1.2.2": {
+      "completed": true,
+      "completed_at": "2026-05-03",
+      "progress": 0.8623757391712503
+    },
+    "2.2.3": {
+      "completed": true,
+      "completed_at": "2026-04-21",
+      "progress": 0.842507207028544
+    },
+    "1.3.1": {
+      "completed": true,
+      "completed_at": "2026-05-27",
+      "progress": 0.8260217780954344
+    }
+  },
+  "3220602025": {
+    "1.2.2": {
+      "completed": true,
+      "completed_at": "2026-05-09",
+      "progress": 0.9423049472731027
+    },
+    "1.6.3": {
+      "completed": true,
+      "completed_at": "2026-03-19",
+      "progress": 0.9890259838599222
+    },
+    "3.4.6": {
+      "completed": true,
+      "completed_at": "2026-03-26",
+      "progress": 0.833545579034987
+    },
+    "3.4.2": {
+      "completed": true,
+      "completed_at": "2026-04-05",
+      "progress": 0.934998091884597
+    },
+    "2.1.1": {
+      "completed": true,
+      "completed_at": "2026-05-15",
+      "progress": 0.8054729074770067
+    },
+    "3.4.5": {
+      "completed": true,
+      "completed_at": "2026-03-19",
+      "progress": 0.8095329528699376
+    },
+    "3.1.1": {
+      "completed": true,
+      "completed_at": "2026-03-10",
+      "progress": 0.8853394061292661
+    },
+    "3.4.7": {
+      "completed": true,
+      "completed_at": "2026-04-05",
+      "progress": 0.9808603569742169
+    },
+    "3.4.4": {
+      "completed": true,
+      "completed_at": "2026-03-21",
+      "progress": 0.9328432452465203
+    },
+    "2.3.4": {
+      "completed": true,
+      "completed_at": "2026-03-28",
+      "progress": 0.8302751993428923
+    },
+    "1.5.1": {
+      "completed": true,
+      "completed_at": "2026-04-05",
+      "progress": 0.8504850600517224
+    },
+    "1.1.2": {
+      "completed": true,
+      "completed_at": "2026-03-15",
+      "progress": 0.8829690259694933
+    },
+    "2.2.2": {
+      "completed": true,
+      "completed_at": "2026-03-27",
+      "progress": 0.9219105451591837
+    },
+    "1.1.4": {
+      "completed": true,
+      "completed_at": "2026-03-24",
+      "progress": 0.9982439591256949
+    },
+    "2.3.2": {
+      "completed": true,
+      "completed_at": "2026-03-14",
+      "progress": 0.8837310089521031
+    },
+    "2.3.3": {
+      "completed": true,
+      "completed_at": "2026-04-09",
+      "progress": 0.8734166397412213
+    },
+    "3.1.2": {
+      "completed": true,
+      "completed_at": "2026-04-21",
+      "progress": 0.985989149864546
+    },
+    "3.2.1": {
+      "completed": true,
+      "completed_at": "2026-04-26",
+      "progress": 0.8990767807571215
+    },
+    "2.4.1": {
+      "completed": true,
+      "completed_at": "2026-03-15",
+      "progress": 0.9942485661029568
+    },
+    "2.2.3": {
+      "completed": true,
+      "completed_at": "2026-04-02",
+      "progress": 0.8134223875778476
+    },
+    "3.4.1": {
+      "completed": true,
+      "completed_at": "2026-03-19",
+      "progress": 0.9811810983939919
+    },
+    "1.2.1": {
+      "completed": true,
+      "completed_at": "2026-04-23",
+      "progress": 0.9758600300029927
+    },
+    "1.1.1": {
+      "completed": true,
+      "completed_at": "2026-04-25",
+      "progress": 0.9942288031478173
+    },
+    "1.4.1": {
+      "completed": true,
+      "completed_at": "2026-03-17",
+      "progress": 0.9760792829521014
+    },
+    "2.2.1": {
+      "completed": true,
+      "completed_at": "2026-05-05",
+      "progress": 0.9966677849630536
+    },
+    "1.1.3": {
+      "completed": true,
+      "completed_at": "2026-05-15",
+      "progress": 0.91112634279565
+    },
+    "1.3.1": {
+      "completed": true,
+      "completed_at": "2026-05-07",
+      "progress": 0.8917865411833065
+    },
+    "2.4.2": {
+      "completed": true,
+      "completed_at": "2026-03-16",
+      "progress": 0.9294065546549245
+    },
+    "3.3.1": {
+      "completed": true,
+      "completed_at": "2026-03-27",
+      "progress": 0.9352559532056117
+    },
+    "2.4.3": {
+      "completed": true,
+      "completed_at": "2026-05-12",
+      "progress": 0.9707439198092472
+    },
+    "3.2.2": {
+      "completed": true,
+      "completed_at": "2026-05-21",
+      "progress": 0.8806945616271434
+    },
+    "1.6.1": {
+      "completed": true,
+      "completed_at": "2026-03-23",
+      "progress": 0.812516758915542
+    },
+    "2.1.2": {
+      "completed": true,
+      "completed_at": "2026-05-16",
+      "progress": 0.9683868733354729
+    },
+    "1.6.2": {
+      "completed": true,
+      "completed_at": "2026-05-03",
+      "progress": 0.9002462753061095
+    },
+    "3.4.3": {
+      "completed": true,
+      "completed_at": "2026-04-26",
+      "progress": 0.8658045812190112
+    },
+    "2.3.1": {
+      "completed": true,
+      "completed_at": "2026-05-25",
+      "progress": 0.8176835691324209
+    },
+    "1.2.3": {
+      "completed": true,
+      "completed_at": "2026-05-19",
+      "progress": 0.9576828496449773
+    }
+  },
+  "3220602026": {
+    "3.2.1": {
+      "completed": true,
+      "completed_at": "2026-03-15",
+      "progress": 0.9842882692875475
+    },
+    "1.4.1": {
+      "completed": true,
+      "completed_at": "2026-05-14",
+      "progress": 0.9988317205571198
+    },
+    "2.2.1": {
+      "completed": true,
+      "completed_at": "2026-03-10",
+      "progress": 0.8846041945319361
+    },
+    "2.1.1": {
+      "completed": true,
+      "completed_at": "2026-03-19",
+      "progress": 0.816458067378513
+    },
+    "3.3.1": {
+      "completed": true,
+      "completed_at": "2026-03-26",
+      "progress": 0.9721077523527831
+    },
+    "2.2.3": {
+      "completed": true,
+      "completed_at": "2026-05-10",
+      "progress": 0.83466806295102
+    },
+    "1.1.2": {
+      "completed": true,
+      "completed_at": "2026-04-26",
+      "progress": 0.9929641135130771
+    },
+    "2.2.2": {
+      "completed": true,
+      "completed_at": "2026-03-15",
+      "progress": 0.997079923225722
+    },
+    "2.3.3": {
+      "completed": true,
+      "completed_at": "2026-04-05",
+      "progress": 0.9802679616764223
+    },
+    "2.1.2": {
+      "completed": true,
+      "completed_at": "2026-03-24",
+      "progress": 0.9735115556378908
+    },
+    "1.1.3": {
+      "completed": true,
+      "completed_at": "2026-04-16",
+      "progress": 0.8008255824439435
+    },
+    "2.3.1": {
+      "completed": true,
+      "completed_at": "2026-03-05",
+      "progress": 0.878754217453911
+    },
+    "1.6.2": {
+      "completed": true,
+      "completed_at": "2026-03-24",
+      "progress": 0.8740403322624908
+    },
+    "3.4.5": {
+      "completed": true,
+      "completed_at": "2026-04-23",
+      "progress": 0.9403326942126256
+    },
+    "3.1.2": {
+      "completed": true,
+      "completed_at": "2026-03-20",
+      "progress": 0.8257626017972015
+    },
+    "2.4.3": {
+      "completed": true,
+      "completed_at": "2026-04-19",
+      "progress": 0.8324740870217765
+    },
+    "1.6.3": {
+      "completed": true,
+      "completed_at": "2026-03-13",
+      "progress": 0.8268051774087575
+    },
+    "1.2.2": {
+      "completed": true,
+      "completed_at": "2026-03-08",
+      "progress": 0.8578208538017686
+    },
+    "1.1.4": {
+      "completed": true,
+      "completed_at": "2026-03-09",
+      "progress": 0.9430712767086034
+    },
+    "1.1.1": {
+      "completed": true,
+      "completed_at": "2026-04-14",
+      "progress": 0.8458404139148192
+    },
+    "3.4.1": {
+      "completed": true,
+      "completed_at": "2026-03-23",
+      "progress": 0.9184292398400964
+    },
+    "3.4.2": {
+      "completed": true,
+      "completed_at": "2026-04-05",
+      "progress": 0.9989246346090148
+    },
+    "1.2.1": {
+      "completed": true,
+      "completed_at": "2026-03-03",
+      "progress": 0.9101960793403302
+    },
+    "1.3.1": {
+      "completed": true,
+      "completed_at": "2026-03-04",
+      "progress": 0.9176162054995082
+    },
+    "2.3.4": {
+      "completed": true,
+      "completed_at": "2026-05-17",
+      "progress": 0.9086495344784877
+    },
+    "3.4.3": {
+      "completed": true,
+      "completed_at": "2026-03-12",
+      "progress": 0.917976422710725
+    },
+    "1.5.1": {
+      "completed": true,
+      "completed_at": "2026-03-24",
+      "progress": 0.8698295428248679
+    },
+    "3.4.7": {
+      "completed": true,
+      "completed_at": "2026-05-06",
+      "progress": 0.9347167706910813
+    },
+    "2.4.2": {
+      "completed": true,
+      "completed_at": "2026-03-16",
+      "progress": 0.9816979808906791
+    },
+    "1.2.3": {
+      "completed": true,
+      "completed_at": "2026-05-10",
+      "progress": 0.8893239118530931
+    },
+    "2.3.2": {
+      "completed": true,
+      "completed_at": "2026-05-28",
+      "progress": 0.9400218449972045
+    },
+    "2.4.1": {
+      "completed": true,
+      "completed_at": "2026-03-10",
+      "progress": 0.866254810520321
+    },
+    "3.1.1": {
+      "completed": true,
+      "completed_at": "2026-05-04",
+      "progress": 0.9215675600181796
+    },
+    "3.4.4": {
+      "completed": true,
+      "completed_at": "2026-04-18",
+      "progress": 0.8225616570171361
+    },
+    "1.6.1": {
+      "completed": true,
+      "completed_at": "2026-03-07",
+      "progress": 0.9136124240166615
+    },
+    "3.4.6": {
+      "completed": true,
+      "completed_at": "2026-04-05",
+      "progress": 0.8395374935295524
+    },
+    "3.2.2": {
+      "completed": true,
+      "completed_at": "2026-03-18",
+      "progress": 0.9037591340508334
+    }
+  },
+  "3220602027": {
+    "2.1.2": {
+      "completed": true,
+      "completed_at": "2026-05-16",
+      "progress": 0.9729909138352465
+    },
+    "1.6.2": {
+      "completed": true,
+      "completed_at": "2026-04-27",
+      "progress": 0.9101995802806664
+    },
+    "3.3.1": {
+      "completed": true,
+      "completed_at": "2026-05-19",
+      "progress": 0.8841413251992201
+    },
+    "2.3.3": {
+      "completed": true,
+      "completed_at": "2026-04-24",
+      "progress": 0.8407442848212493
+    },
+    "2.3.2": {
+      "completed": true,
+      "completed_at": "2026-04-01",
+      "progress": 0.8001093436419288
+    },
+    "1.2.2": {
+      "completed": true,
+      "completed_at": "2026-04-25",
+      "progress": 0.9974854280111449
+    },
+    "2.4.3": {
+      "completed": true,
+      "completed_at": "2026-04-16",
+      "progress": 0.9213222418456721
+    },
+    "1.2.3": {
+      "completed": true,
+      "completed_at": "2026-03-16",
+      "progress": 0.9723080238248931
+    },
+    "3.2.2": {
+      "completed": true,
+      "completed_at": "2026-03-15",
+      "progress": 0.8429227716546454
+    },
+    "2.2.2": {
+      "completed": true,
+      "completed_at": "2026-03-06",
+      "progress": 0.9805515354819467
+    },
+    "2.2.1": {
+      "completed": true,
+      "completed_at": "2026-05-19",
+      "progress": 0.9747810801048352
+    },
+    "1.1.2": {
+      "completed": true,
+      "completed_at": "2026-03-15",
+      "progress": 0.8294461939568887
+    },
+    "3.4.6": {
+      "completed": true,
+      "completed_at": "2026-04-09",
+      "progress": 0.9138822986921007
+    },
+    "1.6.1": {
+      "completed": true,
+      "completed_at": "2026-04-24",
+      "progress": 0.9900998728281325
+    },
+    "1.5.1": {
+      "completed": true,
+      "completed_at": "2026-03-06",
+      "progress": 0.8755337862787298
+    },
+    "2.4.1": {
+      "completed": true,
+      "completed_at": "2026-05-11",
+      "progress": 0.9871402875678468
+    },
+    "1.1.1": {
+      "completed": true,
+      "completed_at": "2026-04-21",
+      "progress": 0.9775254229264485
+    },
+    "2.4.2": {
+      "completed": true,
+      "completed_at": "2026-03-14",
+      "progress": 0.9194926696452403
+    },
+    "2.3.4": {
+      "completed": true,
+      "completed_at": "2026-03-02",
+      "progress": 0.915958286965486
+    },
+    "3.1.2": {
+      "completed": true,
+      "completed_at": "2026-03-12",
+      "progress": 0.9436972376802157
+    },
+    "3.4.3": {
+      "completed": true,
+      "completed_at": "2026-05-12",
+      "progress": 0.8471463559025993
+    },
+    "3.4.1": {
+      "completed": true,
+      "completed_at": "2026-04-24",
+      "progress": 0.986999622063497
+    },
+    "1.1.4": {
+      "completed": true,
+      "completed_at": "2026-03-20",
+      "progress": 0.8968934519756018
+    },
+    "1.1.3": {
+      "completed": true,
+      "completed_at": "2026-03-17",
+      "progress": 0.9845548846958043
+    },
+    "1.2.1": {
+      "completed": true,
+      "completed_at": "2026-04-08",
+      "progress": 0.9015174984863444
+    },
+    "3.1.1": {
+      "completed": true,
+      "completed_at": "2026-05-20",
+      "progress": 0.8944333419532641
+    },
+    "3.4.7": {
+      "completed": true,
+      "completed_at": "2026-04-22",
+      "progress": 0.851995405607111
+    },
+    "3.4.5": {
+      "completed": true,
+      "completed_at": "2026-03-07",
+      "progress": 0.9980076459970887
+    },
+    "3.4.4": {
+      "completed": true,
+      "completed_at": "2026-04-09",
+      "progress": 0.91088794257452
+    },
+    "1.3.1": {
+      "completed": true,
+      "completed_at": "2026-04-27",
+      "progress": 0.8999511727045917
+    },
+    "1.4.1": {
+      "completed": true,
+      "completed_at": "2026-03-14",
+      "progress": 0.9673257696965724
+    },
+    "2.2.3": {
+      "completed": true,
+      "completed_at": "2026-04-13",
+      "progress": 0.9217196004485456
+    },
+    "2.1.1": {
+      "completed": true,
+      "completed_at": "2026-04-13",
+      "progress": 0.8138488039467998
+    },
+    "2.3.1": {
+      "completed": true,
+      "completed_at": "2026-04-24",
+      "progress": 0.9832525232009113
+    },
+    "3.4.2": {
+      "completed": true,
+      "completed_at": "2026-05-20",
+      "progress": 0.9292868111188032
+    },
+    "3.2.1": {
+      "completed": true,
+      "completed_at": "2026-03-18",
+      "progress": 0.9815729499206066
+    },
+    "1.6.3": {
+      "completed": true,
+      "completed_at": "2026-04-22",
+      "progress": 0.8600233059775789
+    }
+  },
+  "3220602028": {
+    "2.3.1": {
+      "completed": true,
+      "completed_at": "2026-03-02",
+      "progress": 0.99772024567546
+    },
+    "1.1.2": {
+      "completed": true,
+      "completed_at": "2026-05-04",
+      "progress": 0.8970917251797453
+    },
+    "2.3.3": {
+      "completed": true,
+      "completed_at": "2026-03-20",
+      "progress": 0.9257465427567555
+    },
+    "1.1.3": {
+      "completed": true,
+      "completed_at": "2026-03-15",
+      "progress": 0.8298583351911175
+    },
+    "3.4.5": {
+      "completed": true,
+      "completed_at": "2026-03-15",
+      "progress": 0.8965854972534559
+    },
+    "1.2.3": {
+      "completed": true,
+      "completed_at": "2026-05-09",
+      "progress": 0.8012163423865949
+    },
+    "1.6.1": {
+      "completed": true,
+      "completed_at": "2026-05-18",
+      "progress": 0.9048938949577101
+    },
+    "3.4.7": {
+      "completed": true,
+      "completed_at": "2026-04-19",
+      "progress": 0.8882832577280867
+    },
+    "1.4.1": {
+      "completed": true,
+      "completed_at": "2026-05-07",
+      "progress": 0.8149812024587163
+    },
+    "2.3.2": {
+      "completed": true,
+      "completed_at": "2026-05-24",
+      "progress": 0.8234969457425766
+    },
+    "1.1.1": {
+      "completed": true,
+      "completed_at": "2026-05-28",
+      "progress": 0.8580909256970435
+    },
+    "2.1.1": {
+      "completed": true,
+      "completed_at": "2026-05-03",
+      "progress": 0.8842118729635547
+    },
+    "2.4.3": {
+      "completed": true,
+      "completed_at": "2026-03-24",
+      "progress": 0.8487930933977588
+    },
+    "3.4.6": {
+      "completed": true,
+      "completed_at": "2026-05-19",
+      "progress": 0.9057441340839943
+    },
+    "1.3.1": {
+      "completed": true,
+      "completed_at": "2026-05-18",
+      "progress": 0.8469799166705375
+    },
+    "3.4.1": {
+      "completed": true,
+      "completed_at": "2026-04-01",
+      "progress": 0.8081064546005633
+    },
+    "3.1.1": {
+      "completed": true,
+      "completed_at": "2026-04-09",
+      "progress": 0.9696907402650161
+    },
+    "1.2.2": {
+      "completed": true,
+      "completed_at": "2026-05-18",
+      "progress": 0.8830229201189269
+    },
+    "2.1.2": {
+      "completed": true,
+      "completed_at": "2026-03-25",
+      "progress": 0.9104402939785965
+    },
+    "3.1.2": {
+      "completed": true,
+      "completed_at": "2026-05-16",
+      "progress": 0.9460591604598982
+    },
+    "1.6.3": {
+      "completed": true,
+      "completed_at": "2026-04-04",
+      "progress": 0.9175192708880912
+    },
+    "3.4.4": {
+      "completed": true,
+      "completed_at": "2026-05-18",
+      "progress": 0.8919669044360146
+    },
+    "2.2.3": {
+      "completed": true,
+      "completed_at": "2026-03-21",
+      "progress": 0.954797006675101
+    },
+    "2.3.4": {
+      "completed": true,
+      "completed_at": "2026-03-02",
+      "progress": 0.9373703292595528
+    },
+    "3.2.1": {
+      "completed": true,
+      "completed_at": "2026-04-23",
+      "progress": 0.9849335109398226
+    }
+  },
+  "3220602029": {
+    "3.4.1": {
+      "completed": true,
+      "completed_at": "2026-05-28",
+      "progress": 0.8057934435927435
+    },
+    "3.4.6": {
+      "completed": true,
+      "completed_at": "2026-05-23",
+      "progress": 0.9334231848985948
+    },
+    "3.1.2": {
+      "completed": true,
+      "completed_at": "2026-03-20",
+      "progress": 0.8806627753395537
+    },
+    "1.2.3": {
+      "completed": true,
+      "completed_at": "2026-05-25",
+      "progress": 0.9021850745188562
+    },
+    "2.4.3": {
+      "completed": true,
+      "completed_at": "2026-03-06",
+      "progress": 0.8871168156147269
+    },
+    "2.3.3": {
+      "completed": true,
+      "completed_at": "2026-05-28",
+      "progress": 0.9309051509747721
+    },
+    "3.2.1": {
+      "completed": true,
+      "completed_at": "2026-03-27",
+      "progress": 0.9756180029600185
+    },
+    "2.2.3": {
+      "completed": true,
+      "completed_at": "2026-05-02",
+      "progress": 0.8461823837079532
+    },
+    "1.4.1": {
+      "completed": true,
+      "completed_at": "2026-04-04",
+      "progress": 0.9256489707382418
+    },
+    "1.1.4": {
+      "completed": true,
+      "completed_at": "2026-03-06",
+      "progress": 0.9486804134113047
+    },
+    "2.4.2": {
+      "completed": true,
+      "completed_at": "2026-04-21",
+      "progress": 0.9566336192580925
+    },
+    "3.1.1": {
+      "completed": true,
+      "completed_at": "2026-03-23",
+      "progress": 0.9567315301919896
+    },
+    "3.4.4": {
+      "completed": true,
+      "completed_at": "2026-04-06",
+      "progress": 0.9163131340698291
+    },
+    "1.1.1": {
+      "completed": true,
+      "completed_at": "2026-05-21",
+      "progress": 0.8369058643951266
+    },
+    "1.1.2": {
+      "completed": true,
+      "completed_at": "2026-04-17",
+      "progress": 0.8394389143947075
+    },
+    "2.3.2": {
+      "completed": true,
+      "completed_at": "2026-03-14",
+      "progress": 0.9062431247637797
+    },
+    "3.4.3": {
+      "completed": true,
+      "completed_at": "2026-03-08",
+      "progress": 0.8034700979670689
+    },
+    "1.2.2": {
+      "completed": true,
+      "completed_at": "2026-05-08",
+      "progress": 0.8297004146008963
+    },
+    "2.3.4": {
+      "completed": true,
+      "completed_at": "2026-04-05",
+      "progress": 0.8851226807365212
+    },
+    "3.4.5": {
+      "completed": true,
+      "completed_at": "2026-03-03",
+      "progress": 0.927019439769784
+    },
+    "2.1.1": {
+      "completed": true,
+      "completed_at": "2026-05-21",
+      "progress": 0.8213966874607932
+    },
+    "1.5.1": {
+      "completed": true,
+      "completed_at": "2026-03-08",
+      "progress": 0.9834674984463654
+    },
+    "3.4.2": {
+      "completed": true,
+      "completed_at": "2026-04-07",
+      "progress": 0.9049845867250614
+    },
+    "1.1.3": {
+      "completed": true,
+      "completed_at": "2026-05-22",
+      "progress": 0.8122374772047407
+    },
+    "3.3.1": {
+      "completed": true,
+      "completed_at": "2026-03-21",
+      "progress": 0.828354306767074
+    },
+    "2.1.2": {
+      "completed": true,
+      "completed_at": "2026-03-05",
+      "progress": 0.8527826542042872
+    },
+    "1.6.1": {
+      "completed": true,
+      "completed_at": "2026-03-24",
+      "progress": 0.9549669053521921
+    },
+    "1.6.2": {
+      "completed": true,
+      "completed_at": "2026-05-26",
+      "progress": 0.9627683153976687
+    },
+    "1.3.1": {
+      "completed": true,
+      "completed_at": "2026-04-05",
+      "progress": 0.9899500024679542
+    },
+    "2.2.2": {
+      "completed": true,
+      "completed_at": "2026-03-02",
+      "progress": 0.8154866710778129
+    },
+    "1.2.1": {
+      "completed": true,
+      "completed_at": "2026-04-26",
+      "progress": 0.9277461324226168
+    },
+    "2.2.1": {
+      "completed": true,
+      "completed_at": "2026-04-06",
+      "progress": 0.9815824357622879
+    },
+    "2.4.1": {
+      "completed": true,
+      "completed_at": "2026-03-24",
+      "progress": 0.8696034129021697
+    },
+    "3.4.7": {
+      "completed": true,
+      "completed_at": "2026-03-02",
+      "progress": 0.9178168578721064
+    },
+    "1.6.3": {
+      "completed": true,
+      "completed_at": "2026-05-03",
+      "progress": 0.8133672216650377
+    },
+    "2.3.1": {
+      "completed": true,
+      "completed_at": "2026-05-24",
+      "progress": 0.8923009635757628
+    },
+    "3.2.2": {
+      "completed": true,
+      "completed_at": "2026-04-17",
+      "progress": 0.8056257583359605
+    }
+  },
+  "3220602030": {
+    "2.4.2": {
+      "completed": true,
+      "completed_at": "2026-05-08",
+      "progress": 0.8985703809725663
+    },
+    "1.3.1": {
+      "completed": true,
+      "completed_at": "2026-03-20",
+      "progress": 0.8186493501536772
+    },
+    "1.2.2": {
+      "completed": true,
+      "completed_at": "2026-04-12",
+      "progress": 0.822165865157532
+    },
+    "1.2.1": {
+      "completed": true,
+      "completed_at": "2026-03-09",
+      "progress": 0.8762875790957548
+    },
+    "2.3.3": {
+      "completed": true,
+      "completed_at": "2026-05-17",
+      "progress": 0.958693578838641
+    },
+    "1.1.2": {
+      "completed": true,
+      "completed_at": "2026-03-26",
+      "progress": 0.8989635531873434
+    },
+    "2.3.4": {
+      "completed": true,
+      "completed_at": "2026-04-03",
+      "progress": 0.8084262617916185
+    },
+    "2.4.1": {
+      "completed": true,
+      "completed_at": "2026-04-18",
+      "progress": 0.8454745423701013
+    },
+    "1.5.1": {
+      "completed": true,
+      "completed_at": "2026-04-18",
+      "progress": 0.9445584405055965
+    },
+    "1.1.4": {
+      "completed": true,
+      "completed_at": "2026-04-20",
+      "progress": 0.8130845648296859
+    },
+    "3.4.5": {
+      "completed": true,
+      "completed_at": "2026-03-15",
+      "progress": 0.8671373514471822
+    },
+    "3.1.2": {
+      "completed": true,
+      "completed_at": "2026-03-14",
+      "progress": 0.9490088629497118
+    },
+    "3.4.7": {
+      "completed": true,
+      "completed_at": "2026-04-28",
+      "progress": 0.8946012848825894
+    },
+    "1.6.1": {
+      "completed": true,
+      "completed_at": "2026-05-24",
+      "progress": 0.8111924981384915
+    },
+    "3.4.2": {
+      "completed": true,
+      "completed_at": "2026-03-25",
+      "progress": 0.845910845224251
+    },
+    "1.1.3": {
+      "completed": true,
+      "completed_at": "2026-03-24",
+      "progress": 0.9321013193146445
+    },
+    "3.2.1": {
+      "completed": true,
+      "completed_at": "2026-04-16",
+      "progress": 0.8675190821491289
+    },
+    "3.1.1": {
+      "completed": true,
+      "completed_at": "2026-05-28",
+      "progress": 0.8140049053635028
+    },
+    "2.2.2": {
+      "completed": true,
+      "completed_at": "2026-04-18",
+      "progress": 0.8386493509352959
+    },
+    "2.1.2": {
+      "completed": true,
+      "completed_at": "2026-05-14",
+      "progress": 0.8382893084268824
+    },
+    "2.4.3": {
+      "completed": true,
+      "completed_at": "2026-05-13",
+      "progress": 0.986010281505
+    },
+    "3.3.1": {
+      "completed": true,
+      "completed_at": "2026-04-27",
+      "progress": 0.8070185780309951
+    },
+    "1.4.1": {
+      "completed": true,
+      "completed_at": "2026-05-21",
+      "progress": 0.9338938703672575
+    },
+    "3.4.1": {
+      "completed": true,
+      "completed_at": "2026-05-11",
+      "progress": 0.9011988707671031
+    },
+    "1.2.3": {
+      "completed": true,
+      "completed_at": "2026-03-04",
+      "progress": 0.9090680649446039
+    },
+    "3.4.6": {
+      "completed": true,
+      "completed_at": "2026-04-15",
+      "progress": 0.895031684763527
+    },
+    "1.1.1": {
+      "completed": true,
+      "completed_at": "2026-04-01",
+      "progress": 0.8885017035061488
+    },
+    "3.4.3": {
+      "completed": true,
+      "completed_at": "2026-04-12",
+      "progress": 0.894471415022351
+    },
+    "2.3.1": {
+      "completed": true,
+      "completed_at": "2026-04-05",
+      "progress": 0.9972848250133354
+    },
+    "1.6.2": {
+      "completed": true,
+      "completed_at": "2026-04-03",
+      "progress": 0.8116697815819118
+    },
+    "2.2.1": {
+      "completed": true,
+      "completed_at": "2026-05-13",
+      "progress": 0.820682665624486
+    },
+    "3.4.4": {
+      "completed": true,
+      "completed_at": "2026-03-10",
+      "progress": 0.8345089715393198
+    },
+    "2.2.3": {
+      "completed": true,
+      "completed_at": "2026-03-08",
+      "progress": 0.8041929341446906
+    },
+    "3.2.2": {
+      "completed": true,
+      "completed_at": "2026-03-23",
+      "progress": 0.9467722123100057
+    },
+    "2.1.1": {
+      "completed": true,
+      "completed_at": "2026-03-18",
+      "progress": 0.8781050645246086
+    },
+    "2.3.2": {
+      "completed": true,
+      "completed_at": "2026-03-28",
+      "progress": 0.9001218081496611
+    },
+    "1.6.3": {
+      "completed": true,
+      "completed_at": "2026-04-20",
+      "progress": 0.9659124448279218
+    }
+  },
+  "3220602003张三": {
+    "1.1.3_操作系统的基本功能_李老师.mp4": {
+      "completed": true,
+      "completed_at": "2026-06-04T21:59:10",
+      "updated_at": "2026-06-04T21:59:14",
+      "knowledge_id": "1.1.3",
+      "teacher_name": "李老师",
+      "resource_type": "Video"
+    }
+  }
+}

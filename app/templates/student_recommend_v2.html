@@ -1,0 +1,360 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <meta charset="UTF-8">
+    <title>学习资源推荐 - {{ student_name }}</title>
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body { font-family: 'Microsoft YaHei', 'SimHei', Arial, sans-serif; background: #f0f2f5; color: #333; display: flex; height: 100vh; overflow: hidden; }
+
+        .sidebar { width: 200px; min-width: 200px; background: #1e293b; color: #e2e8f0; display: flex; flex-direction: column; }
+        .sidebar-header { padding: 20px 16px; border-bottom: 1px solid #334155; }
+        .sidebar-header h3 { font-size: 14px; font-weight: 600; margin-bottom: 4px; color: #f1f5f9; }
+        .sidebar-header .user-badge { font-size: 12px; color: #94a3b8; }
+        .nav-menu { flex: 1; padding: 8px 0; }
+        .nav-item { padding: 10px 16px; display: flex; align-items: center; gap: 10px; font-size: 13px; text-decoration: none; color: #94a3b8; border-left: 3px solid transparent; cursor: pointer; }
+        .nav-item:hover { background: #334155; color: #e2e8f0; }
+        .nav-item.active { background: #1e3a5f; color: #60a5fa; border-left-color: #3b82f6; }
+        .nav-item .nav-icon { width: 18px; text-align: center; font-size: 15px; }
+        .sidebar-footer { padding: 12px 16px; border-top: 1px solid #334155; }
+        .logout-btn { width: 100%; padding: 8px; background: #dc2626; color: white; border: none; border-radius: 4px; cursor: pointer; font-size: 13px; }
+        .logout-btn:hover { background: #b91c1c; }
+
+        .main-wrap { flex: 1; display: flex; flex-direction: column; overflow: hidden; }
+        .top-bar { padding: 14px 24px; background: white; border-bottom: 1px solid #e5e7eb; display: flex; align-items: center; justify-content: space-between; flex-shrink: 0; }
+        .top-bar h2 { font-size: 18px; font-weight: 600; color: #1e293b; }
+        .top-bar .refresh-btn { padding: 7px 18px; background: #3b82f6; color: white; border: none; border-radius: 5px; cursor: pointer; font-size: 13px; }
+        .top-bar .refresh-btn:hover { background: #2563eb; }
+
+        .main-content { flex: 1; overflow-y: auto; padding: 20px 24px; }
+
+        .loading-wrap { display: flex; align-items: center; justify-content: center; height: 200px; color: #94a3b8; font-size: 15px; }
+        .loading-spinner { width: 28px; height: 28px; border: 3px solid #e5e7eb; border-top-color: #3b82f6; border-radius: 50%; animation: spin .8s linear infinite; margin-right: 10px; }
+        @keyframes spin { to { transform: rotate(360deg); } }
+
+        .overview { background: linear-gradient(135deg, #1e3a5f 0%, #3b82f6 100%); border-radius: 12px; padding: 24px 28px; color: white; margin-bottom: 20px; }
+        .overview-row1 { display: flex; align-items: center; gap: 16px; margin-bottom: 14px; }
+        .overview-avatar { width: 44px; height: 44px; border-radius: 50%; background: rgba(255,255,255,.2); display: flex; align-items: center; justify-content: center; font-size: 20px; font-weight: 700; }
+        .overview-name { font-size: 18px; font-weight: 700; }
+        .overview-id { font-size: 12px; opacity: .7; }
+        .overview-type { display: inline-block; padding: 3px 12px; border-radius: 20px; font-size: 12px; font-weight: 600; }
+        .type-excellent { background: #22c55e; }
+        .type-medium { background: #f59e0b; }
+        .type-weak { background: #3b82f6; }
+        .overview-stats { display: grid; grid-template-columns: repeat(5, 1fr); gap: 12px; }
+        .overview-stat { background: rgba(255,255,255,.12); border-radius: 8px; padding: 12px; text-align: center; }
+        .overview-stat .stat-num { font-size: 24px; font-weight: 700; }
+        .overview-stat .stat-label { font-size: 11px; opacity: .8; margin-top: 2px; }
+        .overview-basis { margin-top: 14px; padding: 10px 14px; background: rgba(255,255,255,.1); border-radius: 8px; font-size: 12px; line-height: 1.6; opacity: .9; }
+
+        .path-title { font-size: 16px; font-weight: 600; color: #1e293b; margin-bottom: 16px; display: flex; align-items: center; gap: 8px; }
+        .path-title:before { content: ''; width: 4px; height: 20px; background: #3b82f6; border-radius: 2px; }
+
+        .kp-card { background: white; border-radius: 12px; box-shadow: 0 1px 3px rgba(0,0,0,.06); margin-bottom: 16px; overflow: hidden; }
+        .kp-card-header { padding: 16px 20px; border-bottom: 1px solid #f1f5f9; display: flex; align-items: center; gap: 14px; }
+        .kp-seq { width: 32px; height: 32px; border-radius: 50%; background: #3b82f6; color: white; display: flex; align-items: center; justify-content: center; font-size: 14px; font-weight: 700; flex-shrink: 0; }
+        .kp-info { flex: 1; min-width: 0; }
+        .kp-name { font-size: 15px; font-weight: 600; color: #1e293b; }
+        .kp-code { font-size: 11px; color: #94a3b8; margin-top: 2px; }
+        .kp-mastery-bar { width: 100px; height: 6px; background: #e5e7eb; border-radius: 3px; overflow: hidden; flex-shrink: 0; }
+        .kp-mastery-fill { height: 100%; border-radius: 3px; }
+        .kp-mastery-text { font-size: 12px; color: #64748b; flex-shrink: 0; min-width: 40px; text-align: right; }
+        .kp-status { font-size: 11px; padding: 2px 10px; border-radius: 10px; font-weight: 600; flex-shrink: 0; }
+        .status-unlearned { background: #fee2e2; color: #dc2626; }
+        .status-weak { background: #fef3c7; color: #d97706; }
+        .status-good { background: #dbeafe; color: #2563eb; }
+        .status-mastered { background: #dcfce7; color: #16a34a; }
+
+        .kp-reason { padding: 10px 20px; background: #f8fafc; font-size: 13px; color: #475569; border-bottom: 1px solid #f1f5f9; display: flex; align-items: flex-start; gap: 6px; }
+        .kp-reason .reason-icon { color: #3b82f6; flex-shrink: 0; }
+
+        .kp-body { padding: 16px 20px; }
+        .section-label { font-size: 13px; font-weight: 600; color: #64748b; margin-bottom: 10px; display: flex; align-items: center; gap: 6px; }
+        .section-label .label-icon { font-size: 16px; }
+
+        .res-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(280px, 1fr)); gap: 10px; margin-bottom: 16px; }
+        .res-card { border: 1px solid #e5e7eb; border-radius: 8px; padding: 14px; }
+        .res-card:hover { border-color: #3b82f6; box-shadow: 0 2px 8px rgba(59,130,246,.12); }
+        .res-title { font-size: 14px; font-weight: 600; color: #1e293b; margin-bottom: 6px; }
+        .res-meta { display: flex; flex-wrap: wrap; gap: 6px; margin-bottom: 6px; }
+        .res-tag { font-size: 11px; padding: 2px 8px; border-radius: 4px; background: #f1f5f9; color: #64748b; }
+        .res-tag.video { background: #fef2f2; color: #dc2626; }
+        .res-tag.ppt { background: #eff6ff; color: #2563eb; }
+        .res-tag.doc { background: #f0fdf4; color: #16a34a; }
+        .res-relation { font-size: 11px; padding: 2px 8px; border-radius: 4px; background: #ede9fe; color: #7c3aed; }
+        .res-reason { font-size: 12px; color: #64748b; margin-bottom: 8px; line-height: 1.5; }
+        .res-learn-btn { display: inline-block; padding: 6px 16px; background: #3b82f6; color: white; border-radius: 5px; text-decoration: none; font-size: 12px; font-weight: 600; }
+        .res-learn-btn:hover { background: #2563eb; }
+
+        .q-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(280px, 1fr)); gap: 10px; margin-bottom: 8px; }
+        .q-card { border: 1px solid #e5e7eb; border-radius: 8px; padding: 14px; }
+        .q-card:hover { border-color: #f59e0b; box-shadow: 0 2px 8px rgba(245,158,11,.12); }
+        .q-stem { font-size: 13px; color: #1e293b; margin-bottom: 6px; line-height: 1.5; }
+        .q-meta { display: flex; flex-wrap: wrap; gap: 6px; margin-bottom: 6px; }
+        .q-tag { font-size: 11px; padding: 2px 8px; border-radius: 4px; background: #f1f5f9; color: #64748b; }
+        .q-tag.single { background: #eff6ff; color: #2563eb; }
+        .q-tag.multi { background: #fef3c7; color: #d97706; }
+        .q-reason { font-size: 12px; color: #64748b; margin-bottom: 8px; }
+        .q-practice-btn { display: inline-block; padding: 6px 16px; background: #f59e0b; color: white; border-radius: 5px; text-decoration: none; font-size: 12px; font-weight: 600; }
+        .q-practice-btn:hover { background: #d97706; }
+
+        .kp-suggestion { padding: 10px 20px; background: #f0fdf4; border-top: 1px solid #dcfce7; font-size: 12px; color: #166534; display: flex; align-items: flex-start; gap: 6px; }
+        .kp-suggestion .sug-icon { color: #16a34a; flex-shrink: 0; }
+
+        .empty-state { text-align: center; padding: 40px; color: #94a3b8; }
+        .error-state { text-align: center; padding: 40px; color: #dc2626; }
+
+        @media (max-width: 768px) {
+            .overview-stats { grid-template-columns: repeat(2, 1fr); }
+            .res-grid, .q-grid { grid-template-columns: 1fr; }
+        }
+    </style>
+</head>
+<body>
+
+<div class="sidebar">
+    <div class="sidebar-header">
+        <h3>学习推荐系统</h3>
+        <div class="user-badge">{{ student_name }}</div>
+    </div>
+    <div class="nav-menu">
+        <a href="/student/dashboard" class="nav-item">
+            <span class="nav-icon">&#128200;</span> 首页
+        </a>
+        <a href="/student/recommend" class="nav-item {% if active_page == 'recommend' %}active{% endif %}">
+            <span class="nav-icon">&#127919;</span> 学习资源推荐
+        </a>
+        <a href="/student/resources" class="nav-item">
+            <span class="nav-icon">&#128218;</span> 学习资源库
+        </a>
+        <a href="/student/mastery" class="nav-item">
+            <span class="nav-icon">&#128202;</span> 知识点掌握度
+        </a>
+        <a href="/student/graph" class="nav-item">
+            <span class="nav-icon">&#128279;</span> 知识图谱
+        </a>
+        <a href="/student/discuss" class="nav-item">
+            <span class="nav-icon">&#128172;</span> 讨论区
+        </a>
+        <a href="/student/wrong" class="nav-item">
+            <span class="nav-icon">&#128221;</span> 错题集
+        </a>
+        <a href="/student/records" class="nav-item">
+            <span class="nav-icon">&#128197;</span> 学习记录
+        </a>
+    </div>
+    <div class="sidebar-footer">
+        <button class="logout-btn" onclick="location.href='/logout'">退出登录</button>
+    </div>
+</div>
+
+<div class="main-wrap">
+    <div class="top-bar">
+        <h2>学习资源推荐</h2>
+        <button class="refresh-btn" onclick="loadV2()">刷新推荐</button>
+    </div>
+    <div class="main-content" id="mainContent">
+        <div class="loading-wrap">
+            <div class="loading-spinner"></div>
+            正在加载推荐数据...
+        </div>
+    </div>
+</div>
+
+<script>
+var container = document.getElementById('mainContent');
+
+function masteryColor(v) {
+    if (v >= 0.80) return '#16a34a';
+    if (v >= 0.60) return '#2563eb';
+    if (v >= 0.35) return '#f59e0b';
+    return '#dc2626';
+}
+
+function statusText(v) {
+    if (v <= 0) return '未学习';
+    if (v < 0.35) return '需巩固';
+    if (v < 0.60) return '需巩固';
+    if (v < 0.80) return '良好';
+    return '已掌握';
+}
+
+function statusClass(v) {
+    if (v <= 0) return 'status-unlearned';
+    if (v < 0.60) return 'status-weak';
+    if (v < 0.80) return 'status-good';
+    return 'status-mastered';
+}
+
+function typeClass(t) {
+    if (t === 'excellent') return 'type-excellent';
+    if (t === 'weak') return 'type-weak';
+    return 'type-medium';
+}
+
+function pct(v) { return (v * 100).toFixed(0) + '%'; }
+
+function esc(s) {
+    if (!s) return '';
+    var d = document.createElement('div');
+    d.appendChild(document.createTextNode(s));
+    return d.innerHTML;
+}
+
+function renderOverview(data) {
+    var s = data.student || {};
+    var name = s.name || '未知';
+    var sid = s.id || '';
+    var type = s.type || 'medium';
+    var avgMastery = data.avg_mastery || 0;
+    var targets = data.targets || [];
+    var totalRes = 0, totalQ = 0;
+    targets.forEach(function(t) {
+        totalRes += (t.resources || []).length;
+        totalQ += (t.questions || []).length;
+    });
+    var basis = data.basis || '';
+
+    var html = '<div class="overview">';
+    html += '<div class="overview-row1">';
+    html += '<div class="overview-avatar">' + esc(name.charAt(0)) + '</div>';
+    html += '<div>';
+    html += '<div class="overview-name">' + esc(name) + '</div>';
+    html += '<div class="overview-id">' + esc(sid) + '</div>';
+    html += '</div>';
+    html += '<span class="overview-type ' + typeClass(type) + '">' + esc(data.recommend_type || '') + '</span>';
+    html += '</div>';
+    html += '<div class="overview-stats">';
+    html += '<div class="overview-stat"><div class="stat-num">' + pct(avgMastery) + '</div><div class="stat-label">平均掌握度</div></div>';
+    html += '<div class="overview-stat"><div class="stat-num">' + targets.length + '</div><div class="stat-label">推荐知识点</div></div>';
+    html += '<div class="overview-stat"><div class="stat-num">' + totalRes + '</div><div class="stat-label">推荐资源</div></div>';
+    html += '<div class="overview-stat"><div class="stat-num">' + totalQ + '</div><div class="stat-label">推荐题目</div></div>';
+    html += '<div class="overview-stat"><div class="stat-num">' + (data.weak_count || 0) + '</div><div class="stat-label">薄弱知识点</div></div>';
+    html += '</div>';
+    html += '<div class="overview-basis">&#128161; ' + esc(basis) + '</div>';
+    html += '</div>';
+    return html;
+}
+
+function renderResourceCard(r) {
+    var type = r.type || '文档';
+    var typeTag = '';
+    if (type.indexOf('视频') >= 0) typeTag = 'video';
+    else if (type.indexOf('PPT') >= 0) typeTag = 'ppt';
+    else typeTag = 'doc';
+    var url = r.watch_url || r.view_url || '#';
+    var html = '<div class="res-card">';
+    html += '<div class="res-title">' + esc(r.title || '未知资源') + '</div>';
+    html += '<div class="res-meta">';
+    html += '<span class="res-tag ' + typeTag + '">' + esc(type) + '</span>';
+    if (r.difficulty) html += '<span class="res-tag">' + esc(r.difficulty) + '</span>';
+    if (r.teacher) html += '<span class="res-tag">' + esc(r.teacher) + '</span>';
+    if (r.knowledge_id) html += '<span class="res-tag">' + esc(r.knowledge_id) + '</span>';
+    if (r.relation_label) html += '<span class="res-relation">' + esc(r.relation_label) + '</span>';
+    html += '</div>';
+    if (r.reason) html += '<div class="res-reason">' + esc(r.reason) + '</div>';
+    html += '<a class="res-learn-btn" href="' + url + '" target="_blank">开始学习</a>';
+    html += '</div>';
+    return html;
+}
+
+function renderQuestionCard(q) {
+    var stem = q.stem || '';
+    if (stem.length > 40) stem = stem.substring(0, 40) + '...';
+    var qtype = q.type || '单选';
+    var typeTag = qtype.indexOf('多选') >= 0 ? 'multi' : 'single';
+    var url = q.practice_url || '#';
+    var html = '<div class="q-card">';
+    html += '<div class="q-stem">' + esc(stem) + '</div>';
+    html += '<div class="q-meta">';
+    html += '<span class="q-tag ' + typeTag + '">' + esc(qtype) + '</span>';
+    if (q.difficulty) html += '<span class="q-tag">' + esc(q.difficulty) + '</span>';
+    if (q.knowledge_id) html += '<span class="q-tag">' + esc(q.knowledge_id) + '</span>';
+    html += '</div>';
+    if (q.reason) html += '<div class="q-reason">' + esc(q.reason) + '</div>';
+    html += '<a class="q-practice-btn" href="' + url + '" target="_blank">开始练习</a>';
+    html += '</div>';
+    return html;
+}
+
+function renderKPCard(t, idx) {
+    var mastery = t.mastery || 0;
+    var html = '<div class="kp-card">';
+    html += '<div class="kp-card-header">';
+    html += '<div class="kp-seq">' + (idx + 1) + '</div>';
+    html += '<div class="kp-info">';
+    html += '<div class="kp-name">' + esc(t.name || '未知知识点') + '</div>';
+    html += '<div class="kp-code">' + esc(t.code || '') + '</div>';
+    html += '</div>';
+    html += '<div class="kp-mastery-bar"><div class="kp-mastery-fill" style="width:' + pct(mastery) + ';background:' + masteryColor(mastery) + '"></div></div>';
+    html += '<div class="kp-mastery-text">' + pct(mastery) + '</div>';
+    html += '<span class="kp-status ' + statusClass(mastery) + '">' + statusText(mastery) + '</span>';
+    html += '</div>';
+
+    if (t.reason) {
+        html += '<div class="kp-reason"><span class="reason-icon">&#128161;</span>' + esc(t.reason) + '</div>';
+    }
+
+    html += '<div class="kp-body">';
+
+    var resources = t.resources || [];
+    if (resources.length > 0) {
+        html += '<div class="section-label"><span class="label-icon">&#128218;</span>推荐资源</div>';
+        html += '<div class="res-grid">';
+        resources.forEach(function(r) { html += renderResourceCard(r); });
+        html += '</div>';
+    }
+
+    var questions = t.questions || [];
+    if (questions.length > 0) {
+        html += '<div class="section-label"><span class="label-icon">&#9997;</span>推荐题目</div>';
+        html += '<div class="q-grid">';
+        questions.forEach(function(q) { html += renderQuestionCard(q); });
+        html += '</div>';
+    }
+
+    if (resources.length === 0 && questions.length === 0) {
+        html += '<div class="empty-state">暂无推荐资源与题目</div>';
+    }
+
+    html += '</div>';
+
+    if (t.suggestion) {
+        html += '<div class="kp-suggestion"><span class="sug-icon">&#128220;</span>' + esc(t.suggestion) + '</div>';
+    }
+
+    html += '</div>';
+    return html;
+}
+
+function loadV2() {
+    container.innerHTML = '<div class="loading-wrap"><div class="loading-spinner"></div>正在加载推荐数据...</div>';
+    fetch('/student/recommend/data?t=' + Date.now() + '&refresh=1', {credentials: 'include'})
+        .then(function(r) { return r.json(); })
+        .then(function(data) {
+            if (!data.success) {
+                container.innerHTML = '<div class="error-state">加载失败：' + esc(data.error || '未知错误') + '</div>';
+                return;
+            }
+            var targets = data.targets || [];
+            var html = renderOverview(data);
+            if (targets.length > 0) {
+                html += '<div class="path-title">推荐学习路径</div>';
+                targets.forEach(function(t, i) {
+                    html += renderKPCard(t, i);
+                });
+            } else {
+                html += '<div class="empty-state">暂无推荐数据</div>';
+            }
+            container.innerHTML = html;
+        })
+        .catch(function(e) {
+            container.innerHTML = '<div class="error-state">网络错误：' + esc(e.message) + '</div>';
+        });
+}
+
+loadV2();
+</script>
+
+</body>
+</html>

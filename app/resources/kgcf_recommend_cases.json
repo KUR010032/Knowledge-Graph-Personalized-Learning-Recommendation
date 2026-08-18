@@ -1,0 +1,1202 @@
+[
+  {
+    "case_id": "rc_000001",
+    "student_id": "3220602001",
+    "knowledge_point": "3.3.3 消息传递",
+    "current_mastery": 0.365,
+    "recommend_type": "巩固学习",
+    "priority": 1
+  },
+  {
+    "case_id": "rc_000002",
+    "student_id": "3220602001",
+    "knowledge_point": "3.5.3 打瞌睡的理发师问题",
+    "current_mastery": 0.365,
+    "recommend_type": "巩固学习",
+    "priority": 2
+  },
+  {
+    "case_id": "rc_000003",
+    "student_id": "3220602001",
+    "knowledge_point": "3.4.3 死锁的防止",
+    "current_mastery": 0.42999999999999994,
+    "recommend_type": "巩固学习",
+    "priority": 3
+  },
+  {
+    "case_id": "rc_000004",
+    "student_id": "3220602001",
+    "knowledge_point": "3.3.1 进程通信的类型",
+    "current_mastery": 0.48,
+    "recommend_type": "巩固学习",
+    "priority": 4
+  },
+  {
+    "case_id": "rc_000005",
+    "student_id": "3220602001",
+    "knowledge_point": "3.4.1 死锁的概念",
+    "current_mastery": 0.48,
+    "recommend_type": "巩固学习",
+    "priority": 5
+  },
+  {
+    "case_id": "rc_000006",
+    "student_id": "3220602002",
+    "knowledge_point": "3.4.3 死锁的防止",
+    "current_mastery": 0.15,
+    "recommend_type": "基础学习",
+    "priority": 6
+  },
+  {
+    "case_id": "rc_000007",
+    "student_id": "3220602002",
+    "knowledge_point": "2.2.3 进程状态和转换",
+    "current_mastery": 0.25,
+    "recommend_type": "基础学习",
+    "priority": 7
+  },
+  {
+    "case_id": "rc_000008",
+    "student_id": "3220602002",
+    "knowledge_point": "3.1.2 临界资源与临界区",
+    "current_mastery": 0.27499999999999997,
+    "recommend_type": "基础学习",
+    "priority": 8
+  },
+  {
+    "case_id": "rc_000009",
+    "student_id": "3220602002",
+    "knowledge_point": "3.4.1 死锁的概念",
+    "current_mastery": 0.3333333333333333,
+    "recommend_type": "巩固学习",
+    "priority": 9
+  },
+  {
+    "case_id": "rc_000010",
+    "student_id": "3220602002",
+    "knowledge_point": "3.6 多核环境下的进程同步",
+    "current_mastery": 0.3333333333333333,
+    "recommend_type": "巩固学习",
+    "priority": 10
+  },
+  {
+    "case_id": "rc_000011",
+    "student_id": "3220602003",
+    "knowledge_point": "2.4 多核、多线程与超线程",
+    "current_mastery": 0.15,
+    "recommend_type": "基础学习",
+    "priority": 11
+  },
+  {
+    "case_id": "rc_000012",
+    "student_id": "3220602003",
+    "knowledge_point": "3.1.2 临界资源与临界区",
+    "current_mastery": 0.21666666666666665,
+    "recommend_type": "基础学习",
+    "priority": 12
+  },
+  {
+    "case_id": "rc_000013",
+    "student_id": "3220602003",
+    "knowledge_point": "3.1.3 互斥的软、硬件实现方法",
+    "current_mastery": 0.27499999999999997,
+    "recommend_type": "基础学习",
+    "priority": 13
+  },
+  {
+    "case_id": "rc_000014",
+    "student_id": "3220602003",
+    "knowledge_point": "2.5 进程、线程管理实例",
+    "current_mastery": 0.32499999999999996,
+    "recommend_type": "巩固学习",
+    "priority": 14
+  },
+  {
+    "case_id": "rc_000015",
+    "student_id": "3220602003",
+    "knowledge_point": "3.3.2 进程通信中的问题",
+    "current_mastery": 0.32499999999999996,
+    "recommend_type": "巩固学习",
+    "priority": 15
+  },
+  {
+    "case_id": "rc_000016",
+    "student_id": "3220602004",
+    "knowledge_point": "3.4.3 死锁的防止",
+    "current_mastery": 0.15,
+    "recommend_type": "基础学习",
+    "priority": 16
+  },
+  {
+    "case_id": "rc_000017",
+    "student_id": "3220602004",
+    "knowledge_point": "2.5 进程、线程管理实例",
+    "current_mastery": 0.32499999999999996,
+    "recommend_type": "巩固学习",
+    "priority": 17
+  },
+  {
+    "case_id": "rc_000018",
+    "student_id": "3220602004",
+    "knowledge_point": "1.1.3 操作系统的基本功能",
+    "current_mastery": 0.36,
+    "recommend_type": "巩固学习",
+    "priority": 18
+  },
+  {
+    "case_id": "rc_000019",
+    "student_id": "3220602004",
+    "knowledge_point": "1.1.1 基本概念",
+    "current_mastery": 0.3653846153846154,
+    "recommend_type": "巩固学习",
+    "priority": 19
+  },
+  {
+    "case_id": "rc_000020",
+    "student_id": "3220602004",
+    "knowledge_point": "3.1.2 临界资源与临界区",
+    "current_mastery": 0.44999999999999996,
+    "recommend_type": "巩固学习",
+    "priority": 20
+  },
+  {
+    "case_id": "rc_000021",
+    "student_id": "3220602005",
+    "knowledge_point": "2.3.3 线程的实现",
+    "current_mastery": 0.37999999999999995,
+    "recommend_type": "巩固学习",
+    "priority": 21
+  },
+  {
+    "case_id": "rc_000022",
+    "student_id": "3220602005",
+    "knowledge_point": "3.5.2 哲学家进餐问题",
+    "current_mastery": 0.37999999999999995,
+    "recommend_type": "巩固学习",
+    "priority": 22
+  },
+  {
+    "case_id": "rc_000023",
+    "student_id": "3220602005",
+    "knowledge_point": "2.3.1 线程的概念",
+    "current_mastery": 0.39999999999999997,
+    "recommend_type": "巩固学习",
+    "priority": 23
+  },
+  {
+    "case_id": "rc_000024",
+    "student_id": "3220602005",
+    "knowledge_point": "3.1.3 互斥的软、硬件实现方法",
+    "current_mastery": 0.44999999999999996,
+    "recommend_type": "巩固学习",
+    "priority": 24
+  },
+  {
+    "case_id": "rc_000025",
+    "student_id": "3220602005",
+    "knowledge_point": "3.4.1 死锁的概念",
+    "current_mastery": 0.44999999999999996,
+    "recommend_type": "巩固学习",
+    "priority": 25
+  },
+  {
+    "case_id": "rc_000026",
+    "student_id": "3220602006",
+    "knowledge_point": "3.3.2 进程通信中的问题",
+    "current_mastery": 0.075,
+    "recommend_type": "基础学习",
+    "priority": 26
+  },
+  {
+    "case_id": "rc_000027",
+    "student_id": "3220602006",
+    "knowledge_point": "3.4.6 两阶段加锁",
+    "current_mastery": 0.075,
+    "recommend_type": "基础学习",
+    "priority": 27
+  },
+  {
+    "case_id": "rc_000028",
+    "student_id": "3220602006",
+    "knowledge_point": "2.3.3 线程的实现",
+    "current_mastery": 0.09999999999999999,
+    "recommend_type": "基础学习",
+    "priority": 28
+  },
+  {
+    "case_id": "rc_000029",
+    "student_id": "3220602006",
+    "knowledge_point": "2.2.2 进程的实体",
+    "current_mastery": 0.15,
+    "recommend_type": "基础学习",
+    "priority": 29
+  },
+  {
+    "case_id": "rc_000030",
+    "student_id": "3220602006",
+    "knowledge_point": "2.2.3 进程状态和转换",
+    "current_mastery": 0.355,
+    "recommend_type": "巩固学习",
+    "priority": 30
+  },
+  {
+    "case_id": "rc_000031",
+    "student_id": "3220602007",
+    "knowledge_point": "2.1.1 单道程序的顺序执行",
+    "current_mastery": 0.09999999999999999,
+    "recommend_type": "基础学习",
+    "priority": 31
+  },
+  {
+    "case_id": "rc_000032",
+    "student_id": "3220602007",
+    "knowledge_point": "1.6.1 现代操作系统技术特性",
+    "current_mastery": 0.27499999999999997,
+    "recommend_type": "基础学习",
+    "priority": 32
+  },
+  {
+    "case_id": "rc_000033",
+    "student_id": "3220602007",
+    "knowledge_point": "3.3.1 进程通信的类型",
+    "current_mastery": 0.27499999999999997,
+    "recommend_type": "基础学习",
+    "priority": 33
+  },
+  {
+    "case_id": "rc_000034",
+    "student_id": "3220602007",
+    "knowledge_point": "3.4.7 活锁",
+    "current_mastery": 0.27499999999999997,
+    "recommend_type": "基础学习",
+    "priority": 34
+  },
+  {
+    "case_id": "rc_000035",
+    "student_id": "3220602007",
+    "knowledge_point": "3.1.2 临界资源与临界区",
+    "current_mastery": 0.3333333333333333,
+    "recommend_type": "巩固学习",
+    "priority": 35
+  },
+  {
+    "case_id": "rc_000036",
+    "student_id": "3220602008",
+    "knowledge_point": "3.5.3 打瞌睡的理发师问题",
+    "current_mastery": 0.15,
+    "recommend_type": "基础学习",
+    "priority": 36
+  },
+  {
+    "case_id": "rc_000037",
+    "student_id": "3220602008",
+    "knowledge_point": "2.3.3 线程的实现",
+    "current_mastery": 0.24,
+    "recommend_type": "基础学习",
+    "priority": 37
+  },
+  {
+    "case_id": "rc_000038",
+    "student_id": "3220602008",
+    "knowledge_point": "2.3.1 线程的概念",
+    "current_mastery": 0.3,
+    "recommend_type": "基础学习",
+    "priority": 38
+  },
+  {
+    "case_id": "rc_000039",
+    "student_id": "3220602008",
+    "knowledge_point": "1.6.3 Linux技术特性",
+    "current_mastery": 0.32499999999999996,
+    "recommend_type": "巩固学习",
+    "priority": 39
+  },
+  {
+    "case_id": "rc_000040",
+    "student_id": "3220602008",
+    "knowledge_point": "2.5 进程、线程管理实例",
+    "current_mastery": 0.32499999999999996,
+    "recommend_type": "巩固学习",
+    "priority": 40
+  },
+  {
+    "case_id": "rc_000041",
+    "student_id": "3220602009",
+    "knowledge_point": "3.4.2 死锁的必要条件",
+    "current_mastery": 0.09999999999999999,
+    "recommend_type": "基础学习",
+    "priority": 41
+  },
+  {
+    "case_id": "rc_000042",
+    "student_id": "3220602009",
+    "knowledge_point": "2.1.2 多道程序的并发执行",
+    "current_mastery": 0.21666666666666665,
+    "recommend_type": "基础学习",
+    "priority": 42
+  },
+  {
+    "case_id": "rc_000043",
+    "student_id": "3220602009",
+    "knowledge_point": "2.3.2 线程与进程的比较",
+    "current_mastery": 0.29,
+    "recommend_type": "基础学习",
+    "priority": 43
+  },
+  {
+    "case_id": "rc_000044",
+    "student_id": "3220602009",
+    "knowledge_point": "1.5 操作系统的结构",
+    "current_mastery": 0.32499999999999996,
+    "recommend_type": "巩固学习",
+    "priority": 44
+  },
+  {
+    "case_id": "rc_000045",
+    "student_id": "3220602009",
+    "knowledge_point": "3.7 进程同步与通信实例",
+    "current_mastery": 0.32499999999999996,
+    "recommend_type": "巩固学习",
+    "priority": 45
+  },
+  {
+    "case_id": "rc_000046",
+    "student_id": "3220602010",
+    "knowledge_point": "3.4.2 死锁的必要条件",
+    "current_mastery": 0.09999999999999999,
+    "recommend_type": "基础学习",
+    "priority": 46
+  },
+  {
+    "case_id": "rc_000047",
+    "student_id": "3220602010",
+    "knowledge_point": "2.3.4 线程调度激发",
+    "current_mastery": 0.15,
+    "recommend_type": "基础学习",
+    "priority": 47
+  },
+  {
+    "case_id": "rc_000048",
+    "student_id": "3220602010",
+    "knowledge_point": "2.3.3 线程的实现",
+    "current_mastery": 0.24,
+    "recommend_type": "基础学习",
+    "priority": 48
+  },
+  {
+    "case_id": "rc_000049",
+    "student_id": "3220602010",
+    "knowledge_point": "3.1.3 互斥的软、硬件实现方法",
+    "current_mastery": 0.27499999999999997,
+    "recommend_type": "基础学习",
+    "priority": 49
+  },
+  {
+    "case_id": "rc_000050",
+    "student_id": "3220602010",
+    "knowledge_point": "3.5.1 读者-写者问题",
+    "current_mastery": 0.29,
+    "recommend_type": "基础学习",
+    "priority": 50
+  },
+  {
+    "case_id": "rc_000051",
+    "student_id": "3220602011",
+    "knowledge_point": "1.6.4 Windows Server技术特性",
+    "current_mastery": 0.15,
+    "recommend_type": "基础学习",
+    "priority": 51
+  },
+  {
+    "case_id": "rc_000052",
+    "student_id": "3220602011",
+    "knowledge_point": "2.5 进程、线程管理实例",
+    "current_mastery": 0.15,
+    "recommend_type": "基础学习",
+    "priority": 52
+  },
+  {
+    "case_id": "rc_000053",
+    "student_id": "3220602011",
+    "knowledge_point": "2.2.3 进程状态和转换",
+    "current_mastery": 0.27499999999999997,
+    "recommend_type": "基础学习",
+    "priority": 53
+  },
+  {
+    "case_id": "rc_000054",
+    "student_id": "3220602011",
+    "knowledge_point": "3.1.2 临界资源与临界区",
+    "current_mastery": 0.27499999999999997,
+    "recommend_type": "基础学习",
+    "priority": 54
+  },
+  {
+    "case_id": "rc_000055",
+    "student_id": "3220602011",
+    "knowledge_point": "2.3.3 线程的实现",
+    "current_mastery": 0.3333333333333333,
+    "recommend_type": "巩固学习",
+    "priority": 55
+  },
+  {
+    "case_id": "rc_000056",
+    "student_id": "3220602012",
+    "knowledge_point": "2.2.2 进程的实体",
+    "current_mastery": 0.15,
+    "recommend_type": "基础学习",
+    "priority": 56
+  },
+  {
+    "case_id": "rc_000057",
+    "student_id": "3220602012",
+    "knowledge_point": "2.4 多核、多线程与超线程",
+    "current_mastery": 0.15,
+    "recommend_type": "基础学习",
+    "priority": 57
+  },
+  {
+    "case_id": "rc_000058",
+    "student_id": "3220602012",
+    "knowledge_point": "2.1.1 单道程序的顺序执行",
+    "current_mastery": 0.27499999999999997,
+    "recommend_type": "基础学习",
+    "priority": 58
+  },
+  {
+    "case_id": "rc_000059",
+    "student_id": "3220602012",
+    "knowledge_point": "1.6.4 Windows Server技术特性",
+    "current_mastery": 0.32499999999999996,
+    "recommend_type": "巩固学习",
+    "priority": 59
+  },
+  {
+    "case_id": "rc_000060",
+    "student_id": "3220602012",
+    "knowledge_point": "2.3.4 线程调度激发",
+    "current_mastery": 0.32499999999999996,
+    "recommend_type": "巩固学习",
+    "priority": 60
+  },
+  {
+    "case_id": "rc_000061",
+    "student_id": "3220602013",
+    "knowledge_point": "1.6.2 UNIX技术特性",
+    "current_mastery": 0.09999999999999999,
+    "recommend_type": "基础学习",
+    "priority": 61
+  },
+  {
+    "case_id": "rc_000062",
+    "student_id": "3220602013",
+    "knowledge_point": "3.4.5 死锁检测与恢复",
+    "current_mastery": 0.09999999999999999,
+    "recommend_type": "基础学习",
+    "priority": 62
+  },
+  {
+    "case_id": "rc_000063",
+    "student_id": "3220602013",
+    "knowledge_point": "2.3.1 线程的概念",
+    "current_mastery": 0.21666666666666665,
+    "recommend_type": "基础学习",
+    "priority": 63
+  },
+  {
+    "case_id": "rc_000064",
+    "student_id": "3220602013",
+    "knowledge_point": "1.1.2 计算机系统的视图",
+    "current_mastery": 0.32499999999999996,
+    "recommend_type": "巩固学习",
+    "priority": 64
+  },
+  {
+    "case_id": "rc_000065",
+    "student_id": "3220602013",
+    "knowledge_point": "2.3.2 线程与进程的比较",
+    "current_mastery": 0.32499999999999996,
+    "recommend_type": "巩固学习",
+    "priority": 65
+  },
+  {
+    "case_id": "rc_000066",
+    "student_id": "3220602014",
+    "knowledge_point": "1.4 操作系统的运行环境",
+    "current_mastery": 0.27499999999999997,
+    "recommend_type": "基础学习",
+    "priority": 66
+  },
+  {
+    "case_id": "rc_000067",
+    "student_id": "3220602014",
+    "knowledge_point": "1.6.1 现代操作系统技术特性",
+    "current_mastery": 0.27499999999999997,
+    "recommend_type": "基础学习",
+    "priority": 67
+  },
+  {
+    "case_id": "rc_000068",
+    "student_id": "3220602014",
+    "knowledge_point": "2.3.1 线程的概念",
+    "current_mastery": 0.3,
+    "recommend_type": "基础学习",
+    "priority": 68
+  },
+  {
+    "case_id": "rc_000069",
+    "student_id": "3220602014",
+    "knowledge_point": "2.2.1 进程的概念",
+    "current_mastery": 0.3055555555555555,
+    "recommend_type": "巩固学习",
+    "priority": 69
+  },
+  {
+    "case_id": "rc_000070",
+    "student_id": "3220602014",
+    "knowledge_point": "3.1.2 临界资源与临界区",
+    "current_mastery": 0.3333333333333333,
+    "recommend_type": "巩固学习",
+    "priority": 70
+  },
+  {
+    "case_id": "rc_000071",
+    "student_id": "3220602015",
+    "knowledge_point": "1.5 操作系统的结构",
+    "current_mastery": 0.15,
+    "recommend_type": "基础学习",
+    "priority": 71
+  },
+  {
+    "case_id": "rc_000072",
+    "student_id": "3220602015",
+    "knowledge_point": "2.3.4 线程调度激发",
+    "current_mastery": 0.15,
+    "recommend_type": "基础学习",
+    "priority": 72
+  },
+  {
+    "case_id": "rc_000073",
+    "student_id": "3220602015",
+    "knowledge_point": "3.3.1 进程通信的类型",
+    "current_mastery": 0.27499999999999997,
+    "recommend_type": "基础学习",
+    "priority": 73
+  },
+  {
+    "case_id": "rc_000074",
+    "student_id": "3220602015",
+    "knowledge_point": "3.4.8 饥饿",
+    "current_mastery": 0.27499999999999997,
+    "recommend_type": "基础学习",
+    "priority": 74
+  },
+  {
+    "case_id": "rc_000075",
+    "student_id": "3220602015",
+    "knowledge_point": "1.6.4 Windows Server技术特性",
+    "current_mastery": 0.32499999999999996,
+    "recommend_type": "巩固学习",
+    "priority": 75
+  },
+  {
+    "case_id": "rc_000076",
+    "student_id": "3220602016",
+    "knowledge_point": "2.5 进程、线程管理实例",
+    "current_mastery": 0.15,
+    "recommend_type": "基础学习",
+    "priority": 76
+  },
+  {
+    "case_id": "rc_000077",
+    "student_id": "3220602016",
+    "knowledge_point": "2.4 多核、多线程与超线程",
+    "current_mastery": 0.3083333333333333,
+    "recommend_type": "巩固学习",
+    "priority": 77
+  },
+  {
+    "case_id": "rc_000078",
+    "student_id": "3220602016",
+    "knowledge_point": "2.2.3 进程状态和转换",
+    "current_mastery": 0.375,
+    "recommend_type": "巩固学习",
+    "priority": 78
+  },
+  {
+    "case_id": "rc_000079",
+    "student_id": "3220602016",
+    "knowledge_point": "1.1.1 基本概念",
+    "current_mastery": 0.3833333333333333,
+    "recommend_type": "巩固学习",
+    "priority": 79
+  },
+  {
+    "case_id": "rc_000080",
+    "student_id": "3220602016",
+    "knowledge_point": "1.6.1 现代操作系统技术特性",
+    "current_mastery": 0.5666666666666667,
+    "recommend_type": "巩固学习",
+    "priority": 80
+  },
+  {
+    "case_id": "rc_000081",
+    "student_id": "3220602017",
+    "knowledge_point": "3.4.5 死锁检测与恢复",
+    "current_mastery": 0.09999999999999999,
+    "recommend_type": "基础学习",
+    "priority": 81
+  },
+  {
+    "case_id": "rc_000082",
+    "student_id": "3220602017",
+    "knowledge_point": "2.3.2 线程与进程的比较",
+    "current_mastery": 0.15,
+    "recommend_type": "基础学习",
+    "priority": 82
+  },
+  {
+    "case_id": "rc_000083",
+    "student_id": "3220602017",
+    "knowledge_point": "2.1.2 多道程序的并发执行",
+    "current_mastery": 0.19999999999999998,
+    "recommend_type": "基础学习",
+    "priority": 83
+  },
+  {
+    "case_id": "rc_000084",
+    "student_id": "3220602017",
+    "knowledge_point": "3.4.2 死锁的必要条件",
+    "current_mastery": 0.24,
+    "recommend_type": "基础学习",
+    "priority": 84
+  },
+  {
+    "case_id": "rc_000085",
+    "student_id": "3220602017",
+    "knowledge_point": "3.4.1 死锁的概念",
+    "current_mastery": 0.27499999999999997,
+    "recommend_type": "基础学习",
+    "priority": 85
+  },
+  {
+    "case_id": "rc_000086",
+    "student_id": "3220602018",
+    "knowledge_point": "2.3.3 线程的实现",
+    "current_mastery": 0.24,
+    "recommend_type": "基础学习",
+    "priority": 86
+  },
+  {
+    "case_id": "rc_000087",
+    "student_id": "3220602018",
+    "knowledge_point": "3.5.2 哲学家进餐问题",
+    "current_mastery": 0.24,
+    "recommend_type": "基础学习",
+    "priority": 87
+  },
+  {
+    "case_id": "rc_000088",
+    "student_id": "3220602018",
+    "knowledge_point": "2.3.1 线程的概念",
+    "current_mastery": 0.3,
+    "recommend_type": "基础学习",
+    "priority": 88
+  },
+  {
+    "case_id": "rc_000089",
+    "student_id": "3220602018",
+    "knowledge_point": "3.1.4 信号量和P、V操作",
+    "current_mastery": 0.3055555555555555,
+    "recommend_type": "巩固学习",
+    "priority": 89
+  },
+  {
+    "case_id": "rc_000090",
+    "student_id": "3220602018",
+    "knowledge_point": "3.1.3 互斥的软、硬件实现方法",
+    "current_mastery": 0.44999999999999996,
+    "recommend_type": "巩固学习",
+    "priority": 90
+  },
+  {
+    "case_id": "rc_000091",
+    "student_id": "3220602019",
+    "knowledge_point": "3.2.2 用P、V操作实现同步",
+    "current_mastery": 0.15,
+    "recommend_type": "基础学习",
+    "priority": 91
+  },
+  {
+    "case_id": "rc_000092",
+    "student_id": "3220602019",
+    "knowledge_point": "3.4.4 死锁的避免",
+    "current_mastery": 0.32499999999999996,
+    "recommend_type": "巩固学习",
+    "priority": 92
+  },
+  {
+    "case_id": "rc_000093",
+    "student_id": "3220602019",
+    "knowledge_point": "1.6.1 现代操作系统技术特性",
+    "current_mastery": 0.3333333333333333,
+    "recommend_type": "巩固学习",
+    "priority": 93
+  },
+  {
+    "case_id": "rc_000094",
+    "student_id": "3220602019",
+    "knowledge_point": "3.4.7 活锁",
+    "current_mastery": 0.3333333333333333,
+    "recommend_type": "巩固学习",
+    "priority": 94
+  },
+  {
+    "case_id": "rc_000095",
+    "student_id": "3220602019",
+    "knowledge_point": "3.4.8 饥饿",
+    "current_mastery": 0.3333333333333333,
+    "recommend_type": "巩固学习",
+    "priority": 95
+  },
+  {
+    "case_id": "rc_000096",
+    "student_id": "3220602020",
+    "knowledge_point": "3.6 多核环境下的进程同步",
+    "current_mastery": 0.33999999999999997,
+    "recommend_type": "巩固学习",
+    "priority": 96
+  },
+  {
+    "case_id": "rc_000097",
+    "student_id": "3220602020",
+    "knowledge_point": "1.1.1 基本概念",
+    "current_mastery": 0.42999999999999994,
+    "recommend_type": "巩固学习",
+    "priority": 97
+  },
+  {
+    "case_id": "rc_000098",
+    "student_id": "3220602020",
+    "knowledge_point": "2.3.4 线程调度激发",
+    "current_mastery": 0.42999999999999994,
+    "recommend_type": "巩固学习",
+    "priority": 98
+  },
+  {
+    "case_id": "rc_000099",
+    "student_id": "3220602020",
+    "knowledge_point": "3.1.4 信号量和P、V操作",
+    "current_mastery": 0.42999999999999994,
+    "recommend_type": "巩固学习",
+    "priority": 99
+  },
+  {
+    "case_id": "rc_000100",
+    "student_id": "3220602020",
+    "knowledge_point": "3.2.1 进程同步概念",
+    "current_mastery": 0.42999999999999994,
+    "recommend_type": "巩固学习",
+    "priority": 100
+  },
+  {
+    "case_id": "rc_000101",
+    "student_id": "3220602021",
+    "knowledge_point": "3.4.7 活锁",
+    "current_mastery": 0.09999999999999999,
+    "recommend_type": "基础学习",
+    "priority": 101
+  },
+  {
+    "case_id": "rc_000102",
+    "student_id": "3220602021",
+    "knowledge_point": "1.6.1 现代操作系统技术特性",
+    "current_mastery": 0.27499999999999997,
+    "recommend_type": "基础学习",
+    "priority": 102
+  },
+  {
+    "case_id": "rc_000103",
+    "student_id": "3220602021",
+    "knowledge_point": "3.4.1 死锁的概念",
+    "current_mastery": 0.27499999999999997,
+    "recommend_type": "基础学习",
+    "priority": 103
+  },
+  {
+    "case_id": "rc_000104",
+    "student_id": "3220602021",
+    "knowledge_point": "2.3.1 线程的概念",
+    "current_mastery": 0.3,
+    "recommend_type": "基础学习",
+    "priority": 104
+  },
+  {
+    "case_id": "rc_000105",
+    "student_id": "3220602021",
+    "knowledge_point": "3.5.3 打瞌睡的理发师问题",
+    "current_mastery": 0.32499999999999996,
+    "recommend_type": "巩固学习",
+    "priority": 105
+  },
+  {
+    "case_id": "rc_000106",
+    "student_id": "3220602022",
+    "knowledge_point": "2.1.1 单道程序的顺序执行",
+    "current_mastery": 0.09999999999999999,
+    "recommend_type": "基础学习",
+    "priority": 106
+  },
+  {
+    "case_id": "rc_000107",
+    "student_id": "3220602022",
+    "knowledge_point": "3.3.2 进程通信中的问题",
+    "current_mastery": 0.15,
+    "recommend_type": "基础学习",
+    "priority": 107
+  },
+  {
+    "case_id": "rc_000108",
+    "student_id": "3220602022",
+    "knowledge_point": "3.5.2 哲学家进餐问题",
+    "current_mastery": 0.27499999999999997,
+    "recommend_type": "基础学习",
+    "priority": 108
+  },
+  {
+    "case_id": "rc_000109",
+    "student_id": "3220602022",
+    "knowledge_point": "3.6 多核环境下的进程同步",
+    "current_mastery": 0.3333333333333333,
+    "recommend_type": "巩固学习",
+    "priority": 109
+  },
+  {
+    "case_id": "rc_000110",
+    "student_id": "3220602022",
+    "knowledge_point": "2.2.2 进程的实体",
+    "current_mastery": 0.3833333333333333,
+    "recommend_type": "巩固学习",
+    "priority": 110
+  },
+  {
+    "case_id": "rc_000111",
+    "student_id": "3220602023",
+    "knowledge_point": "3.3.1 进程通信的类型",
+    "current_mastery": 0.27499999999999997,
+    "recommend_type": "基础学习",
+    "priority": 111
+  },
+  {
+    "case_id": "rc_000112",
+    "student_id": "3220602023",
+    "knowledge_point": "3.4.1 死锁的概念",
+    "current_mastery": 0.27499999999999997,
+    "recommend_type": "基础学习",
+    "priority": 112
+  },
+  {
+    "case_id": "rc_000113",
+    "student_id": "3220602023",
+    "knowledge_point": "3.3.2 进程通信中的问题",
+    "current_mastery": 0.32499999999999996,
+    "recommend_type": "巩固学习",
+    "priority": 113
+  },
+  {
+    "case_id": "rc_000114",
+    "student_id": "3220602023",
+    "knowledge_point": "2.1.2 多道程序的并发执行",
+    "current_mastery": 0.39999999999999997,
+    "recommend_type": "巩固学习",
+    "priority": 114
+  },
+  {
+    "case_id": "rc_000115",
+    "student_id": "3220602023",
+    "knowledge_point": "3.1.3 互斥的软、硬件实现方法",
+    "current_mastery": 0.44999999999999996,
+    "recommend_type": "巩固学习",
+    "priority": 115
+  },
+  {
+    "case_id": "rc_000116",
+    "student_id": "3220602024",
+    "knowledge_point": "2.3.3 线程的实现",
+    "current_mastery": 0.09999999999999999,
+    "recommend_type": "基础学习",
+    "priority": 116
+  },
+  {
+    "case_id": "rc_000117",
+    "student_id": "3220602024",
+    "knowledge_point": "3.4.5 死锁检测与恢复",
+    "current_mastery": 0.09999999999999999,
+    "recommend_type": "基础学习",
+    "priority": 117
+  },
+  {
+    "case_id": "rc_000118",
+    "student_id": "3220602024",
+    "knowledge_point": "1.6.4 Windows Server技术特性",
+    "current_mastery": 0.15,
+    "recommend_type": "基础学习",
+    "priority": 118
+  },
+  {
+    "case_id": "rc_000119",
+    "student_id": "3220602024",
+    "knowledge_point": "3.5.2 哲学家进餐问题",
+    "current_mastery": 0.24,
+    "recommend_type": "基础学习",
+    "priority": 119
+  },
+  {
+    "case_id": "rc_000120",
+    "student_id": "3220602024",
+    "knowledge_point": "1.6.1 现代操作系统技术特性",
+    "current_mastery": 0.27499999999999997,
+    "recommend_type": "基础学习",
+    "priority": 120
+  },
+  {
+    "case_id": "rc_000121",
+    "student_id": "3220602025",
+    "knowledge_point": "3.3.1 进程通信的类型",
+    "current_mastery": 0.09999999999999999,
+    "recommend_type": "基础学习",
+    "priority": 121
+  },
+  {
+    "case_id": "rc_000122",
+    "student_id": "3220602025",
+    "knowledge_point": "1.6.1 现代操作系统技术特性",
+    "current_mastery": 0.3333333333333333,
+    "recommend_type": "巩固学习",
+    "priority": 122
+  },
+  {
+    "case_id": "rc_000123",
+    "student_id": "3220602025",
+    "knowledge_point": "3.4.2 死锁的必要条件",
+    "current_mastery": 0.44999999999999996,
+    "recommend_type": "巩固学习",
+    "priority": 123
+  },
+  {
+    "case_id": "rc_000124",
+    "student_id": "3220602025",
+    "knowledge_point": "2.3.2 线程与进程的比较",
+    "current_mastery": 0.5,
+    "recommend_type": "巩固学习",
+    "priority": 124
+  },
+  {
+    "case_id": "rc_000125",
+    "student_id": "3220602025",
+    "knowledge_point": "3.2.2 用P、V操作实现同步",
+    "current_mastery": 0.5,
+    "recommend_type": "巩固学习",
+    "priority": 125
+  },
+  {
+    "case_id": "rc_000126",
+    "student_id": "3220602026",
+    "knowledge_point": "3.4.8 饥饿",
+    "current_mastery": 0.09999999999999999,
+    "recommend_type": "基础学习",
+    "priority": 126
+  },
+  {
+    "case_id": "rc_000127",
+    "student_id": "3220602026",
+    "knowledge_point": "2.3.1 线程的概念",
+    "current_mastery": 0.21666666666666665,
+    "recommend_type": "基础学习",
+    "priority": 127
+  },
+  {
+    "case_id": "rc_000128",
+    "student_id": "3220602026",
+    "knowledge_point": "3.3.1 进程通信的类型",
+    "current_mastery": 0.27499999999999997,
+    "recommend_type": "基础学习",
+    "priority": 128
+  },
+  {
+    "case_id": "rc_000129",
+    "student_id": "3220602026",
+    "knowledge_point": "3.6 多核环境下的进程同步",
+    "current_mastery": 0.27499999999999997,
+    "recommend_type": "基础学习",
+    "priority": 129
+  },
+  {
+    "case_id": "rc_000130",
+    "student_id": "3220602026",
+    "knowledge_point": "3.4.4 死锁的避免",
+    "current_mastery": 0.29,
+    "recommend_type": "基础学习",
+    "priority": 130
+  },
+  {
+    "case_id": "rc_000131",
+    "student_id": "3220602027",
+    "knowledge_point": "2.3.4 线程调度激发",
+    "current_mastery": 0.075,
+    "recommend_type": "基础学习",
+    "priority": 131
+  },
+  {
+    "case_id": "rc_000132",
+    "student_id": "3220602027",
+    "knowledge_point": "2.5 进程、线程管理实例",
+    "current_mastery": 0.15,
+    "recommend_type": "基础学习",
+    "priority": 132
+  },
+  {
+    "case_id": "rc_000133",
+    "student_id": "3220602027",
+    "knowledge_point": "3.5.2 哲学家进餐问题",
+    "current_mastery": 0.27499999999999997,
+    "recommend_type": "基础学习",
+    "priority": 133
+  },
+  {
+    "case_id": "rc_000134",
+    "student_id": "3220602027",
+    "knowledge_point": "1.6.3 Linux技术特性",
+    "current_mastery": 0.3083333333333333,
+    "recommend_type": "巩固学习",
+    "priority": 134
+  },
+  {
+    "case_id": "rc_000135",
+    "student_id": "3220602027",
+    "knowledge_point": "3.1.3 互斥的软、硬件实现方法",
+    "current_mastery": 0.3333333333333333,
+    "recommend_type": "巩固学习",
+    "priority": 135
+  },
+  {
+    "case_id": "rc_000136",
+    "student_id": "3220602028",
+    "knowledge_point": "3.4.6 两阶段加锁",
+    "current_mastery": 0.15,
+    "recommend_type": "基础学习",
+    "priority": 136
+  },
+  {
+    "case_id": "rc_000137",
+    "student_id": "3220602028",
+    "knowledge_point": "1.6.2 UNIX技术特性",
+    "current_mastery": 0.27499999999999997,
+    "recommend_type": "基础学习",
+    "priority": 137
+  },
+  {
+    "case_id": "rc_000138",
+    "student_id": "3220602028",
+    "knowledge_point": "2.1.1 单道程序的顺序执行",
+    "current_mastery": 0.27499999999999997,
+    "recommend_type": "基础学习",
+    "priority": 138
+  },
+  {
+    "case_id": "rc_000139",
+    "student_id": "3220602028",
+    "knowledge_point": "3.6 多核环境下的进程同步",
+    "current_mastery": 0.27499999999999997,
+    "recommend_type": "基础学习",
+    "priority": 139
+  },
+  {
+    "case_id": "rc_000140",
+    "student_id": "3220602028",
+    "knowledge_point": "1.3 操作系统的分类",
+    "current_mastery": 0.3055555555555555,
+    "recommend_type": "巩固学习",
+    "priority": 140
+  },
+  {
+    "case_id": "rc_000141",
+    "student_id": "3220602029",
+    "knowledge_point": "3.1.2 临界资源与临界区",
+    "current_mastery": 0.09999999999999999,
+    "recommend_type": "基础学习",
+    "priority": 141
+  },
+  {
+    "case_id": "rc_000142",
+    "student_id": "3220602029",
+    "knowledge_point": "3.3.2 进程通信中的问题",
+    "current_mastery": 0.15,
+    "recommend_type": "基础学习",
+    "priority": 142
+  },
+  {
+    "case_id": "rc_000143",
+    "student_id": "3220602029",
+    "knowledge_point": "1.6.2 UNIX技术特性",
+    "current_mastery": 0.3333333333333333,
+    "recommend_type": "巩固学习",
+    "priority": 143
+  },
+  {
+    "case_id": "rc_000144",
+    "student_id": "3220602029",
+    "knowledge_point": "2.1.1 单道程序的顺序执行",
+    "current_mastery": 0.3333333333333333,
+    "recommend_type": "巩固学习",
+    "priority": 144
+  },
+  {
+    "case_id": "rc_000145",
+    "student_id": "3220602029",
+    "knowledge_point": "3.3.1 进程通信的类型",
+    "current_mastery": 0.3333333333333333,
+    "recommend_type": "巩固学习",
+    "priority": 145
+  },
+  {
+    "case_id": "rc_000146",
+    "student_id": "3220602030",
+    "knowledge_point": "2.2.2 进程的实体",
+    "current_mastery": 0.29,
+    "recommend_type": "基础学习",
+    "priority": 146
+  },
+  {
+    "case_id": "rc_000147",
+    "student_id": "3220602030",
+    "knowledge_point": "1.6.3 Linux技术特性",
+    "current_mastery": 0.3083333333333333,
+    "recommend_type": "巩固学习",
+    "priority": 147
+  },
+  {
+    "case_id": "rc_000148",
+    "student_id": "3220602030",
+    "knowledge_point": "2.4 多核、多线程与超线程",
+    "current_mastery": 0.3083333333333333,
+    "recommend_type": "巩固学习",
+    "priority": 148
+  },
+  {
+    "case_id": "rc_000149",
+    "student_id": "3220602030",
+    "knowledge_point": "3.3.3 消息传递",
+    "current_mastery": 0.3083333333333333,
+    "recommend_type": "巩固学习",
+    "priority": 149
+  },
+  {
+    "case_id": "rc_000150",
+    "student_id": "3220602030",
+    "knowledge_point": "3.4.6 两阶段加锁",
+    "current_mastery": 0.3083333333333333,
+    "recommend_type": "巩固学习",
+    "priority": 150
+  }
+]

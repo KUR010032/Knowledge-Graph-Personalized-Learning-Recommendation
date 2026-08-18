@@ -1,0 +1,488 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <meta charset="UTF-8">
+    <title>学习资源推荐 - {{ student_name }}</title>
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body { font-family: 'Microsoft YaHei', 'SimHei', Arial, sans-serif; background-color: #f0f2f5; color: #333; display: flex; height: 100vh; overflow: hidden; }
+        
+        .sidebar { width: 200px; background: #2c3e50; color: white; display: flex; flex-direction: column; }
+        .sidebar-header { padding: 20px; border-bottom: 1px solid #34495e; }
+        .sidebar-header h3 { font-size: 15px; margin-bottom: 5px; font-weight: normal; color: #ecf0f1; }
+        .sidebar-header .user-badge { font-size: 12px; color: #95a5a6; }
+        
+        .nav-menu { flex: 1; padding: 10px 0; }
+        .nav-item { padding: 12px 20px; cursor: pointer; display: flex; align-items: center; gap: 10px; font-size: 14px; text-decoration: none; color: #bdc3c7; border-left: 3px solid transparent; }
+        .nav-item:hover { background: #34495e; color: white; }
+        .nav-item.active { background: #34495e; color: white; border-left-color: #3498db; }
+        .nav-item i { width: 18px; text-align: center; font-size: 16px; }
+        
+        .sidebar-footer { padding: 15px 20px; border-top: 1px solid #34495e; }
+        .logout-btn { width: 100%; padding: 8px; background: #e74c3c; color: white; border: none; border-radius: 3px; cursor: pointer; font-size: 13px; }
+        .logout-btn:hover { background: #c0392b; }
+        
+        .main-content { flex: 1; display: flex; flex-direction: column; overflow: hidden; }
+        .top-bar { background: white; padding: 12px 20px; border-bottom: 1px solid #e0e0e0; display: flex; justify-content: space-between; align-items: center; }
+        .top-bar h2 { color: #333; font-size: 16px; font-weight: normal; }
+        
+        .content-area { flex: 1; padding: 20px; overflow-y: auto; }
+        
+        .summary-card {
+            background: white;
+            border-radius: 10px;
+            padding: 20px;
+            margin-bottom: 20px;
+            box-shadow: 0 2px 8px rgba(0,0,0,0.08);
+        }
+        
+        .summary-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 15px;
+        }
+        
+        .summary-title {
+            font-size: 18px;
+            font-weight: bold;
+            color: #2c3e50;
+        }
+        
+        .recommend-type {
+            padding: 6px 12px;
+            border-radius: 20px;
+            font-size: 13px;
+            font-weight: bold;
+        }
+        
+        .type-excellent { background: #d5f4e6; color: #27ae60; }
+        .type-medium { background: #fef9e7; color: #f39c12; }
+        .type-weak { background: #ebf5fb; color: #3498db; }
+        
+        .summary-stats {
+            display: grid;
+            grid-template-columns: repeat(4, 1fr);
+            gap: 15px;
+            margin-top: 15px;
+        }
+        
+        .stat-item {
+            text-align: center;
+            padding: 10px;
+            background: #f8f9fa;
+            border-radius: 8px;
+        }
+        
+        .stat-value {
+            font-size: 24px;
+            font-weight: bold;
+            color: #2c3e50;
+        }
+        
+        .stat-label {
+            font-size: 12px;
+            color: #7f8c8d;
+            margin-top: 5px;
+        }
+        
+        .recommendation-card {
+            background: white;
+            border-radius: 10px;
+            padding: 20px;
+            margin-bottom: 15px;
+            box-shadow: 0 2px 8px rgba(0,0,0,0.08);
+        }
+        
+        .kp-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 15px;
+            padding-bottom: 15px;
+            border-bottom: 1px solid #e0e0e0;
+        }
+        
+        .kp-info {
+            flex: 1;
+        }
+        
+        .kp-name {
+            font-size: 16px;
+            font-weight: bold;
+            color: #2c3e50;
+            margin-bottom: 5px;
+        }
+        
+        .kp-code {
+            font-size: 12px;
+            color: #7f8c8d;
+        }
+        
+        .kp-status {
+            padding: 6px 12px;
+            border-radius: 20px;
+            font-size: 12px;
+            font-weight: bold;
+            margin-left: 10px;
+        }
+        
+        .status-mastered { background: #d5f4e6; color: #27ae60; }
+        .status-good { background: #d5f4e6; color: #27ae60; }
+        .status-need-practice { background: #fef9e7; color: #f39c12; }
+        .status-not-learned { background: #fdeaea; color: #e74c3c; }
+        
+        .kp-mastery {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            margin-bottom: 10px;
+        }
+        
+        .mastery-bar {
+            flex: 1;
+            height: 8px;
+            background: #e0e0e0;
+            border-radius: 4px;
+            overflow: hidden;
+        }
+        
+        .mastery-fill {
+            height: 100%;
+            border-radius: 4px;
+            transition: width 0.3s;
+        }
+        
+        .mastery-text {
+            font-size: 14px;
+            font-weight: bold;
+            color: #2c3e50;
+            min-width: 50px;
+            text-align: right;
+        }
+        
+        .recommend-reason {
+            font-size: 13px;
+            color: #7f8c8d;
+            margin-bottom: 15px;
+            padding: 10px;
+            background: #f8f9fa;
+            border-radius: 6px;
+        }
+        
+        .resources-title {
+            font-size: 14px;
+            font-weight: bold;
+            color: #2c3e50;
+            margin-bottom: 10px;
+        }
+        
+        .resource-list {
+            display: grid;
+            grid-template-columns: repeat(auto-fill, minmax(300px, 1fr));
+            gap: 10px;
+        }
+        
+        .resource-item {
+            padding: 12px;
+            background: #f8f9fa;
+            border-radius: 8px;
+            border: 1px solid #e0e0e0;
+        }
+        
+        .resource-name {
+            font-size: 13px;
+            font-weight: bold;
+            color: #2c3e50;
+            margin-bottom: 5px;
+            overflow: hidden;
+            text-overflow: ellipsis;
+            white-space: nowrap;
+        }
+        
+        .resource-meta {
+            display: flex;
+            gap: 8px;
+            margin-bottom: 8px;
+        }
+        
+        .resource-tag {
+            padding: 2px 6px;
+            border-radius: 10px;
+            font-size: 11px;
+        }
+        
+        .tag-video { background: #ebf5fb; color: #3498db; }
+        .tag-ppt { background: #fef9e7; color: #f39c12; }
+        .tag-doc { background: #d5f4e6; color: #27ae60; }
+        
+        .relation-tag {
+            padding: 2px 6px;
+            border-radius: 10px;
+            font-size: 11px;
+            background: #f0f0f0;
+            color: #666;
+        }
+        
+        .resource-reason {
+            font-size: 12px;
+            color: #7f8c8d;
+            margin-bottom: 8px;
+        }
+        
+        .resource-actions {
+            display: flex;
+            gap: 8px;
+        }
+        
+        .action-btn {
+            padding: 6px 12px;
+            border: none;
+            border-radius: 4px;
+            cursor: pointer;
+            font-size: 12px;
+            text-decoration: none;
+            display: inline-block;
+        }
+        
+        .btn-primary { background: #3498db; color: white; }
+        .btn-success { background: #27ae60; color: white; }
+        .btn-primary:hover { background: #2980b9; }
+        .btn-success:hover { background: #229954; }
+        
+        .loading {
+            text-align: center;
+            padding: 40px;
+            color: #95a5a6;
+        }
+        
+        .error {
+            text-align: center;
+            padding: 40px;
+            color: #e74c3c;
+        }
+    </style>
+</head>
+<body>
+
+<div class="sidebar">
+    <div class="sidebar-header">
+        <h3>学习推荐系统</h3>
+        <div class="user-badge">{{ student_name }}</div>
+    </div>
+    
+    <div class="nav-menu">
+        <a href="/student/graph" class="nav-item {% if active_page == 'graph' %}active{% endif %}">
+            <i>&#128200;</i> 学习画像
+        </a>
+        <a href="/student/progress" class="nav-item {% if active_page == 'progress' %}active{% endif %}">
+            <i>&#128197;</i> 学习进度
+        </a>
+        <a href="/student/recommend_v2" class="nav-item">
+            <i>&#127919;</i> 学习资源推荐
+        </a>
+        <a href="/student/resources" class="nav-item {% if active_page == 'resources' %}active{% endif %}">
+            <i>&#128218;</i> 学习资源库
+        </a>
+        <a href="/student/mastery" class="nav-item {% if active_page == 'mastery' %}active{% endif %}">
+            <i>&#128202;</i> 知识点掌握度
+        </a>
+        <a href="/student/kg" class="nav-item {% if active_page == 'kg' %}active{% endif %}">
+            <i>&#128279;</i> 知识图谱
+        </a>
+        <a href="/student/discuss" class="nav-item {% if active_page == 'discuss' %}active{% endif %}">
+            <i>&#128172;</i> 讨论区
+        </a>
+        <a href="/student/wrong" class="nav-item {% if active_page == 'wrong' %}active{% endif %}">
+            <i>&#128221;</i> 错题集
+        </a>
+        <a href="/student/records" class="nav-item {% if active_page == 'records' %}active{% endif %}">
+            <i>&#128197;</i> 学习记录
+        </a>
+    </div>
+    
+    <div class="sidebar-footer">
+        <button class="logout-btn" onclick="location.href='/logout'">退出登录</button>
+    </div>
+</div>
+
+<div class="main-content">
+    <div class="top-bar">
+        <h2>学习资源推荐</h2>
+    </div>
+    
+    <div class="content-area">
+        <div id="recommendContent" class="loading">加载中...</div>
+    </div>
+</div>
+
+<script>
+function loadRecommendations() {
+    var container = document.getElementById('recommendContent');
+    container.innerHTML = '<div class="loading">正在加载推荐数据...</div>';
+    
+    fetch('/student/recommend/data?t=' + Date.now(), {credentials: 'include'})
+        .then(function(response) { return response.json(); })
+        .then(function(data) {
+            console.log('Recommend data:', data);
+            if (data.success) {
+                renderRecommendations(data);
+            } else {
+                container.innerHTML = '<div class="error">' + (data.error || '加载失败') + '</div>';
+            }
+        })
+        .catch(function(error) {
+            console.error('Error:', error);
+            container.innerHTML = '<div class="error">网络错误: ' + error.message + '</div>';
+        });
+}
+
+function renderRecommendations(data) {
+    var container = document.getElementById('recommendContent');
+    container.innerHTML = '';
+
+    var student = data.student || {};
+    var studentType = student.type || 'weak';
+    var typeCssClass = 'type-' + studentType;
+    var typeLabel = data.recommend_type || '基础入门型推荐';
+    var avgMastery = data.avg_mastery || 0;
+    var studentName = student.name || '';
+
+    var targetList = data.targets || [];
+
+    var mastered = 0, good = 0, needPractice = 0, notLearned = 0;
+    targetList.forEach(function(t) {
+        var m = t.mastery || 0;
+        var st = t.status || '';
+        if (st === '未学习') notLearned++;
+        else if (st === '需巩固') needPractice++;
+        else if (st === '良好') good++;
+        else if (st === '已掌握') mastered++;
+    });
+
+    var summaryHtml = '<div class="summary-card">' +
+        '<div class="summary-header">' +
+        '<div class="summary-title">学习资源推荐 — ' + studentName + '</div>' +
+        '<div class="recommend-type ' + typeCssClass + '">' + typeLabel + '</div>' +
+        '</div>' +
+        '<div style="font-size:13px;color:#7f8c8d;margin-bottom:12px;">根据知识点掌握度、课程知识图谱关系、相似学生学习效果和错题记录生成推荐。</div>' +
+        '<div class="summary-stats">' +
+        '<div class="stat-item"><div class="stat-value">' + (avgMastery * 100).toFixed(1) + '%</div><div class="stat-label">平均掌握度</div></div>' +
+        '<div class="stat-item"><div class="stat-value">' + mastered + '</div><div class="stat-label">已掌握</div></div>' +
+        '<div class="stat-item"><div class="stat-value">' + good + '</div><div class="stat-label">良好</div></div>' +
+        '<div class="stat-item"><div class="stat-value">' + (needPractice + notLearned) + '</div><div class="stat-label">需巩固/未学习</div></div>' +
+        '</div>' +
+        '</div>';
+
+    container.innerHTML = summaryHtml;
+
+    if (targetList.length === 0) {
+        container.innerHTML += '<div class="loading">暂无推荐内容</div>';
+        return;
+    }
+
+    targetList.forEach(function(rec, index) {
+        var mastery = rec.mastery || 0;
+        var statusClass = 'status-not-learned';
+        if (rec.status === '已掌握') statusClass = 'status-mastered';
+        else if (rec.status === '良好') statusClass = 'status-good';
+        else if (rec.status === '需巩固') statusClass = 'status-need-practice';
+
+        var resources = rec.resources || [];
+        var questions = rec.questions || [];
+
+        var cardHtml = '<div class="recommendation-card">' +
+            '<div class="kp-header">' +
+            '<div class="kp-info">' +
+            '<div class="kp-name">' + (index + 1) + '. ' + (rec.code || '') + ' ' + (rec.name || '') + '</div>' +
+            '</div>' +
+            '<div class="kp-status ' + statusClass + '">' + (rec.status || '未学习') + '</div>' +
+            '</div>' +
+            '<div class="kp-mastery">' +
+            '<div class="mastery-bar"><div class="mastery-fill" style="width:' + (mastery * 100) + '%;background:' + getMasteryColor(mastery) + ';"></div></div>' +
+            '<div class="mastery-text">' + (mastery * 100).toFixed(1) + '%</div>' +
+            '</div>' +
+            '<div class="recommend-reason"><strong>推荐原因:</strong> ' + (rec.reason || '根据掌握度分析推荐') + '</div>';
+
+        if (resources.length > 0) {
+            cardHtml += '<div class="resources-title">推荐资源 (' + resources.length + '个)</div>' +
+                '<div class="resource-list">';
+
+            resources.forEach(function(res) {
+                var resType = (res.type || '').toLowerCase();
+                var typeTag = resType.indexOf('video') >= 0 ? 'tag-video' :
+                              resType.indexOf('ppt') >= 0 ? 'tag-ppt' : 'tag-doc';
+                var typeLabel = resType.indexOf('video') >= 0 ? '视频' :
+                               resType.indexOf('ppt') >= 0 ? 'PPT' : '文档';
+                var relation = res.relation || '当前知识点';
+                var difficulty = res.difficulty || '';
+
+                cardHtml += '<div class="resource-item">' +
+                    '<div class="resource-name" title="' + (res.title || res.name || '') + '">' + (res.title || res.name || '') + '</div>' +
+                    '<div class="resource-meta">' +
+                    '<span class="resource-tag ' + typeTag + '">' + typeLabel + '</span>' +
+                    (difficulty ? '<span class="resource-tag" style="background:#f0f0f0;color:#666;">' + difficulty + '</span>' : '') +
+                    '<span class="relation-tag">' + relation + '</span>' +
+                    '</div>' +
+                    '<div class="resource-reason">对应知识点: ' + (res.knowledge_point || rec.code || '') + '</div>' +
+                    '<div class="resource-actions">' +
+                    '<a href="/download/' + encodeURIComponent(res.title || res.name || '') + '" class="action-btn btn-success">学习</a>' +
+                    '</div>' +
+                    '</div>';
+            });
+
+            cardHtml += '</div>';
+        }
+
+        if (questions.length > 0) {
+            cardHtml += '<div style="margin-top:15px;">' +
+                '<div class="resources-title">推荐练习题 (' + questions.length + '道)</div>' +
+                '<div class="resource-list">';
+
+            questions.forEach(function(q) {
+                var qDiff = q.difficulty || '基础';
+                var qReason = q.reason || '未做题补充';
+                var diffColor = '#27ae60';
+                if (qDiff === '提高') diffColor = '#e74c3c';
+                else if (qDiff === '中等') diffColor = '#f39c12';
+
+                cardHtml += '<div class="resource-item" style="border-left:3px solid ' + diffColor + ';">' +
+                    '<div class="resource-name">' + (q.title || '') + '</div>' +
+                    '<div class="resource-meta">' +
+                    '<span class="resource-tag" style="background:#fef9e7;color:' + diffColor + ';">' + qDiff + '</span>' +
+                    '<span class="relation-tag" style="background:#ebf5fb;color:#3498db;">' + qReason + '</span>' +
+                    '</div>' +
+                    '<div class="resource-reason">对应知识点: ' + (q.knowledge_name || rec.code || '') + '</div>' +
+                    '</div>';
+            });
+
+            cardHtml += '</div></div>';
+        }
+
+        if (mastery >= 0.80) {
+            cardHtml += '<div style="margin-top:12px;font-size:13px;color:#27ae60;">学习建议：已掌握该知识点，建议挑战更高难度的综合题目。</div>';
+        } else if (mastery >= 0.60) {
+            cardHtml += '<div style="margin-top:12px;font-size:13px;color:#3498db;">学习建议：基础较好，建议通过中等难度练习进一步提升。</div>';
+        } else if (mastery > 0) {
+            cardHtml += '<div style="margin-top:12px;font-size:13px;color:#f39c12;">学习建议：掌握度偏低，建议认真学习推荐资源后完成练习题。</div>';
+        } else {
+            cardHtml += '<div style="margin-top:12px;font-size:13px;color:#e74c3c;">学习建议：从零开始学习，建议按顺序学习资源并完成基础练习。</div>';
+        }
+
+        cardHtml += '</div>';
+        container.innerHTML += cardHtml;
+    });
+}
+
+function getMasteryColor(mastery) {
+    if (mastery >= 0.8) return '#27ae60';
+    if (mastery >= 0.6) return '#3498db';
+    if (mastery > 0) return '#f39c12';
+    return '#e74c3c';
+}
+
+loadRecommendations();
+</script>
+
+</body>
+</html>

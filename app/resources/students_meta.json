@@ -1,0 +1,242 @@
+{
+  "3220602001": {
+    "student_num": "3220602001",
+    "name": "刘大",
+    "class_name": "软件工程1班",
+    "gender": "男",
+    "password": "123456",
+    "note": ""
+  },
+  "3220602002": {
+    "student_num": "3220602002",
+    "name": "陈二",
+    "class_name": "软件工程1班",
+    "gender": "女",
+    "password": "123456",
+    "note": ""
+  },
+  "3220602003": {
+    "student_num": "3220602003",
+    "name": "张三",
+    "class_name": "软件工程1班",
+    "gender": "男",
+    "password": "123456",
+    "note": ""
+  },
+  "3220602004": {
+    "student_num": "3220602004",
+    "name": "李四",
+    "class_name": "软件工程1班",
+    "gender": "女",
+    "password": "123456",
+    "note": ""
+  },
+  "3220602005": {
+    "student_num": "3220602005",
+    "name": "王五",
+    "class_name": "软件工程1班",
+    "gender": "男",
+    "password": "123456",
+    "note": ""
+  },
+  "3220602006": {
+    "student_num": "3220602006",
+    "name": "赵六",
+    "class_name": "软件工程1班",
+    "gender": "女",
+    "password": "123456",
+    "note": ""
+  },
+  "3220602007": {
+    "student_num": "3220602007",
+    "name": "周七",
+    "class_name": "软件工程1班",
+    "gender": "男",
+    "password": "123456",
+    "note": ""
+  },
+  "3220602008": {
+    "student_num": "3220602008",
+    "name": "吴八",
+    "class_name": "软件工程1班",
+    "gender": "女",
+    "password": "123456",
+    "note": ""
+  },
+  "3220602009": {
+    "student_num": "3220602009",
+    "name": "郑九",
+    "class_name": "软件工程1班",
+    "gender": "男",
+    "password": "123456",
+    "note": ""
+  },
+  "3220602010": {
+    "student_num": "3220602010",
+    "name": "冯十",
+    "class_name": "软件工程1班",
+    "gender": "女",
+    "password": "123456",
+    "note": ""
+  },
+  "3220602011": {
+    "student_num": "3220602011",
+    "name": "陈琳",
+    "class_name": "软件工程1班",
+    "gender": "男",
+    "password": "123456",
+    "note": ""
+  },
+  "3220602012": {
+    "student_num": "3220602012",
+    "name": "黄明",
+    "class_name": "软件工程1班",
+    "gender": "女",
+    "password": "123456",
+    "note": ""
+  },
+  "3220602013": {
+    "student_num": "3220602013",
+    "name": "林芳",
+    "class_name": "软件工程1班",
+    "gender": "男",
+    "password": "123456",
+    "note": ""
+  },
+  "3220602014": {
+    "student_num": "3220602014",
+    "name": "何强",
+    "class_name": "软件工程1班",
+    "gender": "女",
+    "password": "123456",
+    "note": ""
+  },
+  "3220602015": {
+    "student_num": "3220602015",
+    "name": "罗静",
+    "class_name": "软件工程1班",
+    "gender": "男",
+    "password": "123456",
+    "note": ""
+  },
+  "3220602016": {
+    "student_num": "3220602016",
+    "name": "梁军",
+    "class_name": "软件工程2班",
+    "gender": "女",
+    "password": "123456",
+    "note": ""
+  },
+  "3220602017": {
+    "student_num": "3220602017",
+    "name": "宋杰",
+    "class_name": "软件工程2班",
+    "gender": "男",
+    "password": "123456",
+    "note": ""
+  },
+  "3220602018": {
+    "student_num": "3220602018",
+    "name": "唐丽",
+    "class_name": "软件工程2班",
+    "gender": "女",
+    "password": "123456",
+    "note": ""
+  },
+  "3220602019": {
+    "student_num": "3220602019",
+    "name": "许刚",
+    "class_name": "软件工程2班",
+    "gender": "男",
+    "password": "123456",
+    "note": ""
+  },
+  "3220602020": {
+    "student_num": "3220602020",
+    "name": "韩雪",
+    "class_name": "软件工程2班",
+    "gender": "女",
+    "password": "123456",
+    "note": ""
+  },
+  "3220602021": {
+    "student_num": "3220602021",
+    "name": "冯磊",
+    "class_name": "软件工程2班",
+    "gender": "男",
+    "password": "123456",
+    "note": ""
+  },
+  "3220602022": {
+    "student_num": "3220602022",
+    "name": "董敏",
+    "class_name": "软件工程2班",
+    "gender": "女",
+    "password": "123456",
+    "note": ""
+  },
+  "3220602023": {
+    "student_num": "3220602023",
+    "name": "程伟",
+    "class_name": "软件工程2班",
+    "gender": "男",
+    "password": "123456",
+    "note": ""
+  },
+  "3220602024": {
+    "student_num": "3220602024",
+    "name": "曹芳",
+    "class_name": "软件工程2班",
+    "gender": "女",
+    "password": "123456",
+    "note": ""
+  },
+  "3220602025": {
+    "student_num": "3220602025",
+    "name": "袁鹏",
+    "class_name": "软件工程2班",
+    "gender": "男",
+    "password": "123456",
+    "note": ""
+  },
+  "3220602026": {
+    "student_num": "3220602026",
+    "name": "邓华",
+    "class_name": "软件工程2班",
+    "gender": "女",
+    "password": "123456",
+    "note": ""
+  },
+  "3220602027": {
+    "student_num": "3220602027",
+    "name": "蒋涛",
+    "class_name": "软件工程2班",
+    "gender": "男",
+    "password": "123456",
+    "note": ""
+  },
+  "3220602028": {
+    "student_num": "3220602028",
+    "name": "沈娟",
+    "class_name": "软件工程2班",
+    "gender": "女",
+    "password": "123456",
+    "note": ""
+  },
+  "3220602029": {
+    "student_num": "3220602029",
+    "name": "周鑫",
+    "class_name": "软件工程2班",
+    "gender": "男",
+    "password": "123456",
+    "note": ""
+  },
+  "3220602030": {
+    "student_num": "3220602030",
+    "name": "林勇",
+    "class_name": "软件工程2班",
+    "gender": "女",
+    "password": "123456",
+    "note": ""
+  }
+}
